@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="WorldChunkConfig" format=3 uid="uid://chxglwkfc64ni"]
+
+[ext_resource type="Script" uid="uid://cn4vc6yi0sxfb" path="res://game/scripts/gameplay/world_chunk_config.gd" id="1_script"]
+[ext_resource type="TileSet" uid="uid://cvlr81p6r2dpi" path="res://game/resources/summer_terrain_tileset.tres" id="2_tileset"]
+
+[resource]
+script = ExtResource("1_script")
+road_half_width = 200.0
+terrain_tileset = ExtResource("2_tileset")
+road_atlas_coordinates = Vector2i(4, 1)
+ground_atlas_coordinates = Vector2i(0, 1)
+ground_variant_atlas_coordinates = Vector2i(0, 2)

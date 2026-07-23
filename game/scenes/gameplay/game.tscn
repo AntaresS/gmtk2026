@@ -1,0 +1,42 @@
+[gd_scene format=3 uid="uid://dt3cq5k4og56r"]
+
+[ext_resource type="Script" uid="uid://8y3eqgopjr0k" path="res://game/scripts/gameplay/game.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://game/scenes/gameplay/player.tscn" id="3_player"]
+[ext_resource type="Script" uid="uid://dh365sfe2c42s" path="res://game/scripts/gameplay/infinite_world.gd" id="4_world"]
+[ext_resource type="PackedScene" path="res://game/scenes/menus/pause_menu.tscn" id="5_pause"]
+
+[node name="Game" type="Node2D" unique_id=666890130]
+script = ExtResource("1_script")
+camera_forward_look_ahead = 300.0
+
+[node name="InfiniteWorld" type="Node2D" parent="." unique_id=498060208 node_paths=PackedStringArray("player")]
+z_index = -10
+script = ExtResource("4_world")
+player = NodePath("../Player")
+
+[node name="Player" parent="." unique_id=9189911 instance=ExtResource("3_player")]
+road_half_width = 150.0
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1506846933]
+position = Vector2(0, -180)
+
+[node name="PauseMenu" parent="." unique_id=833634009 instance=ExtResource("5_pause")]
+
+[node name="DebugLayer" type="CanvasLayer" parent="." unique_id=1783769906]
+layer = 50
+
+[node name="MarginContainer" type="MarginContainer" parent="DebugLayer" unique_id=1357146757]
+offset_right = 120.0
+offset_bottom = 92.0
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+
+[node name="DebugLabel" type="Label" parent="DebugLayer/MarginContainer" unique_id=68522426]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+text = "Speed: 0
+Distance: 0
+Chunks: 0"

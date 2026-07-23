@@ -1,0 +1,18 @@
+[gd_resource type="TileSet" format=3 uid="uid://cvlr81p6r2dpi"]
+
+[ext_resource type="Texture2D" uid="uid://bx5ra42nbu87s" path="res://assets/seasonal sample (summer).png" id="1_texture"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_summer"]
+texture = ExtResource("1_texture")
+4:0/0 = 0
+0:1/0 = 0
+0:2/0 = 0
+4:1/0 = 0
+4:2/0 = 0
+4:3/0 = 0
+4:4/0 = 0
+0:3/0 = 0
+0:4/0 = 0
+
+[resource]
+sources/0 = SubResource("TileSetAtlasSource_summer")

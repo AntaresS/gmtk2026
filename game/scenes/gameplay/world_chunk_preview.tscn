@@ -1,0 +1,22 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://game/scripts/gameplay/world_chunk_preview.gd" id="1_script"]
+[ext_resource type="Resource" path="res://game/resources/default_world_chunk_config.tres" id="2_config"]
+[ext_resource type="PackedScene" path="res://game/scenes/gameplay/world_chunk.tscn" id="3_chunk"]
+[ext_resource type="PackedScene" path="res://game/scenes/gameplay/player.tscn" id="4_player"]
+
+[node name="WorldChunkPreview" type="Node2D"]
+script = ExtResource("1_script")
+config = ExtResource("2_config")
+
+[node name="PreviousChunk" parent="." instance=ExtResource("3_chunk")]
+position = Vector2(0, -512)
+preview_chunk_index = -1
+
+[node name="CurrentChunk" parent="." instance=ExtResource("3_chunk")]
+
+[node name="NextChunk" parent="." instance=ExtResource("3_chunk")]
+position = Vector2(0, 512)
+preview_chunk_index = 1
+
+[node name="Player" parent="." instance=ExtResource("4_player")]
