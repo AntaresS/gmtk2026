@@ -5,6 +5,17 @@ signal qi_collected(amount: int)
 signal technique_fragment_collected(amount: int)
 signal weapon_power_fragment_collected(amount: int)
 
+const WeaponDataResource = preload(
+	"res://game/scripts/gameplay/weapon_data.gd"
+)
+const DAO_DATA: WeaponDataResource = preload("res://game/resources/dao.tres")
+const FLYING_SWORD_DATA: WeaponDataResource = preload(
+	"res://game/resources/flying_sword.tres"
+)
+const QIANKUN_RING_DATA: WeaponDataResource = preload(
+	"res://game/resources/qiankun_ring.tres"
+)
+
 ## Enemy scene created beyond either camera edge. It must instantiate an
 ## EnemyController.
 @export var enemy_scene: PackedScene = preload(
@@ -106,21 +117,17 @@ signal weapon_power_fragment_collected(amount: int)
 @export_category("Enemy Drops")
 ## Qi granted by the single qi pickup dropped from every defeated enemy.
 @export_range(1, 1000, 1) var enemy_qi_drop_amount: int = 15
-## Probability from zero to one that a defeated enemy also drops a dao, flying
-## sword, or Universe Ring. The three weapon identities are selected evenly.
+## Probability from zero to one that a defeated enemy also drops one definition
+## selected evenly from weapon_drop_pool.
 @export_range(0.0, 1.0, 0.05) var weapon_drop_chance: float = 0.35
-## Inclusive minimum randomized damage for dao drops.
-@export_range(1, 100, 1) var dao_min_damage: int = 2
-## Inclusive maximum randomized damage for dao drops.
-@export_range(1, 100, 1) var dao_max_damage: int = 5
-## Inclusive minimum randomized damage for flying-sword drops.
-@export_range(1, 100, 1) var flying_sword_min_damage: int = 4
-## Inclusive maximum randomized damage for flying-sword drops.
-@export_range(1, 100, 1) var flying_sword_max_damage: int = 8
-## Inclusive minimum randomized damage for Universe Ring drops.
-@export_range(1, 100, 1) var qiankun_ring_min_damage: int = 3
-## Inclusive maximum randomized damage for Universe Ring drops.
-@export_range(1, 100, 1) var qiankun_ring_max_damage: int = 7
+## Designer-managed definitions eligible for enemy drops. Invalid or null
+## entries are ignored; damage, identity, and combat tuning belong to each
+## shared WeaponData resource rather than this spawner.
+@export var weapon_drop_pool: Array[WeaponDataResource] = [
+	DAO_DATA,
+	FLYING_SWORD_DATA,
+	QIANKUN_RING_DATA,
+]
 
 var road_half_width: float = 200.0
 var _spawn_time_remaining: float = 0.0
@@ -389,29 +396,20 @@ func _drop_weapon(
 			"EnemySpawner weapon_pickup_scene must instantiate WeaponPickup."
 		)
 		return
-	var weapon_type := WeaponPickup.WeaponType.DAO
-	var weapon_damage := 1
-	match _rng.randi_range(0, 2):
-		0:
-			weapon_damage = _rng.randi_range(
-				mini(dao_min_damage, dao_max_damage),
-				maxi(dao_min_damage, dao_max_damage)
-			)
-		1:
-			weapon_type = WeaponPickup.WeaponType.FLYING_SWORD
-			weapon_damage = _rng.randi_range(
-				mini(flying_sword_min_damage, flying_sword_max_damage),
-				maxi(flying_sword_min_damage, flying_sword_max_damage)
-			)
-		_:
-			weapon_type = WeaponPickup.WeaponType.QIANKUN_RING
-			weapon_damage = _rng.randi_range(
-				mini(qiankun_ring_min_damage, qiankun_ring_max_damage),
-				maxi(qiankun_ring_min_damage, qiankun_ring_max_damage)
-			)
+	var available_weapons: Array[WeaponDataResource] = []
+	for weapon_data in weapon_drop_pool:
+		if weapon_data != null and weapon_data.is_valid_definition():
+			available_weapons.append(weapon_data)
+	if available_weapons.is_empty():
+		push_warning("EnemySpawner weapon_drop_pool has no valid WeaponData.")
+		weapon_pickup.queue_free()
+		return
+	var weapon_data := available_weapons[
+		_rng.randi_range(0, available_weapons.size() - 1)
+	]
 	weapon_pickup.configure(
-		weapon_type,
-		weapon_damage,
+		weapon_data,
+		weapon_data.roll_damage(_rng),
 		inherited_velocity,
 		player
 	)

@@ -63,9 +63,12 @@ The minimal run loop is owned by separate gameplay systems:
   the current equipment's live attack range. A separate invisible attraction
   radius pulls qi and equipment and grows by 10 pixels per cultivation level.
 - Every enemy drops one 15-qi pickup and has a 35-percent chance to drop one
-  evenly selected weapon: `刀` with 2–5 damage, `飞剑` with 4–8 damage, or
-  `乾坤圈` with 3–7 damage. Weapon labels include randomized damage, follow
-  their drops, and retain the enemy's forward velocity until attracted.
+  evenly selected `WeaponData` resource: `刀` with 2–5 damage, `飞剑` with
+  4–8 damage, or `乾坤圈` with 3–7 damage. The shared resources are the
+  designer-facing source of identity, damage bounds, range, cooldown,
+  technique scaling, and projectile scenes. Weapon labels include randomized
+  damage, follow their drops, and retain the enemy's forward velocity until
+  attracted.
 - The player begins with `大力掌`. Only the current collected weapon is visible
   beside the player; the strongest copy of each type is kept and new upgrades
   auto-equip. Tab is captured before UI focus navigation and cycles the

@@ -1,3 +1,5 @@
+DO NOT update this file automatically unless the user REQUIRES an update!
+
 # Count Down game guidance
 
 This directory contains the playable Godot 4.7 foundation for a top-down,
@@ -12,7 +14,11 @@ game/
   README.md
   resources/
     default_world_chunk_config.tres
+    dao.tres
+    flying_sword.tres
+    great_strength_palm.tres
     qi_profile.tres
+    qiankun_ring.tres
     summer_terrain_tileset.tres
   scenes/
     gameplay/
@@ -54,6 +60,7 @@ game/
       run_ended_overlay.gd
       run_resources.gd
       weapon_pickup.gd
+      weapon_data.gd
       world_chunk.gd
       world_chunk_config.gd
       world_chunk_preview.gd
@@ -81,17 +88,21 @@ manually.
 - `player.tscn` is a reusable `CharacterBody2D`. `player.gd` owns movement,
   speed modes, accumulated distance, lateral clamping, incoming melee damage
   signals, the best collected copy of each equipment type, Tab cycling,
-  automatic equipment-specific attacks, one visible current-attack circle,
-  and a separate invisible collectible-attraction circle. Cultivation expands
-  only attraction; elite technique fragments independently upgrade every
-  weapon according to its distinct mechanic. Its `CharacterSprite` plays
-  the nine PNG frames converted from the root `chara_fly.gif`, and cultivation
-  increases trigger a short expanding aura.
+  automatic equipment-specific attacks, per-run rolled damage, one visible
+  current-attack circle, and a separate invisible collectible-attraction
+  circle. Shared `WeaponData` resources provide identity, base combat tuning,
+  technique scaling, and projectile scenes. Cultivation expands only
+  attraction; elite technique fragments independently upgrade every weapon
+  according to its distinct mechanic. Its `CharacterSprite` plays the nine PNG
+  frames converted from the root `chara_fly.gif`, and cultivation increases
+  trigger a short expanding aura.
 - `EnemySpawner` creates bounded enemies beyond both camera edges, injects the
-  player reference, owns enemy qi and weapon drops, routes dropped qi upward,
-  and freezes all enemies when the run ends. Forward enemies are slower than
-  the player; periodic rear pursuers are slightly faster. Route migration
-  removes enemies left on roads outside the player's newly active route.
+  player reference, owns enemy qi drops and the designer-managed pool of
+  droppable `WeaponData`, routes dropped qi upward, and freezes all enemies
+  when the run ends. It selects weapon definitions evenly and asks the selected
+  resource to roll its configured damage. Forward enemies are slower than the
+  player; periodic rear pursuers are slightly faster. Route migration removes
+  enemies left on roads outside the player's newly active route.
   Unpaused elapsed time and current cultivation level jointly scale new enemy
   health, count, damage, attack frequency, and spawn frequency. Eight percent
   of new enemies become gold-labeled elites with triple health, 1.6-times
@@ -110,10 +121,10 @@ manually.
 - Qi pickups are collected immediately when the player's body touches them and
   emit completion upward through the chunk and world. They carry a small
   description label and can be pulled by the player's shared range.
-- `weapon_pickup.tscn` represents dao, flying-sword, and Universe Ring enemy
-  drops. A weapon keeps the defeated enemy's velocity until attracted, then
-  equips itself on player contact. Each drop has randomized damage; weaker
-  same-type copies are discarded. Only the currently equipped collected weapon
+- `weapon_pickup.tscn` presents any assigned `WeaponData` enemy drop. A weapon
+  keeps the defeated enemy's velocity until attracted, then passes its shared
+  definition and per-drop rolled damage to the player on contact. Weaker
+  same-ID copies are discarded. Only the currently equipped collected weapon
   is drawn beside the player.
 - `technique_fragment.tscn` has no collision collection path. It draws an
   obvious recognition circle and resets its progress whenever the player
@@ -137,6 +148,12 @@ manually.
   enemy, but earlier targets become eligible again so a ring can alternate
   A-B-A-B. Every completed bounce compounds the next hit by 20 percent. The
   idle companion is hidden while its ring projectile is away.
+- `great_strength_palm.tres`, `dao.tres`, `flying_sword.tres`, and
+  `qiankun_ring.tres` are the designer-facing sources of truth for weapon
+  identity, damage bounds, attack range and interval, technique scaling, and
+  projectile references. Treat these shared definitions as immutable at
+  runtime; rolled damage, collection state, and upgrade levels belong to the
+  player.
 - `heavenly_tribulation.tscn` runs once when cultivation advances beyond level
   nine. It warns nine predicted, slightly randomized ground positions before
   applying lightning damage. Surviving all strikes doubles maximum lifespan

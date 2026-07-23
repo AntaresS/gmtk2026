@@ -1,5 +1,19 @@
 extends SceneTree
 
+const WeaponDataResource = preload(
+	"res://game/scripts/gameplay/weapon_data.gd"
+)
+const PALM_DATA: WeaponDataResource = preload(
+	"res://game/resources/great_strength_palm.tres"
+)
+const DAO_DATA: WeaponDataResource = preload("res://game/resources/dao.tres")
+const FLYING_SWORD_DATA: WeaponDataResource = preload(
+	"res://game/resources/flying_sword.tres"
+)
+const QIANKUN_RING_DATA: WeaponDataResource = preload(
+	"res://game/resources/qiankun_ring.tres"
+)
+
 var _failures: Array[String] = []
 var _levels_emitted: int = 0
 var _pickup_emissions: int = 0
@@ -69,7 +83,8 @@ func _run() -> void:
 		"Player melee range is not stronger than the enemy default."
 	)
 	_check(
-		player.palm_attack_interval < 1.0,
+		player.get_current_weapon_data() == PALM_DATA
+		and PALM_DATA.attack_interval < 1.0,
 		"Player melee frequency is not stronger than the enemy default."
 	)
 	_check(
@@ -115,10 +130,17 @@ func _run() -> void:
 	)
 	_check(InputMap.has_action("switch_equipment"), "Tab switch action is missing.")
 	_check(
-		is_equal_approx(player.flying_sword_attack_interval, 0.9)
-		and player.flying_sword_attack_interval
-			> player.dao_attack_interval,
+		is_equal_approx(FLYING_SWORD_DATA.attack_interval, 0.9)
+		and FLYING_SWORD_DATA.attack_interval > DAO_DATA.attack_interval,
 		"Flying-sword volley interval was not lengthened beyond dao attacks."
+	)
+	_check(
+		enemy_spawner.weapon_drop_pool == [
+			DAO_DATA,
+			FLYING_SWORD_DATA,
+			QIANKUN_RING_DATA,
+		],
+		"EnemySpawner did not use the three shared weapon definitions."
 	)
 	_check(
 		is_equal_approx(enemy_spawner.spawn_interval, 3.5)
@@ -397,6 +419,8 @@ func _run() -> void:
 				saw_weapon_drop = (
 					weapon_drop.inherited_velocity
 						.is_equal_approx(inherited_enemy_velocity)
+					and weapon_drop.weapon_data
+						in enemy_spawner.weapon_drop_pool
 					and (
 						weapon_drop.description_label.text.begins_with("刀")
 						or weapon_drop.description_label.text.begins_with("飞剑")
@@ -722,7 +746,7 @@ func _run() -> void:
 		"res://game/scenes/gameplay/weapon_pickup.tscn"
 	).instantiate() as WeaponPickup
 	weapon_pickup.configure(
-		WeaponPickup.WeaponType.FLYING_SWORD,
+		FLYING_SWORD_DATA,
 		6,
 		Vector2.ZERO,
 		player
@@ -746,7 +770,7 @@ func _run() -> void:
 		"HUD did not update after equipping a weapon drop."
 	)
 	_check(
-		not player.collect_weapon("flying_sword", "飞剑", 5)
+		not player.collect_weapon(FLYING_SWORD_DATA, 5)
 		and player.get_current_weapon_damage() == 6,
 		"Weaker duplicate weapon was not discarded."
 	)
@@ -807,7 +831,7 @@ func _run() -> void:
 		is_equal_approx(
 			player.get_current_attack_range(),
 			level_one_sword_range
-				+ player.flying_sword_range_increase_per_level
+				+ FLYING_SWORD_DATA.range_increase_per_upgrade
 		),
 		"First technique fragment did not expand flying-sword range."
 	)
@@ -841,7 +865,7 @@ func _run() -> void:
 	await _wait_process_frames(2)
 
 	_check(
-		player.collect_weapon("dao", "刀", 4),
+		player.collect_weapon(DAO_DATA, 4),
 		"First dao was not added to the equipment library."
 	)
 	_check(
@@ -855,7 +879,8 @@ func _run() -> void:
 	_check(
 		is_equal_approx(
 			player.get_current_attack_range(),
-			player.dao_attack_range + player.dao_range_increase_per_level
+			DAO_DATA.attack_range
+				+ DAO_DATA.range_increase_per_upgrade
 		),
 		"First technique fragment did not expand dao attack range."
 	)
@@ -868,7 +893,7 @@ func _run() -> void:
 	root.add_child(dao_target)
 	dao_target.global_position = (
 		player.global_position
-		+ Vector2(0.0, -(player.dao_attack_range + 8.0))
+		+ Vector2(0.0, -(DAO_DATA.attack_range + 8.0))
 	)
 	await _wait_physics_frames(20)
 	_check(
@@ -905,12 +930,13 @@ func _run() -> void:
 			> player.get_dao_orbit_radius(1),
 		"Each technique fragment did not add a stable new dao orbit path."
 	)
-	player.qiankun_ring_attack_interval = 10.0
+	var slow_ring_data := QIANKUN_RING_DATA.duplicate() as WeaponDataResource
+	slow_ring_data.attack_interval = 10.0
 	var ring_pickup := preload(
 		"res://game/scenes/gameplay/weapon_pickup.tscn"
 	).instantiate() as WeaponPickup
 	ring_pickup.configure(
-		WeaponPickup.WeaponType.QIANKUN_RING,
+		slow_ring_data,
 		5,
 		Vector2.ZERO,
 		player

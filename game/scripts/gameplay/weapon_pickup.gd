@@ -1,14 +1,16 @@
 class_name WeaponPickup
 extends Area2D
 
-enum WeaponType {
-	DAO,
-	FLYING_SWORD,
-	QIANKUN_RING,
-}
+const WeaponDataResource = preload(
+	"res://game/scripts/gameplay/weapon_data.gd"
+)
+const DEFAULT_WEAPON_DATA: WeaponDataResource = preload(
+	"res://game/resources/dao.tres"
+)
 
-## Weapon identity used to choose its label, color, and equipped name.
-@export var weapon_type: WeaponType = WeaponType.DAO
+## Shared definition used for this pickup's identity, display, and combat
+## tuning. EnemySpawner assigns one definition before adding the pickup.
+@export var weapon_data: WeaponDataResource = DEFAULT_WEAPON_DATA
 ## World velocity inherited from the defeated enemy. The drop keeps this
 ## velocity until it enters the player's attraction circle.
 @export var inherited_velocity: Vector2 = Vector2(0.0, -140.0)
@@ -27,7 +29,10 @@ var _animation_phase: float = 0.0
 
 
 func _ready() -> void:
-	description_label.text = "%s  %d" % [get_weapon_name(), weapon_damage]
+	description_label.text = "%s  %d" % [
+		weapon_data.display_name if weapon_data != null else "无效武器",
+		weapon_damage,
+	]
 	queue_redraw()
 
 
@@ -53,15 +58,11 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var weapon_color := (
-		Color("ffcf62")
-		if weapon_type == WeaponType.DAO
-		else Color("77d9ff")
-			if weapon_type == WeaponType.FLYING_SWORD
-			else Color("ff8ee7")
-	)
-	draw_circle(Vector2.ZERO, 19.0, Color(weapon_color, 0.14))
-	if weapon_type == WeaponType.QIANKUN_RING:
+	if weapon_data == null:
+		return
+	var weapon_color := weapon_data.pickup_color
+	if weapon_data.attack_kind == WeaponDataResource.AttackKind.QIANKUN_RING:
+		draw_circle(Vector2.ZERO, 19.0, Color(weapon_color, 0.14))
 		draw_arc(
 			Vector2.ZERO,
 			11.0,
@@ -83,9 +84,10 @@ func _draw() -> void:
 			true
 		)
 		return
+	draw_circle(Vector2.ZERO, 19.0, Color(weapon_color, 0.14))
 	draw_line(Vector2(-11.0, 9.0), Vector2(10.0, -12.0), weapon_color, 6.0)
 	draw_line(Vector2(-14.0, 5.0), Vector2(-7.0, 12.0), Color("e8d7ae"), 4.0)
-	if weapon_type == WeaponType.FLYING_SWORD:
+	if weapon_data.attack_kind == WeaponDataResource.AttackKind.FLYING_SWORD:
 		draw_line(
 			Vector2(10.0, -12.0),
 			Vector2(15.0, -17.0),
@@ -96,12 +98,12 @@ func _draw() -> void:
 
 ## Configures one enemy drop before it enters the scene tree.
 func configure(
-	new_weapon_type: WeaponType,
+	new_weapon_data: WeaponDataResource,
 	new_weapon_damage: int,
 	enemy_velocity: Vector2,
 	player: PlayerController
 ) -> void:
-	weapon_type = new_weapon_type
+	weapon_data = new_weapon_data
 	weapon_damage = maxi(new_weapon_damage, 1)
 	inherited_velocity = enemy_velocity
 	_owner_player = player
@@ -120,19 +122,11 @@ func attract_to_player(
 
 
 func get_weapon_name() -> String:
-	if weapon_type == WeaponType.FLYING_SWORD:
-		return "飞剑"
-	if weapon_type == WeaponType.QIANKUN_RING:
-		return "乾坤圈"
-	return "刀"
+	return weapon_data.display_name if weapon_data != null else ""
 
 
-func get_weapon_id() -> String:
-	if weapon_type == WeaponType.FLYING_SWORD:
-		return "flying_sword"
-	if weapon_type == WeaponType.QIANKUN_RING:
-		return "qiankun_ring"
-	return "dao"
+func get_weapon_id() -> StringName:
+	return weapon_data.weapon_id if weapon_data != null else &""
 
 
 func _on_player_body_entered(body: Node2D) -> void:
@@ -140,8 +134,7 @@ func _on_player_body_entered(body: Node2D) -> void:
 		return
 	_collected = true
 	(body as PlayerController).collect_weapon(
-		get_weapon_id(),
-		get_weapon_name(),
+		weapon_data,
 		weapon_damage
 	)
 	collision_layer = 0

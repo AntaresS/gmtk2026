@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="WeaponData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://game/scripts/gameplay/weapon_data.gd" id="1_weapon_data"]
+[ext_resource type="PackedScene" path="res://game/scenes/gameplay/qiankun_ring_projectile.tscn" id="2_projectile"]
+
+[resource]
+script = ExtResource("1_weapon_data")
+weapon_id = &"qiankun_ring"
+display_name = "乾坤圈"
+attack_kind = 3
+display_color = Color(1, 0.556863, 0.905882, 1)
+pickup_color = Color(1, 0.556863, 0.905882, 1)
+minimum_damage = 3
+maximum_damage = 7
+attack_range = 210.0
+attack_interval = 0.9
+additional_effects_per_upgrade = 1
+projectile_scene = ExtResource("2_projectile")
+secondary_range = 240.0

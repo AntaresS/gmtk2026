@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="WeaponData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/scripts/gameplay/weapon_data.gd" id="1_weapon_data"]
+
+[resource]
+script = ExtResource("1_weapon_data")
+weapon_id = &"dao"
+display_name = "刀"
+attack_kind = 1
+display_color = Color(1, 0.819608, 0.4, 1)
+pickup_color = Color(1, 0.811765, 0.384314, 1)
+minimum_damage = 2
+maximum_damage = 5
+attack_range = 94.0
+attack_interval = 0.5
+range_increase_per_upgrade = 18.0
+additional_effects_per_upgrade = 1

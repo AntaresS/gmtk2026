@@ -12,10 +12,12 @@ signal equipment_inventory_changed(entries: Array[String], current_index: int)
 signal weapon_upgrade_changed(level: int)
 signal weapon_power_changed(bonus_damage: int)
 
-const PALM_ID := "great_strength_palm"
-const DAO_ID := "dao"
-const FLYING_SWORD_ID := "flying_sword"
-const QIANKUN_RING_ID := "qiankun_ring"
+const WeaponDataResource = preload(
+	"res://game/scripts/gameplay/weapon_data.gd"
+)
+const DEFAULT_STARTING_WEAPON_DATA: WeaponDataResource = preload(
+	"res://game/resources/great_strength_palm.tres"
+)
 
 @export_category("Forward Movement")
 ## Normal automatic forward travel speed in world pixels per second.
@@ -39,49 +41,10 @@ const QIANKUN_RING_ID := "qiankun_ring"
 @export var horizontal_clearance: float = 22.0
 
 @export_category("Starting Technique")
-## Technique equipped at the beginning of every run and shown on the HUD.
-@export var starting_technique_name: String = "大力掌"
-## Fixed automatic attack radius of Great Strength Palm, in world pixels.
-@export_range(24.0, 180.0, 1.0) var palm_attack_range: float = 72.0
-## Seconds between automatic Great Strength Palm attacks.
-@export_range(0.1, 3.0, 0.05) var palm_attack_interval: float = 0.7
-## Damage dealt by each Great Strength Palm strike.
-@export_range(1, 100, 1) var palm_attack_damage: int = 1
-
-@export_category("Weapon Attacks")
-## Fixed world-space radius covered by one dao orbit attack.
-@export_range(32.0, 220.0, 1.0) var dao_attack_range: float = 94.0
-## Additional dao attack radius gained per absorbed technique fragment, in
-## world pixels. The original inner dao orbit keeps its original radius.
-@export_range(0.0, 80.0, 1.0) var dao_range_increase_per_level: float = 18.0
-## Seconds between dao orbit attacks. Dao attacks faster than flying swords.
-@export_range(0.1, 3.0, 0.05) var dao_attack_interval: float = 0.5
-## Fixed targeting and travel distance of a flying sword, in world pixels.
-@export_range(80.0, 600.0, 1.0) var flying_sword_attack_range: float = 240.0
-## Additional flying-sword range gained per absorbed technique fragment, in
-## world pixels.
-@export_range(0.0, 80.0, 1.0) var flying_sword_range_increase_per_level: float = 16.0
-## Extra projectiles added to each volley per absorbed technique fragment.
-@export_range(1, 4, 1) var flying_sword_count_increase_per_level: int = 1
-## Delay in seconds between individual swords in one multi-sword sequence.
-## Smaller values make the sequence denser without firing simultaneously.
-@export_range(0.03, 0.5, 0.01) var flying_sword_sequence_interval: float = 0.12
-## Seconds between flying-sword sequences. This is intentionally slower than
-## dao attacks so each sequential sword-light volley has a readable pause.
-@export_range(0.05, 5.0, 0.01) var flying_sword_attack_interval: float = 0.9
-## Projectile scene launched by an equipped flying sword.
-@export var flying_sword_projectile_scene: PackedScene = preload(
-	"res://game/scenes/gameplay/flying_sword_projectile.tscn"
-)
-## Fixed targeting radius of the Universe Ring, in world pixels.
-@export_range(80.0, 600.0, 1.0) var qiankun_ring_attack_range: float = 210.0
-## Seconds between Universe Ring launches after the previous ring returns.
-@export_range(0.1, 5.0, 0.05) var qiankun_ring_attack_interval: float = 0.9
-## Maximum distance, in world pixels, used to find each next bounce target.
-@export_range(80.0, 600.0, 1.0) var qiankun_ring_bounce_search_range: float = 240.0
-## Homing projectile scene used by the equipped Universe Ring.
-@export var qiankun_ring_projectile_scene: PackedScene = preload(
-	"res://game/scenes/gameplay/qiankun_ring_projectile.tscn"
+## Shared definition equipped at the beginning of every run. Its display name
+## is also presented as the player's cultivation technique on the HUD.
+@export var starting_weapon_data: WeaponDataResource = (
+	DEFAULT_STARTING_WEAPON_DATA
 )
 
 @export_category("Collectible Attraction")
@@ -146,13 +109,13 @@ func _ready() -> void:
 	current_forward_speed = maxf(base_forward_speed, 1.0)
 	_last_lifespan_decay_multiplier = get_lifespan_decay_multiplier()
 	current_attraction_range = base_attraction_range
+	if starting_weapon_data == null or not starting_weapon_data.is_valid_definition():
+		push_error("Player starting_weapon_data must contain a valid WeaponData.")
+		starting_weapon_data = DEFAULT_STARTING_WEAPON_DATA
 	_equipment_inventory = [
 		_create_equipment(
-			PALM_ID,
-			starting_technique_name,
-			palm_attack_damage,
-			palm_attack_range,
-			palm_attack_interval
+			starting_weapon_data,
+			starting_weapon_data.minimum_damage
 		)
 	]
 	_current_equipment_index = 0
@@ -299,23 +262,18 @@ func take_melee_damage(amount: float) -> void:
 ## Keeps only the strongest collected copy of each weapon type. A new or
 ## improved weapon is equipped immediately; weaker duplicates are discarded.
 func collect_weapon(
-	weapon_id: String,
-	weapon_name: String,
+	weapon_data: WeaponDataResource,
 	damage: int
 ) -> bool:
-	if weapon_id.is_empty() or weapon_name.is_empty() or damage <= 0:
+	if (
+		weapon_data == null
+		or not weapon_data.is_valid_definition()
+		or damage <= 0
+	):
 		return false
 
-	var existing_index := _find_equipment_index(weapon_id)
-	var attack_range := _get_weapon_base_range(weapon_id)
-	var attack_interval := _get_weapon_attack_interval(weapon_id)
-	var equipment := _create_equipment(
-		weapon_id,
-		weapon_name,
-		damage,
-		attack_range,
-		attack_interval
-	)
+	var existing_index := _find_equipment_index(weapon_data.weapon_id)
+	var equipment := _create_equipment(weapon_data, damage)
 
 	if existing_index >= 0:
 		var existing_damage := int(_equipment_inventory[existing_index]["damage"])
@@ -341,11 +299,15 @@ func cycle_equipment() -> void:
 
 
 func get_technique_name() -> String:
-	return starting_technique_name
+	return (
+		starting_weapon_data.display_name
+		if starting_weapon_data != null
+		else ""
+	)
 
 
 func get_weapon_name() -> String:
-	return str(_get_current_equipment()["name"])
+	return _get_current_weapon_data().display_name
 
 
 func get_current_weapon_damage() -> int:
@@ -356,24 +318,28 @@ func get_current_weapon_damage() -> int:
 
 
 func get_current_attack_range() -> float:
-	var equipment := _get_current_equipment()
-	var attack_range := float(equipment["range"])
-	var bonus_levels := maxi(weapon_upgrade_level, 0)
-	var equipment_id := str(equipment["id"])
-	if equipment_id == DAO_ID:
-		attack_range += float(bonus_levels) * dao_range_increase_per_level
-	elif equipment_id == FLYING_SWORD_ID:
-		attack_range += (
-			float(bonus_levels)
-			* flying_sword_range_increase_per_level
-		)
-	return attack_range
+	var weapon_data := _get_current_weapon_data()
+	return (
+		weapon_data.attack_range
+		+ float(maxi(weapon_upgrade_level, 0))
+			* weapon_data.range_increase_per_upgrade
+	)
+
+
+## Returns the immutable shared definition for the currently equipped weapon.
+func get_current_weapon_data() -> WeaponDataResource:
+	return _get_current_weapon_data()
 
 
 ## Returns the original inner dao path plus one new concentric path per
 ## absorbed technique fragment.
 func get_dao_orbit_count() -> int:
-	return 1 + maxi(weapon_upgrade_level, 0)
+	var weapon_data := _get_current_weapon_data()
+	return (
+		1
+		+ maxi(weapon_upgrade_level, 0)
+			* maxi(weapon_data.additional_effects_per_upgrade, 0)
+	)
 
 
 ## Returns a stable radius for one dao path. Existing paths keep their radius
@@ -381,25 +347,31 @@ func get_dao_orbit_count() -> int:
 func get_dao_orbit_radius(orbit_index: int) -> float:
 	if orbit_index <= 0:
 		return 52.0
+	var weapon_data := _get_current_weapon_data()
 	return maxf(
-		dao_attack_range - 12.0
-			+ float(orbit_index) * dao_range_increase_per_level,
+		weapon_data.attack_range - 12.0
+			+ float(orbit_index) * weapon_data.range_increase_per_upgrade,
 		62.0
 	)
 
 
 ## Returns the number of projectiles launched by one flying-sword volley.
 func get_flying_sword_projectile_count() -> int:
+	var weapon_data := _get_current_weapon_data()
 	return (
 		1
 		+ maxi(weapon_upgrade_level, 0)
-			* maxi(flying_sword_count_increase_per_level, 1)
+			* maxi(weapon_data.additional_effects_per_upgrade, 0)
 	)
 
 
 ## Returns extra enemy-to-enemy bounces before the Universe Ring comes back.
 func get_qiankun_ring_bounce_count() -> int:
-	return maxi(weapon_upgrade_level, 0)
+	var weapon_data := _get_current_weapon_data()
+	return (
+		maxi(weapon_upgrade_level, 0)
+		* maxi(weapon_data.additional_effects_per_upgrade, 0)
+	)
 
 
 func get_weapon_upgrade_level() -> int:
@@ -447,10 +419,10 @@ func get_pending_flying_sword_count() -> int:
 ## Returns the number of idle weapons visibly accompanying the player.
 ## Equipped weapons always use one companion regardless of upgrade level.
 func get_visible_companion_weapon_count() -> int:
-	var equipment_id := str(_get_current_equipment()["id"])
+	var attack_kind := _get_current_weapon_data().attack_kind
 	if (
-		equipment_id == PALM_ID
-		or equipment_id == QIANKUN_RING_ID
+		attack_kind == WeaponDataResource.AttackKind.GREAT_STRENGTH_PALM
+		or attack_kind == WeaponDataResource.AttackKind.QIANKUN_RING
 			and _qiankun_ring_in_flight
 	):
 		return 0
@@ -488,11 +460,12 @@ func get_equipment_inventory_entries() -> Array[String]:
 	var entries: Array[String] = []
 	for index in _equipment_inventory.size():
 		var equipment := _equipment_inventory[index]
+		var weapon_data := equipment["data"] as WeaponDataResource
 		var marker := "▶ " if index == _current_equipment_index else "  "
 		entries.append(
 			"%s%s  伤害 %d" % [
 				marker,
-				str(equipment["name"]),
+				weapon_data.display_name,
 				int(equipment["damage"]) + maxi(weapon_power_bonus, 0),
 			]
 		)
@@ -562,25 +535,28 @@ func _update_weapon_attack(delta: float) -> void:
 	var targets := _get_attack_targets()
 	if targets.is_empty():
 		return
-	var equipment := _get_current_equipment()
-	var equipment_id := str(equipment["id"])
-	if equipment_id == QIANKUN_RING_ID and _qiankun_ring_in_flight:
+	var weapon_data := _get_current_weapon_data()
+	var attack_kind := weapon_data.attack_kind
+	if (
+		attack_kind == WeaponDataResource.AttackKind.QIANKUN_RING
+		and _qiankun_ring_in_flight
+	):
 		return
 	var damage := get_current_weapon_damage()
 
-	if equipment_id == DAO_ID:
+	if attack_kind == WeaponDataResource.AttackKind.DAO:
 		for enemy in targets:
 			enemy.take_melee_damage(damage)
 		_dao_attack_remaining = 0.28
-	elif equipment_id == FLYING_SWORD_ID:
+	elif attack_kind == WeaponDataResource.AttackKind.FLYING_SWORD:
 		_begin_flying_sword_sequence(damage)
-	elif equipment_id == QIANKUN_RING_ID:
+	elif attack_kind == WeaponDataResource.AttackKind.QIANKUN_RING:
 		_launch_qiankun_ring(targets[0], damage)
 	else:
 		targets[0].take_melee_damage(damage)
 		_attack_flash_remaining = 0.12
 
-	_attack_cooldown_remaining = maxf(float(equipment["interval"]), 0.1)
+	_attack_cooldown_remaining = maxf(weapon_data.attack_interval, 0.1)
 	queue_redraw()
 
 
@@ -611,8 +587,9 @@ func _launch_next_flying_sword() -> void:
 	)
 	_flying_sword_sequence_launched += 1
 	_pending_flying_swords -= 1
+	var weapon_data := _get_current_weapon_data()
 	_flying_sword_sequence_timer = maxf(
-		flying_sword_sequence_interval,
+		weapon_data.projectile_sequence_interval,
 		0.01
 	)
 
@@ -644,15 +621,17 @@ func _launch_flying_sword(
 	projectile_index: int,
 	projectile_count: int
 ) -> void:
-	if flying_sword_projectile_scene == null:
+	var weapon_data := _get_current_weapon_data()
+	if weapon_data.projectile_scene == null:
 		return
 	var projectile := (
-		flying_sword_projectile_scene.instantiate()
+		weapon_data.projectile_scene.instantiate()
 		as FlyingSwordProjectile
 	)
 	if projectile == null:
 		push_error(
-			"Player flying_sword_projectile_scene must create FlyingSwordProjectile."
+			"Flying Sword WeaponData projectile_scene must create "
+			+ "FlyingSwordProjectile."
 		)
 		return
 	var lateral_offset := (
@@ -673,15 +652,17 @@ func _launch_qiankun_ring(
 	target: EnemyController,
 	damage: int
 ) -> void:
-	if qiankun_ring_projectile_scene == null:
+	var weapon_data := _get_current_weapon_data()
+	if weapon_data.projectile_scene == null:
 		return
 	var projectile := (
-		qiankun_ring_projectile_scene.instantiate()
+		weapon_data.projectile_scene.instantiate()
 		as QiankunRingProjectile
 	)
 	if projectile == null:
 		push_error(
-			"Player qiankun_ring_projectile_scene must create QiankunRingProjectile."
+			"Universe Ring WeaponData projectile_scene must create "
+			+ "QiankunRingProjectile."
 		)
 		return
 	get_parent().add_child(projectile)
@@ -691,7 +672,7 @@ func _launch_qiankun_ring(
 		target,
 		damage,
 		get_qiankun_ring_bounce_count(),
-		qiankun_ring_bounce_search_range
+		weapon_data.secondary_range
 	)
 	projectile.returned_to_player.connect(
 		_on_qiankun_ring_returned,
@@ -863,14 +844,16 @@ func _publish_lifespan_decay_multiplier() -> void:
 
 
 func _draw_weapon_companions() -> void:
-	var equipment := _get_current_equipment()
-	var equipment_id := str(equipment["id"])
-	if equipment_id == PALM_ID:
+	var attack_kind := _get_current_weapon_data().attack_kind
+	if attack_kind == WeaponDataResource.AttackKind.GREAT_STRENGTH_PALM:
 		return
-	if equipment_id == QIANKUN_RING_ID and _qiankun_ring_in_flight:
+	if (
+		attack_kind == WeaponDataResource.AttackKind.QIANKUN_RING
+		and _qiankun_ring_in_flight
+	):
 		return
 	var angle := _companion_phase
-	if equipment_id == DAO_ID:
+	if attack_kind == WeaponDataResource.AttackKind.DAO:
 		var inner_position := Vector2.from_angle(angle) * 52.0
 		draw_circle(
 			inner_position,
@@ -878,7 +861,7 @@ func _draw_weapon_companions() -> void:
 			Color(1.0, 0.9, 0.4, 0.2)
 		)
 		_draw_dao(inner_position, angle + PI * 0.5, true)
-	elif equipment_id == FLYING_SWORD_ID:
+	elif attack_kind == WeaponDataResource.AttackKind.FLYING_SWORD:
 		var companion_position := Vector2.from_angle(angle) * 38.0
 		draw_circle(
 			companion_position,
@@ -954,24 +937,21 @@ func _draw_qiankun_ring(position: Vector2) -> void:
 
 
 func _create_equipment(
-	id: String,
-	display_name: String,
-	damage: int,
-	attack_range: float,
-	attack_interval: float
+	weapon_data: WeaponDataResource,
+	damage: int
 ) -> Dictionary:
 	return {
-		"id": id,
-		"name": display_name,
+		"data": weapon_data,
 		"damage": damage,
-		"range": attack_range,
-		"interval": attack_interval,
 	}
 
 
-func _find_equipment_index(equipment_id: String) -> int:
+func _find_equipment_index(equipment_id: StringName) -> int:
 	for index in _equipment_inventory.size():
-		if str(_equipment_inventory[index]["id"]) == equipment_id:
+		var weapon_data := (
+			_equipment_inventory[index]["data"] as WeaponDataResource
+		)
+		if weapon_data.weapon_id == equipment_id:
 			return index
 	return -1
 
@@ -980,24 +960,8 @@ func _get_current_equipment() -> Dictionary:
 	return _equipment_inventory[_current_equipment_index]
 
 
-func _get_weapon_base_range(weapon_id: String) -> float:
-	if weapon_id == DAO_ID:
-		return dao_attack_range
-	if weapon_id == FLYING_SWORD_ID:
-		return flying_sword_attack_range
-	if weapon_id == QIANKUN_RING_ID:
-		return qiankun_ring_attack_range
-	return palm_attack_range
-
-
-func _get_weapon_attack_interval(weapon_id: String) -> float:
-	if weapon_id == DAO_ID:
-		return dao_attack_interval
-	if weapon_id == FLYING_SWORD_ID:
-		return flying_sword_attack_interval
-	if weapon_id == QIANKUN_RING_ID:
-		return qiankun_ring_attack_interval
-	return palm_attack_interval
+func _get_current_weapon_data() -> WeaponDataResource:
+	return _get_current_equipment()["data"] as WeaponDataResource
 
 
 func _on_current_equipment_changed() -> void:
@@ -1009,10 +973,10 @@ func _on_current_equipment_changed() -> void:
 
 
 func _publish_equipment() -> void:
-	var equipment := _get_current_equipment()
+	var weapon_data := _get_current_weapon_data()
 	equipment_changed.emit(
-		starting_technique_name,
-		str(equipment["name"]),
+		get_technique_name(),
+		weapon_data.display_name,
 		get_current_weapon_damage()
 	)
 	equipment_inventory_changed.emit(
@@ -1032,14 +996,7 @@ func _apply_attraction_range() -> void:
 
 
 func _get_current_range_color() -> Color:
-	var equipment_id := str(_get_current_equipment()["id"])
-	if equipment_id == DAO_ID:
-		return Color("ffd166")
-	if equipment_id == FLYING_SWORD_ID:
-		return Color("79dfff")
-	if equipment_id == QIANKUN_RING_ID:
-		return Color("ff8ee7")
-	return Color("7dffd8")
+	return _get_current_weapon_data().display_color
 
 
 func _get_target_forward_speed() -> float:
