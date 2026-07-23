@@ -1,0 +1,27 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://game/scripts/gameplay/enemy.gd" id="1_script"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_enemy"]
+radius = 20.0
+
+[node name="Enemy" type="CharacterBody2D"]
+z_index = 4
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("1_script")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_enemy")
+
+[node name="EliteLabel" type="Label" parent="."]
+visible = false
+position = Vector2(-32, -58)
+offset_right = 64.0
+offset_bottom = 22.0
+theme_override_colors/font_color = Color(1, 0.82, 0.25, 1)
+theme_override_colors/font_outline_color = Color(0.12, 0.04, 0.01, 0.95)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 16
+text = "精英"
+horizontal_alignment = 1

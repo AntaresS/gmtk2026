@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/scripts/gameplay/heavenly_tribulation.gd" id="1_script"]
+
+[node name="HeavenlyTribulation" type="Node2D"]
+z_index = 20
+script = ExtResource("1_script")
+
+[node name="WarningLabel" type="Label" parent="."]
+offset_right = 136.0
+offset_bottom = 24.0
+theme_override_colors/font_color = Color(0.62, 0.9, 1, 1)
+theme_override_colors/font_outline_color = Color(0.01, 0.04, 0.1, 0.95)
+theme_override_constants/outline_size = 5
+theme_override_font_sizes/font_size = 17
+text = "天雷落点  1 / 9"
+horizontal_alignment = 1

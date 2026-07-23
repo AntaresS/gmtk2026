@@ -19,7 +19,7 @@ mouse_filter = 2
 layout_mode = 1
 anchors_preset = 0
 offset_right = 380.0
-offset_bottom = 240.0
+offset_bottom = 430.0
 theme_override_constants/margin_left = 24
 theme_override_constants/margin_top = 24
 
@@ -42,15 +42,22 @@ theme_override_constants/separation = 7
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
-text = "寿元  45.0s"
+text = "寿元  180.0s"
 
 [node name="LifespanBar" type="ProgressBar" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 18)
 layout_mode = 2
-max_value = 45.0
-value = 45.0
+max_value = 180.0
+value = 180.0
 show_percentage = false
+
+[node name="LifespanRateLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.72, 0.58, 1)
+theme_override_font_sizes/font_size = 16
+text = "寿元消耗  -1.00 / 秒"
 
 [node name="CultivationLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
 unique_name_in_owner = true
@@ -70,6 +77,29 @@ custom_minimum_size = Vector2(0, 18)
 layout_mode = 2
 value = 0.0
 show_percentage = false
+
+[node name="TechniqueLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "功法  大力掌"
+
+[node name="WeaponLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "当前装备  大力掌  · 伤害 1"
+
+[node name="EquipmentLibraryLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.9, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 15
+text = "功法碎片强化 +0 · 武器威能 +0
+装备库（Tab 切换）
+▶ 大力掌  伤害 1"
 
 [node name="LevelMessageCenter" type="CenterContainer" parent="HudRoot"]
 layout_mode = 1

@@ -4,14 +4,8 @@ extends Node2D
 
 signal qi_collected(amount: int)
 
-const SMALL_QI_PROFILE: QiDensityProfile = preload(
-	"res://game/resources/qi_density_small.tres"
-)
-const MEDIUM_QI_PROFILE: QiDensityProfile = preload(
-	"res://game/resources/qi_density_medium.tres"
-)
-const LARGE_QI_PROFILE: QiDensityProfile = preload(
-	"res://game/resources/qi_density_large.tres"
+const QI_PROFILE: QiDensityProfile = preload(
+	"res://game/resources/qi_profile.tres"
 )
 
 @export_category("Chunk Definition")
@@ -31,11 +25,10 @@ const LARGE_QI_PROFILE: QiDensityProfile = preload(
 	"res://game/scenes/gameplay/qi_pickup.tscn"
 )
 
-## Minimum pickup instances in each regenerated chunk. The final count is
-## selected deterministically between this value and max_pickups_per_chunk.
+## Minimum candidate positions tested in each regenerated chunk. The single qi
+## profile's spawn percentage determines how many become real pickups.
 @export_range(1, 40, 1) var min_pickups_per_chunk: int = 10
-## Hard upper bound for pickup instances in each pooled chunk. This keeps total
-## pickup nodes bounded by the existing fixed chunk pool.
+## Maximum candidate positions tested in each regenerated chunk.
 @export_range(1, 40, 1) var max_pickups_per_chunk: int = 18
 ## Probability that the next placement operation creates a local cluster
 ## instead of one independent pickup.
@@ -80,6 +73,7 @@ var _tile_map_layer: TileMapLayer
 var _pickup_container: Node2D
 var _show_fallback: bool = true
 var _preview_update_queued: bool = false
+var _trial_hell_active: bool = false
 
 
 func _enter_tree() -> void:
@@ -146,13 +140,15 @@ func _regenerate_pickups() -> void:
 
 	var rng := _create_pickup_rng()
 	for pickup_position in _get_scattered_pickup_positions(rng):
+		if rng.randf() > clampf(QI_PROFILE.spawn_weight / 100.0, 0.0, 1.0):
+			continue
 		var pickup := qi_pickup_scene.instantiate() as QiPickup
 		if pickup == null:
 			push_error("WorldChunk qi_pickup_scene must instantiate a QiPickup.")
 			return
 		_pickup_container.add_child(pickup)
 		pickup.position = pickup_position
-		pickup.configure_density(_choose_density_profile(rng))
+		pickup.configure_density(QI_PROFILE)
 		pickup.qi_collected.connect(_on_qi_pickup_collected)
 
 
@@ -289,28 +285,6 @@ func _is_position_separated(
 	return true
 
 
-func _choose_density_profile(
-	rng: RandomNumberGenerator
-) -> QiDensityProfile:
-	var profiles: Array[QiDensityProfile] = [
-		SMALL_QI_PROFILE,
-		MEDIUM_QI_PROFILE,
-		LARGE_QI_PROFILE,
-	]
-	var total_weight := 0.0
-	for profile in profiles:
-		total_weight += maxf(profile.spawn_weight, 0.0)
-	if total_weight <= 0.0:
-		return SMALL_QI_PROFILE
-
-	var roll := rng.randf_range(0.0, total_weight)
-	for profile in profiles:
-		roll -= maxf(profile.spawn_weight, 0.0)
-		if roll <= 0.0:
-			return profile
-	return profiles.back()
-
-
 func _on_qi_pickup_collected(amount: int) -> void:
 	qi_collected.emit(amount)
 
@@ -319,6 +293,17 @@ func get_pickup_count() -> int:
 	if not is_instance_valid(_pickup_container):
 		return 0
 	return _pickup_container.get_child_count()
+
+
+## Switches the runtime road between its normal palette and Trial Hell's
+## persistent red-black palette without rebuilding deterministic contents.
+func set_trial_hell_active(active: bool) -> void:
+	_trial_hell_active = active
+	queue_redraw()
+
+
+func is_trial_hell_active() -> bool:
+	return _trial_hell_active
 
 
 func _paint_terrain_set() -> bool:
@@ -441,8 +426,47 @@ func _draw() -> void:
 	var chunk_size := config.get_pixel_size()
 	if not _show_fallback:
 		_draw_road_guides(chunk_size)
+		if _trial_hell_active:
+			_draw_trial_hell_overlay(chunk_size)
 		return
 	_draw_fallback_terrain(chunk_size)
+	if _trial_hell_active:
+		_draw_trial_hell_overlay(chunk_size)
+
+
+func _draw_trial_hell_overlay(chunk_size: Vector2) -> void:
+	var chunk_rect := Rect2(-chunk_size * 0.5, chunk_size)
+	var shoulder_rect := Rect2(
+		-config.road_half_width - 10.0,
+		-chunk_size.y * 0.5,
+		config.road_half_width * 2.0 + 20.0,
+		chunk_size.y
+	)
+	var road_rect := Rect2(
+		-config.road_half_width,
+		-chunk_size.y * 0.5,
+		config.road_half_width * 2.0,
+		chunk_size.y
+	)
+	draw_rect(chunk_rect, Color(0.22, 0.0, 0.015, 0.58))
+	draw_rect(shoulder_rect, Color(0.34, 0.025, 0.015, 0.92))
+	draw_rect(road_rect, Color(0.10, 0.008, 0.012, 0.88))
+	var first_mark_y := -chunk_size.y * 0.5 + 34.0
+	for mark_index in int(ceilf(chunk_size.y / 92.0)):
+		var mark_y := first_mark_y + float(mark_index) * 92.0
+		var mark_color := Color(1.0, 0.20, 0.04, 0.80)
+		draw_line(
+			Vector2(-config.road_half_width + 12.0, mark_y),
+			Vector2(-config.road_half_width + 34.0, mark_y - 20.0),
+			mark_color,
+			3.0
+		)
+		draw_line(
+			Vector2(config.road_half_width - 12.0, mark_y),
+			Vector2(config.road_half_width - 34.0, mark_y - 20.0),
+			mark_color,
+			3.0
+		)
 
 
 func _draw_fallback_terrain(chunk_size: Vector2) -> void:

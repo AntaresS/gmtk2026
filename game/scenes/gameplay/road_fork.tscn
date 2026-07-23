@@ -1,0 +1,41 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/scripts/gameplay/road_fork.gd" id="1_script"]
+
+[node name="RoadFork" type="Node2D"]
+z_index = -5
+script = ExtResource("1_script")
+
+[node name="LeftLabel" type="Label" parent="."]
+position = Vector2(-141, -135)
+offset_right = 72.0
+offset_bottom = 24.0
+theme_override_colors/font_color = Color(0.75, 1, 0.9, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 17
+text = "左岔路"
+horizontal_alignment = 1
+
+[node name="RightLabel" type="Label" parent="."]
+position = Vector2(69, -135)
+offset_right = 72.0
+offset_bottom = 24.0
+theme_override_colors/font_color = Color(0.75, 1, 0.9, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 17
+text = "右岔路"
+horizontal_alignment = 1
+
+[node name="ChoiceLabel" type="Label" parent="."]
+visible = false
+position = Vector2(-90, 95)
+offset_right = 180.0
+offset_bottom = 28.0
+theme_override_colors/font_color = Color(1, 0.88, 0.45, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 18
+text = "已选择：左岔路"
+horizontal_alignment = 1

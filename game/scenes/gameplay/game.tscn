@@ -7,6 +7,8 @@
 [ext_resource type="Script" uid="uid://cd6uay63wcsya" path="res://game/scripts/gameplay/run_resources.gd" id="6_resources"]
 [ext_resource type="PackedScene" path="res://game/scenes/gameplay/gameplay_hud.tscn" id="7_hud"]
 [ext_resource type="PackedScene" path="res://game/scenes/gameplay/run_ended_overlay.tscn" id="8_run_ended"]
+[ext_resource type="Script" path="res://game/scripts/gameplay/enemy_spawner.gd" id="9_enemy_spawner"]
+[ext_resource type="Script" path="res://game/scripts/gameplay/road_fork_spawner.gd" id="10_fork_spawner"]
 
 [node name="Game" type="Node2D" unique_id=666890130]
 script = ExtResource("1_script")
@@ -25,6 +27,16 @@ road_half_width = 150.0
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=1506846933]
 position = Vector2(0, -180)
+
+[node name="EnemySpawner" type="Node2D" parent="." node_paths=PackedStringArray("player", "camera")]
+script = ExtResource("9_enemy_spawner")
+player = NodePath("../Player")
+camera = NodePath("../Camera2D")
+
+[node name="RoadForkSpawner" type="Node2D" parent="." node_paths=PackedStringArray("player", "camera")]
+script = ExtResource("10_fork_spawner")
+player = NodePath("../Player")
+camera = NodePath("../Camera2D")
 
 [node name="PauseMenu" parent="." unique_id=833634009 instance=ExtResource("5_pause")]
 
@@ -49,4 +61,5 @@ theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
 text = "Speed: 0
 Distance: 0
-Chunks: 0"
+Chunks: 0
+Enemies: 0"

@@ -26,6 +26,7 @@ signal qi_collected(amount: int)
 
 var _chunks: Array[WorldChunk] = []
 var _progression_enabled: bool = true
+var _trial_hell_active: bool = false
 
 
 func _ready() -> void:
@@ -38,6 +39,7 @@ func _ready() -> void:
 		set_physics_process(false)
 		return
 	player.road_half_width = chunk_config.road_half_width
+	player.set_road_center_x(global_position.x)
 	_progression_enabled = true
 	_create_chunk_pool()
 
@@ -65,6 +67,7 @@ func _physics_process(_delta: float) -> void:
 			next_chunk_index,
 			chunk_config
 		)
+		trailing_chunk.set_trial_hell_active(_trial_hell_active)
 		_chunks.push_front(trailing_chunk)
 
 
@@ -82,6 +85,7 @@ func _reposition_pool_after_large_jump(
 		var new_chunk_index: int = first_index + offset
 		chunk.position = Vector2(0.0, new_chunk_index * chunk_height)
 		chunk.configure(new_chunk_index, chunk_config)
+		chunk.set_trial_hell_active(_trial_hell_active)
 
 
 func get_active_chunk_count() -> int:
@@ -100,6 +104,29 @@ func set_progression_enabled(enabled: bool) -> void:
 	_progression_enabled = enabled
 
 
+## Moves the complete pooled infinite road to a newly committed branch center.
+## Chunk indices and deterministic contents remain unchanged.
+func set_route_center_x(value: float) -> void:
+	global_position.x = value
+	if is_instance_valid(player):
+		player.set_road_center_x(value)
+
+
+func get_route_center_x() -> float:
+	return global_position.x
+
+
+## Applies or removes the Trial Hell palette across the entire pooled road.
+func set_trial_hell_active(active: bool) -> void:
+	_trial_hell_active = active
+	for chunk in _chunks:
+		chunk.set_trial_hell_active(active)
+
+
+func is_trial_hell_active() -> bool:
+	return _trial_hell_active
+
+
 func _create_chunk_pool() -> void:
 	var first_chunk_index := -active_chunk_count + 2
 	for offset in active_chunk_count:
@@ -115,6 +142,7 @@ func _create_chunk_pool() -> void:
 			chunk_index,
 			chunk_config
 		)
+		chunk.set_trial_hell_active(_trial_hell_active)
 		_chunks.append(chunk)
 
 

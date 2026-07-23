@@ -86,6 +86,11 @@ func _run() -> void:
 	Input.action_press("move_right")
 	await _wait_physics_frames(180)
 	Input.action_release("move_right")
+	await _wait_physics_frames(1)
+	_check(
+		is_zero_approx(player.velocity.x),
+		"Lateral movement retained inertia after input release."
+	)
 	var right_bound := player.road_half_width - player.horizontal_clearance
 	_check(
 		player.global_position.x <= right_bound + 0.01,

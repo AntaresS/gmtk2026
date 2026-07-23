@@ -4,10 +4,7 @@
 
 [resource]
 script = ExtResource("1_profile")
-density = 1
-display_name = "Medium"
-qi_value = 25
-absorption_duration_seconds = 0.9
-visual_scale = 1.0
-color = Color(0.3, 0.82, 1, 1)
-spawn_weight = 24.0
+qi_value = 10
+visual_scale = 0.72
+color = Color(0.42, 1, 0.78, 1)
+spawn_weight = 5.0

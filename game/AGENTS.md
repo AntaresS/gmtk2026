@@ -12,18 +12,23 @@ game/
   README.md
   resources/
     default_world_chunk_config.tres
-    qi_density_large.tres
-    qi_density_medium.tres
-    qi_density_small.tres
+    qi_profile.tres
     summer_terrain_tileset.tres
   scenes/
     gameplay/
+      enemy.tscn
+      flying_sword_projectile.tscn
       game.tscn
       gameplay_hud.tscn
+      heavenly_tribulation.tscn
       player.tscn
-      player_absorption_area.tscn
       qi_pickup.tscn
+      qiankun_ring_projectile.tscn
+      technique_fragment.tscn
+      weapon_power_fragment.tscn
+      road_fork.tscn
       run_ended_overlay.tscn
+      weapon_pickup.tscn
       world_chunk.tscn
       world_chunk_preview.tscn
     menus/
@@ -31,15 +36,24 @@ game/
       pause_menu.tscn
   scripts/
     gameplay/
+      enemy.gd
+      enemy_spawner.gd
+      flying_sword_projectile.gd
       game.gd
       gameplay_hud.gd
+      heavenly_tribulation.gd
       infinite_world.gd
       player.gd
-      player_absorption_area.gd
       qi_density_profile.gd
       qi_pickup.gd
+      qiankun_ring_projectile.gd
+      technique_fragment.gd
+      weapon_power_fragment.gd
+      road_fork.gd
+      road_fork_spawner.gd
       run_ended_overlay.gd
       run_resources.gd
+      weapon_pickup.gd
       world_chunk.gd
       world_chunk_config.gd
       world_chunk_preview.gd
@@ -48,6 +62,7 @@ game/
       pause_menu.gd
   tests/
     foundation_smoke.gd
+    gameplay_loop_smoke.gd
 ```
 
 Godot-generated `.uid` companions live beside scripts. Do not edit them
@@ -60,19 +75,81 @@ manually.
 - `game.tscn` owns the player, vertically tracking camera, infinite-world
   controller, run resources, HUD, pause menu, run-ended flow, and optional
   debug overlay.
-- `run_resources.gd` owns lifespan, qi, cultivation level, and level-up
-  recovery. `gameplay_hud.tscn` only presents its signals.
+- `run_resources.gd` owns lifespan, qi, cultivation level, level-up recovery,
+  lifespan damage routed from enemy attacks, and the one-time post-tribulation
+  lifespan doubling. `gameplay_hud.tscn` only presents its signals.
 - `player.tscn` is a reusable `CharacterBody2D`. `player.gd` owns movement,
-  speed modes, accumulated distance, and lateral clamping.
+  speed modes, accumulated distance, lateral clamping, incoming melee damage
+  signals, the best collected copy of each equipment type, Tab cycling,
+  automatic equipment-specific attacks, one visible current-attack circle,
+  and a separate invisible collectible-attraction circle. Cultivation expands
+  only attraction; elite technique fragments independently upgrade every
+  weapon according to its distinct mechanic. Its `CharacterSprite` plays
+  the nine PNG frames converted from the root `chara_fly.gif`, and cultivation
+  increases trigger a short expanding aura.
+- `EnemySpawner` creates bounded enemies beyond both camera edges, injects the
+  player reference, owns enemy qi and weapon drops, routes dropped qi upward,
+  and freezes all enemies when the run ends. Forward enemies are slower than
+  the player; periodic rear pursuers are slightly faster. Route migration
+  removes enemies left on roads outside the player's newly active route.
+  Unpaused elapsed time and current cultivation level jointly scale new enemy
+  health, count, damage, attack frequency, and spawn frequency. Eight percent
+  of new enemies become gold-labeled elites with triple health, 1.6-times
+  melee range, and a larger body. Every defeated elite drops one technique
+  fragment and one weapon-power fragment.
+- `enemy.tscn` moves straight forward at one assigned constant speed. It never
+  accelerates or steers toward the player, attacks only at close range, routes
+  lifespan damage through the player signal, owns its health, and publishes
+  its death position and velocity for drop generation.
 - `InfiniteWorld` owns a fixed pool of `WorldChunk` instances. It recycles
   chunks by player world distance and must not instantiate or free chunks
   during ordinary movement.
-- Each pooled `WorldChunk` regenerates one bounded, deterministic mix of
-  scattered and grouped pickups when configured. Density profiles define
-  small, medium, and large qi value, scale, color, duration, and spawn weight.
-- `player_absorption_area.tscn` owns the player's visible absorption radius.
-  Pickups retain their own partial absorption progress and emit completion
-  upward through the chunk and world; they never search for run state.
+- Each pooled `WorldChunk` tests one bounded, deterministic set of scattered
+  and grouped candidate positions. The single `qi_profile.tres` uses a
+  percentage chance to keep actual pickup generation sparse.
+- Qi pickups are collected immediately when the player's body touches them and
+  emit completion upward through the chunk and world. They carry a small
+  description label and can be pulled by the player's shared range.
+- `weapon_pickup.tscn` represents dao, flying-sword, and Universe Ring enemy
+  drops. A weapon keeps the defeated enemy's velocity until attracted, then
+  equips itself on player contact. Each drop has randomized damage; weaker
+  same-type copies are discarded. Only the currently equipped collected weapon
+  is drawn beside the player.
+- `technique_fragment.tscn` has no collision collection path. It draws an
+  obvious recognition circle and resets its progress whenever the player
+  leaves; remaining inside continuously for 1.5 seconds absorbs it and
+  advances the shared weapon-upgrade level.
+- `weapon_power_fragment.tscn` uses the same continuous 1.5-second recognition
+  contract with a distinct orange-red presentation. Each absorbed fragment
+  permanently adds one flat base-damage point to every existing and future
+  weapon, including Great Strength Palm.
+- Dao attacks rapidly orbit the player. The original inner path remains fixed
+  and every technique fragment adds one new, persistent concentric outer path
+  while expanding total damage range. Flying swords use
+  `flying_sword_projectile.tscn` for straight sword-light streaks; each level
+  of fragment strengthening adds one sequential projectile and slightly
+  expands their range. Their 0.9-second volley interval is deliberately longer
+  than dao attacks. Idle companion rendering always shows only one copy of the
+  equipped weapon.
+- Universe Rings use `qiankun_ring_projectile.tscn` to home into one enemy,
+  gain one additional enemy-to-enemy bounce per absorbed technique fragment,
+  and return to the moving player. Consecutive hits cannot target the same
+  enemy, but earlier targets become eligible again so a ring can alternate
+  A-B-A-B. Every completed bounce compounds the next hit by 20 percent. The
+  idle companion is hidden while its ring projectile is away.
+- `heavenly_tribulation.tscn` runs once when cultivation advances beyond level
+  nine. It warns nine predicted, slightly randomized ground positions before
+  applying lightning damage. Surviving all strikes doubles maximum lifespan
+  and adds half of that new maximum directly to current lifespan, then asks
+  `player.gd` to play a larger multi-ring breakthrough effect.
+- `RoadForkSpawner` periodically places `road_fork.tscn` beyond the camera on
+  the active route. Events alternate between normal roads and a red-black
+  `试炼地狱`, while also alternating their full-width left/right placement
+  outside the current route. Entering a branch commits a new infinite route
+  center for world, camera, player, enemies, and later forks, so branches can
+  recursively contain further branches. Trial Hell persists its palette across
+  the pooled road and raises enemy health, damage, attack frequency, spawn
+  frequency, and simultaneous count until a normal branch is committed.
 - `default_world_chunk_config.tres` is the shared designer-facing source of
   truth for chunk dimensions, road width, seed, TileSet, and tile selection.
   `InfiniteWorld` applies its road width to the player at startup.
