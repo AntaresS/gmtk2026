@@ -12,11 +12,18 @@ game/
   README.md
   resources/
     default_world_chunk_config.tres
+    qi_density_large.tres
+    qi_density_medium.tres
+    qi_density_small.tres
     summer_terrain_tileset.tres
   scenes/
     gameplay/
       game.tscn
+      gameplay_hud.tscn
       player.tscn
+      player_absorption_area.tscn
+      qi_pickup.tscn
+      run_ended_overlay.tscn
       world_chunk.tscn
       world_chunk_preview.tscn
     menus/
@@ -25,8 +32,14 @@ game/
   scripts/
     gameplay/
       game.gd
+      gameplay_hud.gd
       infinite_world.gd
       player.gd
+      player_absorption_area.gd
+      qi_density_profile.gd
+      qi_pickup.gd
+      run_ended_overlay.gd
+      run_resources.gd
       world_chunk.gd
       world_chunk_config.gd
       world_chunk_preview.gd
@@ -45,12 +58,21 @@ manually.
 - `main_menu.tscn` is the application entry point and replaces itself with
   `game.tscn` when play starts.
 - `game.tscn` owns the player, vertically tracking camera, infinite-world
-  controller, pause menu, and optional debug overlay.
+  controller, run resources, HUD, pause menu, run-ended flow, and optional
+  debug overlay.
+- `run_resources.gd` owns lifespan, qi, cultivation level, and level-up
+  recovery. `gameplay_hud.tscn` only presents its signals.
 - `player.tscn` is a reusable `CharacterBody2D`. `player.gd` owns movement,
   speed modes, accumulated distance, and lateral clamping.
 - `InfiniteWorld` owns a fixed pool of `WorldChunk` instances. It recycles
   chunks by player world distance and must not instantiate or free chunks
   during ordinary movement.
+- Each pooled `WorldChunk` regenerates one bounded, deterministic mix of
+  scattered and grouped pickups when configured. Density profiles define
+  small, medium, and large qi value, scale, color, duration, and spawn weight.
+- `player_absorption_area.tscn` owns the player's visible absorption radius.
+  Pickups retain their own partial absorption progress and emit completion
+  upward through the chunk and world; they never search for run state.
 - `default_world_chunk_config.tres` is the shared designer-facing source of
   truth for chunk dimensions, road width, seed, TileSet, and tile selection.
   `InfiniteWorld` applies its road width to the player at startup.
@@ -114,4 +136,3 @@ when behavior or authority changes; stale documentation is a defect.
 - Avoid unnecessary autoloads and per-frame terrain generation.
 - Do not leave parser warnings, runtime errors, or placeholder methods.
 - Update this structure section when files or responsibilities move.
-

@@ -28,13 +28,19 @@ extends CharacterBody2D
 
 var current_forward_speed: float = 0.0
 var distance_traveled: float = 0.0
+var _movement_enabled: bool = true
 
 
 func _ready() -> void:
+	_movement_enabled = true
 	current_forward_speed = maxf(base_forward_speed, 1.0)
 
 
 func _physics_process(delta: float) -> void:
+	if not _movement_enabled:
+		velocity = Vector2.ZERO
+		return
+
 	var lateral_input := Input.get_axis("move_left", "move_right")
 	var target_lateral_velocity := lateral_input * lateral_speed
 	velocity.x = move_toward(
@@ -59,6 +65,14 @@ func _physics_process(delta: float) -> void:
 		road_half_width - horizontal_clearance
 	)
 	distance_traveled += current_forward_speed * delta
+
+
+## Enables or stops player locomotion without changing input ownership or
+## resetting run distance. The gameplay controller stops it when a run ends.
+func set_movement_enabled(enabled: bool) -> void:
+	_movement_enabled = enabled
+	if not _movement_enabled:
+		velocity = Vector2.ZERO
 
 
 func _get_target_forward_speed() -> float:

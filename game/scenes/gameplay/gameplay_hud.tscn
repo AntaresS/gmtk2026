@@ -1,0 +1,101 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/scripts/gameplay/gameplay_hud.gd" id="1_script"]
+
+[node name="GameplayHud" type="CanvasLayer"]
+layer = 40
+script = ExtResource("1_script")
+
+[node name="HudRoot" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="HudRoot"]
+layout_mode = 1
+anchors_preset = 0
+offset_right = 380.0
+offset_bottom = 240.0
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+
+[node name="Panel" type="PanelContainer" parent="HudRoot/MarginContainer"]
+custom_minimum_size = Vector2(330, 0)
+layout_mode = 2
+
+[node name="StatsMargin" type="MarginContainer" parent="HudRoot/MarginContainer/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 14
+
+[node name="Stats" type="VBoxContainer" parent="HudRoot/MarginContainer/Panel/StatsMargin"]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="LifespanLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "寿元  45.0s"
+
+[node name="LifespanBar" type="ProgressBar" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 18)
+layout_mode = 2
+max_value = 45.0
+value = 45.0
+show_percentage = false
+
+[node name="CultivationLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "练气 1"
+
+[node name="QiLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "灵气  0 / 100"
+
+[node name="QiBar" type="ProgressBar" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 18)
+layout_mode = 2
+value = 0.0
+show_percentage = false
+
+[node name="LevelMessageCenter" type="CenterContainer" parent="HudRoot"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 120.0
+offset_bottom = 240.0
+grow_horizontal = 2
+mouse_filter = 2
+
+[node name="LevelUpMessage" type="Label" parent="HudRoot/LevelMessageCenter"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 1, 0.86, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 36
+text = "练气 2
+寿元 +10"
+horizontal_alignment = 1
+
+[node name="LevelUpTimer" type="Timer" parent="."]
+unique_name_in_owner = true
+wait_time = 1.8
+one_shot = true
+
+[connection signal="timeout" from="LevelUpTimer" to="." method="_on_level_up_timer_timeout"]

@@ -8,13 +8,18 @@ extends CanvasLayer
 
 @onready var resume_button: Button = %ResumeButton
 
+var _pause_enabled: bool = true
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_pause_enabled = true
 	hide()
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not _pause_enabled:
+		return
 	if not event.is_action_pressed("pause") or event.is_echo():
 		return
 
@@ -26,6 +31,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func pause_game() -> void:
+	if not _pause_enabled:
+		return
 	show()
 	get_tree().paused = true
 	resume_button.grab_focus()
@@ -34,6 +41,15 @@ func pause_game() -> void:
 func resume_game() -> void:
 	get_tree().paused = false
 	hide()
+
+
+## Enables normal pause input or dismisses and locks the pause menu. The
+## gameplay controller locks pausing after run depletion.
+func set_pause_enabled(enabled: bool) -> void:
+	_pause_enabled = enabled
+	if not _pause_enabled:
+		get_tree().paused = false
+		hide()
 
 
 func _on_resume_pressed() -> void:

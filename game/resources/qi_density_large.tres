@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="QiDensityProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/scripts/gameplay/qi_density_profile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+density = 2
+display_name = "Large"
+qi_value = 50
+absorption_duration_seconds = 1.6
+visual_scale = 1.35
+color = Color(0.72, 0.48, 1, 1)
+spawn_weight = 8.0

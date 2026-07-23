@@ -1,7 +1,8 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://game/scripts/gameplay/player.gd" id="1_script"]
 [ext_resource type="Texture2D" path="res://icon.svg" id="2_icon"]
+[ext_resource type="PackedScene" path="res://game/scenes/gameplay/player_absorption_area.tscn" id="3_absorption"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_player"]
 radius = 20.0
@@ -15,3 +16,5 @@ scale = Vector2(0.375, 0.375)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_player")
+
+[node name="QiAbsorptionArea" parent="." instance=ExtResource("3_absorption")]

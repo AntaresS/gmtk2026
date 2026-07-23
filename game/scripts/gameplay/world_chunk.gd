@@ -2,6 +2,18 @@
 class_name WorldChunk
 extends Node2D
 
+signal qi_collected(amount: int)
+
+const SMALL_QI_PROFILE: QiDensityProfile = preload(
+	"res://game/resources/qi_density_small.tres"
+)
+const MEDIUM_QI_PROFILE: QiDensityProfile = preload(
+	"res://game/resources/qi_density_medium.tres"
+)
+const LARGE_QI_PROFILE: QiDensityProfile = preload(
+	"res://game/resources/qi_density_large.tres"
+)
+
 @export_category("Chunk Definition")
 ## Shared source of chunk dimensions, road width, seed, TileSet, and tile IDs.
 ## InfiniteWorld supplies the same resource to every runtime chunk.
@@ -11,6 +23,34 @@ extends Node2D
 		config = value
 		_connect_config()
 		_request_editor_preview()
+
+@export_category("Pickup Generation")
+## Reusable Area2D scene placed into this chunk at runtime. It must instantiate
+## a QiPickup so collection can be routed through the pooled world.
+@export var qi_pickup_scene: PackedScene = preload(
+	"res://game/scenes/gameplay/qi_pickup.tscn"
+)
+
+## Minimum pickup instances in each regenerated chunk. The final count is
+## selected deterministically between this value and max_pickups_per_chunk.
+@export_range(1, 40, 1) var min_pickups_per_chunk: int = 10
+## Hard upper bound for pickup instances in each pooled chunk. This keeps total
+## pickup nodes bounded by the existing fixed chunk pool.
+@export_range(1, 40, 1) var max_pickups_per_chunk: int = 18
+## Probability that the next placement operation creates a local cluster
+## instead of one independent pickup.
+@export_range(0.0, 1.0, 0.05) var pickup_group_chance: float = 0.68
+## Minimum number of pickups requested when a cluster is generated.
+@export_range(2, 8, 1) var min_pickups_per_group: int = 2
+## Maximum number of pickups requested when a cluster is generated.
+@export_range(2, 8, 1) var max_pickups_per_group: int = 5
+## Maximum radial scatter, in world pixels, around a generated cluster center.
+@export_range(8.0, 160.0, 1.0) var pickup_group_scatter_radius: float = 58.0
+## Preferred center-to-center spacing, in world pixels. Placement retries keep
+## visuals readable while retaining visibly grouped distributions.
+@export_range(8.0, 80.0, 1.0) var minimum_pickup_spacing: float = 24.0
+## Clearance, in world pixels, between pickup centers and each road edge.
+@export_range(8.0, 100.0, 1.0) var pickup_edge_clearance: float = 34.0
 
 @export_category("Editor Preview")
 ## Draws generated terrain in the 2D editor. This affects editor visualization
@@ -37,6 +77,7 @@ extends Node2D
 
 var chunk_index: int = 0
 var _tile_map_layer: TileMapLayer
+var _pickup_container: Node2D
 var _show_fallback: bool = true
 var _preview_update_queued: bool = false
 
@@ -58,6 +99,7 @@ func configure(new_chunk_index: int, new_config: WorldChunkConfig) -> void:
 	if not is_node_ready():
 		await ready
 	_build_terrain()
+	_regenerate_pickups()
 
 
 func _ensure_tile_map_layer() -> void:
@@ -92,6 +134,191 @@ func _build_terrain() -> void:
 
 	_tile_map_layer.visible = not _show_fallback
 	queue_redraw()
+
+
+func _regenerate_pickups() -> void:
+	if Engine.is_editor_hint():
+		return
+	_ensure_pickup_container()
+	_clear_pickups()
+	if config == null or qi_pickup_scene == null:
+		return
+
+	var rng := _create_pickup_rng()
+	for pickup_position in _get_scattered_pickup_positions(rng):
+		var pickup := qi_pickup_scene.instantiate() as QiPickup
+		if pickup == null:
+			push_error("WorldChunk qi_pickup_scene must instantiate a QiPickup.")
+			return
+		_pickup_container.add_child(pickup)
+		pickup.position = pickup_position
+		pickup.configure_density(_choose_density_profile(rng))
+		pickup.qi_collected.connect(_on_qi_pickup_collected)
+
+
+func _ensure_pickup_container() -> void:
+	if is_instance_valid(_pickup_container):
+		return
+	_pickup_container = Node2D.new()
+	_pickup_container.name = "Pickups"
+	add_child(_pickup_container)
+
+
+func _clear_pickups() -> void:
+	if not is_instance_valid(_pickup_container):
+		return
+	for child in _pickup_container.get_children():
+		if child is QiPickup:
+			(child as QiPickup).disable_collection()
+		_pickup_container.remove_child(child)
+		child.queue_free()
+
+
+func _create_pickup_rng() -> RandomNumberGenerator:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(Vector3i(config.world_seed, chunk_index, 7919))
+	return rng
+
+
+func _get_scattered_pickup_positions(
+	rng: RandomNumberGenerator
+) -> Array[Vector2]:
+	var positions: Array[Vector2] = []
+	var chunk_height := config.get_pixel_size().y
+	var maximum_count := maxi(max_pickups_per_chunk, 1)
+	var minimum_count := clampi(
+		min_pickups_per_chunk,
+		1,
+		maximum_count
+	)
+	var target_count := rng.randi_range(minimum_count, maximum_count)
+	var usable_half_width := maxf(
+		config.road_half_width - pickup_edge_clearance,
+		1.0
+	)
+	var usable_half_height := maxf(chunk_height * 0.5 - 34.0, 1.0)
+	var minimum_group_size := maxi(min_pickups_per_group, 2)
+	var maximum_group_size := maxi(
+		max_pickups_per_group,
+		minimum_group_size
+	)
+
+	while positions.size() < target_count:
+		var grouped := rng.randf() < clampf(pickup_group_chance, 0.0, 1.0)
+		var requested_count := 1
+		if grouped:
+			requested_count = rng.randi_range(
+				minimum_group_size,
+				maximum_group_size
+			)
+		var group_center := Vector2(
+			rng.randf_range(-usable_half_width, usable_half_width),
+			rng.randf_range(-usable_half_height, usable_half_height)
+		)
+
+		for member_index in requested_count:
+			if positions.size() >= target_count:
+				break
+			var candidate := group_center
+			if grouped and member_index > 0:
+				var angle := rng.randf_range(0.0, TAU)
+				var scatter := rng.randf_range(
+					minimum_pickup_spacing,
+					maxf(
+						pickup_group_scatter_radius,
+						minimum_pickup_spacing
+					)
+				)
+				candidate += Vector2.from_angle(angle) * scatter
+			candidate.x = clampf(
+				candidate.x,
+				-usable_half_width,
+				usable_half_width
+			)
+			candidate.y = clampf(
+				candidate.y,
+				-usable_half_height,
+				usable_half_height
+			)
+			positions.append(
+				_find_readable_pickup_position(
+					candidate,
+					positions,
+					rng,
+					usable_half_width,
+					usable_half_height
+				)
+			)
+	return positions
+
+
+func _find_readable_pickup_position(
+	initial_position: Vector2,
+	existing_positions: Array[Vector2],
+	rng: RandomNumberGenerator,
+	usable_half_width: float,
+	usable_half_height: float
+) -> Vector2:
+	var candidate := initial_position
+	for _attempt in 8:
+		if _is_position_separated(candidate, existing_positions):
+			return candidate
+		var angle := rng.randf_range(0.0, TAU)
+		candidate += Vector2.from_angle(angle) * minimum_pickup_spacing
+		candidate.x = clampf(
+			candidate.x,
+			-usable_half_width,
+			usable_half_width
+		)
+		candidate.y = clampf(
+			candidate.y,
+			-usable_half_height,
+			usable_half_height
+		)
+	return candidate
+
+
+func _is_position_separated(
+	candidate: Vector2,
+	existing_positions: Array[Vector2]
+) -> bool:
+	var required_spacing_squared := minimum_pickup_spacing * minimum_pickup_spacing
+	for existing_position in existing_positions:
+		if candidate.distance_squared_to(existing_position) < required_spacing_squared:
+			return false
+	return true
+
+
+func _choose_density_profile(
+	rng: RandomNumberGenerator
+) -> QiDensityProfile:
+	var profiles: Array[QiDensityProfile] = [
+		SMALL_QI_PROFILE,
+		MEDIUM_QI_PROFILE,
+		LARGE_QI_PROFILE,
+	]
+	var total_weight := 0.0
+	for profile in profiles:
+		total_weight += maxf(profile.spawn_weight, 0.0)
+	if total_weight <= 0.0:
+		return SMALL_QI_PROFILE
+
+	var roll := rng.randf_range(0.0, total_weight)
+	for profile in profiles:
+		roll -= maxf(profile.spawn_weight, 0.0)
+		if roll <= 0.0:
+			return profile
+	return profiles.back()
+
+
+func _on_qi_pickup_collected(amount: int) -> void:
+	qi_collected.emit(amount)
+
+
+func get_pickup_count() -> int:
+	if not is_instance_valid(_pickup_container):
+		return 0
+	return _pickup_container.get_child_count()
 
 
 func _paint_terrain_set() -> bool:

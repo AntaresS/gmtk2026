@@ -6,3 +6,7 @@
 [node name="WorldChunk" type="Node2D" unique_id=576843391]
 script = ExtResource("1_script")
 config = ExtResource("2_config")
+min_pickups_per_chunk = 5
+max_pickups_per_chunk = 6
+pickup_group_chance = 0.2
+max_pickups_per_group = 3
