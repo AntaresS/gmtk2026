@@ -56,7 +56,7 @@ The minimal run loop is owned by separate gameplay systems:
   damage, attack and spawn faster, and increase the simultaneous-enemy cap.
   Each spawn has an eight-percent chance to become a gold-labeled elite with
   triple health, 1.6-times melee range, and a 1.25-times larger body. Every
-  defeated elite drops one `功法碎片` and one `武器威能碎片`.
+  defeated elite drops one cycling `精 / 气 / 神` cultivation fragment.
 - Horizontal input is applied immediately with no release inertia. Forward
   speed changes remain smoothed independently.
 - The player attacks automatically. The visible circle always represents only
@@ -66,7 +66,7 @@ The minimal run loop is owned by separate gameplay systems:
   evenly selected `WeaponData` resource: `刀` with 2–5 damage, `飞剑` with
   4–8 damage, or `乾坤圈` with 3–7 damage. The shared resources are the
   designer-facing source of identity, damage bounds, range, cooldown,
-  technique scaling, and projectile scenes. Weapon labels include randomized
+  cultivation type, delivery tuning, and projectile scenes. Weapon labels include randomized
   damage, follow their drops, and retain the enemy's forward velocity until
   attracted.
 - The player begins with `大力掌`. Only the current collected weapon is visible
@@ -74,29 +74,33 @@ The minimal run loop is owned by separate gameplay systems:
   auto-equip. Tab is captured before UI focus navigation and cycles the
   equipment library shown on the HUD. The player uses the looping nine-frame
   animation converted from `chara_fly.gif`; each cultivation increase adds a
-  brief cyan-and-gold expanding aura. Cultivation no longer upgrades weapons.
-- Elite technique fragments cannot be collected by direct collision or normal
-  item attraction. Each has a prominent purple recognition circle; the player
-  must remain inside continuously for 1.5 seconds, and leaving resets progress.
-  Absorption advances one shared weapon-strengthening level shown on the HUD.
-- Weapon-power fragments use a distinct orange-red recognition circle and the
-  same uninterrupted 1.5-second collection rule. Each one permanently adds one
-  base-damage point to every current and future weapon, including `大力掌`.
-- Dao attacks orbit the player every 0.5 seconds over a 94-pixel starting
-  radius. The original inner orbit remains fixed and every absorbed technique
-  fragment adds one additional persistent concentric dao path at the expanding
-  outer range. Flying swords launch
-  2,200-pixel-per-second sword-light projectiles every 0.9 seconds over a
-  240-pixel starting range; every fragment adds one sequentially launched
-  projectile and 16 pixels of range. Swept queries prevent tunneling between
-  physics frames. Regardless of weapon count, only one idle weapon accompanies
-  the player.
+  brief cyan-and-gold expanding aura.
+- Elite cultivation fragments rotate deterministically through `精 → 气 → 神`.
+  Entering their 96-pixel circle locks the displayed type and automatically
+  channels while the player remains inside for 1.2 seconds, without stopping
+  movement or combat. Leaving the circle cancels progress, unlocks the type,
+  and resumes its prior cycle point. Each type tracks an independent level and
+  `0/3` fragment progress.
+- `cultivation_config.tres` owns the three repeating reward cycles, percentage
+  values, caps, cap-conversion damage, colors, and optional icons. Secondary
+  rewards resolve as player-global stats. Only the +10% additive damage per
+  level remains affinity-specific: 刀 uses 精, 飞剑 uses 气, and 乾坤圈 uses 神.
+  Untyped weapons such as 大力掌 remain neutral for that typed damage.
+- `player_combat_config.tres` is the source of truth for player-global base
+  combat stats, caps, and overall-level growth. Every overall cultivation level
+  after level one adds one configurable flat global damage point to all current
+  and future weapons before an affinity-specific damage multiplier is applied.
+- Dao attacks orbit the player every 0.5 seconds over a 94-pixel radius.
+  Player-wide AoE bonuses expand that primary damage circle. Flying swords
+  launch 2,200-pixel-per-second sword-light projectiles every 0.9 seconds over
+  a 240-pixel range. Delivery-count rewards add sequential swords to each
+  volley. Swept queries prevent tunneling between physics frames. Regardless of
+  weapon count, only one idle weapon accompanies the player.
 - The Universe Ring homes into an enemy and then returns to the moving player.
-  Every absorbed technique fragment adds one enemy-to-enemy bounce before the
-  return. It cannot hit the same enemy twice in a row, but can alternate
-  repeatedly between two enemies until reaching its current bounce cap. Every
-  bounce compounds the next hit's damage by 20 percent. While the ring is away,
-  its idle companion is hidden.
+  Delivery count adds enemy-to-enemy bounces before its return, while 神 area
+  and targeting rewards expand its impact and search radii. Player-global
+  projectile-speed bonuses affect its outbound, bounce, and return movement.
+  While the ring is away, its idle companion is hidden.
 - Advancing beyond cultivation level nine starts nine heavenly-lightning
   strikes. Each shows a labeled ground warning near the player's predicted
   position; its random offset remains inside a guaranteed-hit radius if the
@@ -113,8 +117,10 @@ The minimal run loop is owned by separate gameplay systems:
   Every committed route recenters player and camera, migrates the pooled world
   and spawners, and can recursively generate later branches.
 - The HUD shows current lifespan decay, technique, active equipment damage,
-  shared technique strengthening, flat weapon-power bonus, and the complete
-  equipment library.
+  all three cultivation levels and fragment counts, fragment-channel progress
+  and cancellation, level reward messages, and the complete equipment library.
+  Its compact player-stat section shows live white global/final values plus
+  separately color-coded 精, 气, and 神 contributions.
 - `GameplayHud` listens to resource signals, while `game.gd` owns run-ended
   movement, enemy shutdown, and scene transitions.
 
@@ -123,4 +129,5 @@ Run the executable checks from the project root with:
 ```sh
 godot --headless --path . --script res://game/tests/foundation_smoke.gd
 godot --headless --path . --script res://game/tests/gameplay_loop_smoke.gd
+godot --headless --path . --script res://game/tests/cultivation_smoke.gd
 ```

@@ -223,6 +223,7 @@ when behavior or authority changes; stale documentation is a defect.
 ## Engineering conventions
 
 - Use typed GDScript where practical.
+- Prefer resource driven and composable driven pattern when best fit.
 - Prefer direct ownership references and focused signals over broad scene-tree
   searches.
 - Keep forward movement on negative Y and prevent reverse world travel.

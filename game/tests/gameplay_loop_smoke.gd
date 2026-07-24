@@ -540,8 +540,8 @@ func _run() -> void:
 		await _wait_process_frames(2)
 		var saw_enemy_qi_drop := false
 		var saw_weapon_drop := false
-		var saw_technique_fragment := false
-		var saw_weapon_power_fragment := false
+		var cultivation_fragment_count := 0
+		var saw_cultivation_fragment := false
 		for drop_node in enemy_spawner.get_children():
 			if drop_node is QiPickup:
 				var qi_drop := drop_node as QiPickup
@@ -565,42 +565,15 @@ func _run() -> void:
 					)
 					and weapon_drop.weapon_damage >= 2
 				)
-			elif (
-				drop_node.get_script()
-				== preload(
-					"res://game/scripts/gameplay/technique_fragment.gd"
-				)
-			):
-				var fragment_label := (
-					drop_node.get_node("DescriptionLabel") as Label
-				)
-				saw_technique_fragment = (
-					is_equal_approx(
-						float(drop_node.get("recognition_duration")),
-						1.5
-					)
-					and float(drop_node.get("recognition_radius")) >= 80.0
-					and fragment_label.visible
-					and fragment_label.text.contains(
-						"识别圈"
-					)
-				)
-			elif (
-				drop_node.get_script()
-				== preload(
-					"res://game/scripts/gameplay/weapon_power_fragment.gd"
-				)
-			):
-				var power_fragment_label := (
-					drop_node.get_node("DescriptionLabel") as Label
-				)
-				saw_weapon_power_fragment = (
-					is_equal_approx(
-						float(drop_node.get("recognition_duration")),
-						1.5
-					)
-					and int(drop_node.get("base_damage_increase")) == 1
-					and power_fragment_label.text.contains("基础攻击 +1")
+			elif drop_node is CultivationFragment:
+				var fragment := drop_node as CultivationFragment
+				cultivation_fragment_count += 1
+				saw_cultivation_fragment = (
+					is_equal_approx(fragment.channel_duration, 1.2)
+					and fragment.pickup_radius >= 90.0
+					and fragment.current_type == 0
+					and fragment.get_time_until_next_type() > 0.0
+					and fragment.description_label.text.contains("持续停留")
 				)
 		_check(saw_enemy_qi_drop, "Defeated enemy did not drop configured qi.")
 		_check(
@@ -608,12 +581,8 @@ func _run() -> void:
 			"Weapon drop did not inherit enemy velocity or show its label."
 		)
 		_check(
-			saw_technique_fragment,
-			"Elite enemy did not drop a clearly labeled technique fragment."
-		)
-		_check(
-			saw_weapon_power_fragment,
-			"Elite enemy did not drop its weapon-power fragment."
+			saw_cultivation_fragment and cultivation_fragment_count == 1,
+			"Elite enemy did not drop exactly one cycling cultivation fragment."
 		)
 	enemy_spawner.set(
 		"_elapsed_run_time",
@@ -985,65 +954,18 @@ func _run() -> void:
 	var level_one_sword_range := player.get_current_attack_range()
 	resources.add_qi(100)
 	_check(
-		player.get_weapon_upgrade_level() == 0
-		and player.get_flying_sword_projectile_count() == 1
+		player.get_flying_sword_projectile_count() == 1
+		and player.get_current_weapon_damage() == 7
+		and is_equal_approx(
+			player.get_global_combat_stats().global_damage_bonus,
+			1.0
+		)
 		and is_equal_approx(
 			player.get_current_attack_range(),
 			level_one_sword_range
 		),
-		"Cultivation incorrectly auto-upgraded the flying sword."
+		"Overall Qi did not add global damage while preserving delivery/range."
 	)
-	var first_fragment: Node2D = preload(
-		"res://game/scenes/gameplay/technique_fragment.tscn"
-	).instantiate() as Node2D
-	first_fragment.call("configure", player, Vector2(0.0, -1.0))
-	first_fragment.connect(
-		"fragment_collected",
-		player.add_weapon_upgrade_fragments
-	)
-	root.add_child(first_fragment)
-	first_fragment.global_position = player.global_position
-	await _wait_physics_frames(2)
-	_check(
-		player.get_weapon_upgrade_level() == 0
-		and is_instance_valid(first_fragment)
-		and float(first_fragment.call("get_recognition_progress")) > 0.0,
-		"Direct fragment collision bypassed its 1.5-second recognition."
-	)
-	first_fragment.global_position = (
-		player.global_position + Vector2(200.0, 0.0)
-	)
-	await _wait_physics_frames(2)
-	_check(
-		is_zero_approx(
-			float(first_fragment.call("get_recognition_progress"))
-		),
-		"Leaving the fragment recognition circle did not reset progress."
-	)
-	first_fragment.global_position = player.global_position
-	await _wait_physics_frames(100)
-	_check(
-		player.get_weapon_upgrade_level() == 1
-		and not is_instance_valid(first_fragment),
-		"Staying in the fragment circle for 1.5 seconds did not absorb it."
-	)
-	_check(
-		player.get_flying_sword_projectile_count() == 2,
-		"First technique fragment did not add a flying-sword projectile."
-	)
-	_check(
-		player.get_visible_companion_weapon_count() == 1,
-		"Multiple flying swords appeared as multiple idle companions."
-	)
-	_check(
-		is_equal_approx(
-			player.get_current_attack_range(),
-			level_one_sword_range
-				+ FLYING_SWORD_DATA.range_increase_per_upgrade
-		),
-		"First technique fragment did not expand flying-sword range."
-	)
-
 	var flying_target := preload(
 		"res://game/scenes/gameplay/enemy.tscn"
 	).instantiate() as EnemyController
@@ -1052,22 +974,12 @@ func _run() -> void:
 	flying_target.cruise_speed = 1.0
 	root.add_child(flying_target)
 	flying_target.global_position = (
-		player.global_position
-		+ Vector2(0.0, -(level_one_sword_range + 8.0))
+		player.global_position + Vector2(0.0, -80.0)
 	)
-	var saw_sequential_sword_wait := false
-	for _sequence_frame in 10:
-		await physics_frame
-		if player.get_pending_flying_sword_count() == 1:
-			saw_sequential_sword_wait = true
+	await _wait_physics_frames(30)
 	_check(
-		saw_sequential_sword_wait,
-		"Fragment-upgraded flying swords were launched simultaneously."
-	)
-	await _wait_physics_frames(20)
-	_check(
-		flying_target.current_health <= 87,
-		"Fragment-upgraded flying sword did not launch two projectiles."
+		flying_target.current_health <= 93,
+		"Base Flying Sword did not launch its single projectile."
 	)
 	flying_target.queue_free()
 	await _wait_process_frames(2)
@@ -1077,20 +989,13 @@ func _run() -> void:
 		"First dao was not added to the equipment library."
 	)
 	_check(
-		player.get_dao_orbit_count() == 2,
-		"First technique fragment did not add the dao's outer orbit."
-	)
-	_check(
-		player.get_visible_companion_weapon_count() == 1,
-		"Upgraded dao displayed more than one idle companion."
-	)
-	_check(
-		is_equal_approx(
+		player.get_dao_orbit_count() == 1
+		and player.get_visible_companion_weapon_count() == 1
+		and is_equal_approx(
 			player.get_current_attack_range(),
 			DAO_DATA.attack_range
-				+ DAO_DATA.range_increase_per_upgrade
 		),
-		"First technique fragment did not expand dao attack range."
+		"Dao did not retain its base single-orbit behavior."
 	)
 	var dao_target := preload(
 		"res://game/scenes/gameplay/enemy.tscn"
@@ -1100,8 +1005,7 @@ func _run() -> void:
 	dao_target.cruise_speed = 1.0
 	root.add_child(dao_target)
 	dao_target.global_position = (
-		player.global_position
-		+ Vector2(0.0, -(DAO_DATA.attack_range + 8.0))
+		player.global_position + Vector2(0.0, -70.0)
 	)
 	await _wait_physics_frames(20)
 	_check(
@@ -1111,33 +1015,6 @@ func _run() -> void:
 	dao_target.queue_free()
 	await _wait_process_frames(2)
 
-	resources.add_qi(100)
-	_check(
-		player.get_weapon_upgrade_level() == 1,
-		"Cultivation level three incorrectly granted a weapon upgrade."
-	)
-	var second_fragment: Node2D = preload(
-		"res://game/scenes/gameplay/technique_fragment.tscn"
-	).instantiate() as Node2D
-	second_fragment.call("configure", player, Vector2(0.0, -1.0))
-	second_fragment.connect(
-		"fragment_collected",
-		player.add_weapon_upgrade_fragments
-	)
-	root.add_child(second_fragment)
-	second_fragment.global_position = player.global_position
-	await _wait_physics_frames(100)
-	_check(
-		player.get_weapon_upgrade_level() == 2,
-		"Second recognized technique fragment did not upgrade all weapons."
-	)
-	_check(
-		player.get_dao_orbit_count() == 3
-		and is_equal_approx(player.get_dao_orbit_radius(0), 52.0)
-		and player.get_dao_orbit_radius(2)
-			> player.get_dao_orbit_radius(1),
-		"Each technique fragment did not add a stable new dao orbit path."
-	)
 	var slow_ring_data := QIANKUN_RING_DATA.duplicate() as WeaponDataResource
 	slow_ring_data.attack_interval = 10.0
 	var ring_pickup := preload(
@@ -1157,77 +1034,32 @@ func _run() -> void:
 	await _wait_physics_frames(30)
 	_check(
 		player.get_weapon_name() == "乾坤圈"
-		and player.get_current_weapon_damage() == 5,
-		"Universe Ring pickup was not collected and equipped."
+		and player.get_current_weapon_damage() == 6
+		and player.get_qiankun_ring_bounce_count() == 0,
+		"Universe Ring did not retain its base no-bounce behavior."
 	)
-	_check(
-		player.get_qiankun_ring_bounce_count() == 2,
-		"Two technique fragments did not grant two extra ring bounces."
+	var ring_target := preload(
+		"res://game/scenes/gameplay/enemy.tscn"
+	).instantiate() as EnemyController
+	ring_target.player = player
+	ring_target.max_health = 99
+	ring_target.cruise_speed = 1.0
+	root.add_child(ring_target)
+	ring_target.global_position = (
+		player.global_position + Vector2(0.0, -70.0)
 	)
-	var ring_targets: Array[EnemyController] = []
-	var ring_target_offsets := [
-		Vector2(0.0, -70.0),
-		Vector2(55.0, -96.0),
-	]
-	for ring_target_offset in ring_target_offsets:
-		var ring_target := preload(
-			"res://game/scenes/gameplay/enemy.tscn"
-		).instantiate() as EnemyController
-		ring_target.player = player
-		ring_target.max_health = 99
-		ring_target.cruise_speed = 1.0
-		root.add_child(ring_target)
-		ring_target.global_position = (
-			player.global_position + ring_target_offset
-		)
-		ring_targets.append(ring_target)
 	await _wait_physics_frames(70)
-	var total_ring_target_health := 0
-	var all_ring_targets_hit := true
-	for ring_target in ring_targets:
-		all_ring_targets_hit = (
-			all_ring_targets_hit and ring_target.current_health <= 94
-		)
-		total_ring_target_health += ring_target.current_health
-		ring_target.queue_free()
 	_check(
-		all_ring_targets_hit and total_ring_target_health == 180,
-		"Universe Ring did not alternate A-B-A with proportional bounce damage."
+		ring_target.current_health == 93,
+		"Base Universe Ring did not deal one hit before returning."
 	)
+	ring_target.queue_free()
 	_check(
-		not player.is_qiankun_ring_in_flight(),
-		"Universe Ring did not return to the player after its bounces."
-	)
-	_check(
-		player.get_visible_companion_weapon_count() == 1,
-		"Returned Universe Ring did not resume as the single companion weapon."
+		not player.is_qiankun_ring_in_flight()
+		and player.get_visible_companion_weapon_count() == 1,
+		"Universe Ring did not return as the single companion weapon."
 	)
 	await _wait_process_frames(2)
-
-	var damage_before_power_fragment := player.get_current_weapon_damage()
-	var power_fragment: Node2D = preload(
-		"res://game/scenes/gameplay/weapon_power_fragment.tscn"
-	).instantiate() as Node2D
-	power_fragment.call("configure", player, Vector2(0.0, -1.0))
-	power_fragment.connect(
-		"power_fragment_collected",
-		player.add_weapon_power_fragments
-	)
-	root.add_child(power_fragment)
-	power_fragment.global_position = player.global_position
-	await _wait_physics_frames(2)
-	_check(
-		player.get_weapon_power_bonus() == 0
-		and is_instance_valid(power_fragment),
-		"Weapon-power fragment was collected without recognition time."
-	)
-	await _wait_physics_frames(100)
-	_check(
-		player.get_weapon_power_bonus() == 1
-		and player.get_current_weapon_damage()
-			== damage_before_power_fragment + 1,
-		"Weapon-power fragment did not raise base damage for all weapons."
-	)
 
 	var tab_press := InputEventKey.new()
 	tab_press.keycode = KEY_TAB
@@ -1246,12 +1078,10 @@ func _run() -> void:
 	)
 	_check(
 		hud.equipment_library_label.text.contains("刀  伤害 5")
-		and hud.equipment_library_label.text.contains("飞剑  伤害 7")
-		and hud.equipment_library_label.text.contains("乾坤圈  伤害 6")
-		and hud.equipment_library_label.text.contains("功法碎片强化 +2")
-		and hud.equipment_library_label.text.contains("武器威能 +1"),
-		"HUD equipment library did not list collected best weapons."
-	)
+			and hud.equipment_library_label.text.contains("飞剑  伤害 7")
+			and hud.equipment_library_label.text.contains("乾坤圈  伤害 6"),
+			"HUD equipment library did not list collected best weapons."
+		)
 
 	var lifespan_before_tribulation := resources.current_lifespan
 	var maximum_before_tribulation := resources.max_lifespan

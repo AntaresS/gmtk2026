@@ -51,12 +51,18 @@ func _draw() -> void:
 	draw_circle(Vector2(22.0, 0.0), 3.0, Color.WHITE)
 
 
-## Initializes one straight flying-sword attack from the player's current
-## target, damage, and fixed equipment range.
-func configure(direction: Vector2, damage: int, maximum_distance: float) -> void:
+## Initializes one straight flying-sword attack with final cultivation-adjusted
+## delivery stats supplied by PlayerController's centralized stat pipeline.
+func configure(
+	direction: Vector2,
+	damage: int,
+	maximum_distance: float,
+	speed_multiplier: float = 1.0
+) -> void:
 	_direction = direction.normalized()
 	_damage = maxi(damage, 1)
 	_maximum_distance = maxf(maximum_distance, 1.0)
+	travel_speed *= maxf(speed_multiplier, 0.01)
 	rotation = _direction.angle()
 
 
@@ -72,8 +78,8 @@ func _on_body_entered(body: Node2D) -> void:
 func _hit_enemy(enemy: EnemyController) -> void:
 	if _spent or not enemy.is_combat_active():
 		return
-	_spent = true
 	enemy.take_melee_damage(_damage)
+	_spent = true
 	collision_layer = 0
 	collision_mask = 0
 

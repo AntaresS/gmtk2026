@@ -9,14 +9,36 @@ signal equipment_changed(
 	damage: int
 )
 signal equipment_inventory_changed(entries: Array[String], current_index: int)
-signal weapon_upgrade_changed(level: int)
-signal weapon_power_changed(bonus_damage: int)
+## Publishes fresh read-only player-wide and current-weapon snapshots whenever
+## equipment or cultivation progression changes.
+signal combat_stats_changed(
+	global_stats: PlayerGlobalCombatStatsResource,
+	weapon_stats: WeaponCombatStatsResource
+)
 
 const WeaponDataResource = preload(
 	"res://game/scripts/gameplay/weapon_data.gd"
 )
 const DEFAULT_STARTING_WEAPON_DATA: WeaponDataResource = preload(
 	"res://game/resources/great_strength_palm.tres"
+)
+const CultivationTypesResource = preload(
+	"res://game/scripts/gameplay/cultivation_types.gd"
+)
+const PlayerGlobalCombatStatsResource = preload(
+	"res://game/scripts/gameplay/player_global_combat_stats.gd"
+)
+const WeaponCombatStatsResource = preload(
+	"res://game/scripts/gameplay/weapon_combat_stats.gd"
+)
+const CombatStatsResolverResource = preload(
+	"res://game/scripts/gameplay/combat_stats_resolver.gd"
+)
+const PlayerCombatConfigResource = preload(
+	"res://game/scripts/gameplay/player_combat_config.gd"
+)
+const DEFAULT_PLAYER_COMBAT_CONFIG: PlayerCombatConfigResource = preload(
+	"res://game/resources/player_combat_config.tres"
 )
 
 @export_category("Forward Movement")
@@ -45,6 +67,13 @@ const DEFAULT_STARTING_WEAPON_DATA: WeaponDataResource = preload(
 ## is also presented as the player's cultivation technique on the HUD.
 @export var starting_weapon_data: WeaponDataResource = (
 	DEFAULT_STARTING_WEAPON_DATA
+)
+
+@export_category("Combat Configuration")
+## Designer-authored source of truth for player-wide base combat stats and
+## global safety limits. Runtime snapshots read this Resource without mutating it.
+@export var combat_config: PlayerCombatConfigResource = (
+	DEFAULT_PLAYER_COMBAT_CONFIG
 )
 
 @export_category("Collectible Attraction")
@@ -89,8 +118,6 @@ var distance_traveled: float = 0.0
 var current_attraction_range: float = 72.0
 var road_center_x: float = 0.0
 var current_cultivation_level: int = 1
-var weapon_upgrade_level: int = 0
-var weapon_power_bonus: int = 0
 
 var _movement_enabled: bool = true
 var _attack_cooldown_remaining: float = 0.0
@@ -115,6 +142,13 @@ var _flying_sword_sequence_timer: float = 0.0
 var _level_up_effect_remaining: float = 0.0
 var _breakthrough_effect_remaining: float = 0.0
 var _qiankun_ring_in_flight: bool = false
+var _cultivation_resources: RunResources
+var _global_combat_stats: PlayerGlobalCombatStatsResource = (
+	PlayerGlobalCombatStatsResource.new()
+)
+var _current_weapon_combat_stats: WeaponCombatStatsResource = (
+	WeaponCombatStatsResource.new()
+)
 
 
 func _ready() -> void:
@@ -125,6 +159,9 @@ func _ready() -> void:
 	current_forward_speed = maxf(base_forward_speed, 1.0)
 	_last_lifespan_decay_multiplier = get_lifespan_decay_multiplier()
 	current_attraction_range = base_attraction_range
+	if combat_config == null:
+		push_error("Player combat_config must contain a PlayerCombatConfig.")
+		combat_config = DEFAULT_PLAYER_COMBAT_CONFIG
 	if starting_weapon_data == null or not starting_weapon_data.is_valid_definition():
 		push_error("Player starting_weapon_data must contain a valid WeaponData.")
 		starting_weapon_data = DEFAULT_STARTING_WEAPON_DATA
@@ -135,6 +172,7 @@ func _ready() -> void:
 		)
 	]
 	_current_equipment_index = 0
+	_rebuild_combat_stats()
 	_apply_attack_range()
 	_apply_attraction_range()
 	_publish_equipment()
@@ -269,17 +307,28 @@ func set_movement_enabled(enabled: bool) -> void:
 		_cancel_flying_sword_sequence()
 
 
-## Receives enemy melee damage and reports it to the run resource owner.
-func take_melee_damage(amount: float) -> void:
+## Receives direct damage and reports its cultivation-adjusted amount to the
+## run resource owner. Known nearby sources receive 精 close-range mitigation;
+## source-less hazards preserve their authored damage.
+func take_melee_damage(amount: float, source: Node2D = null) -> void:
 	if not _movement_enabled or amount <= 0.0:
 		return
-	_last_damage_amount = amount
+	var resolved_amount := amount
+	if (
+		is_instance_valid(source)
+		and global_position.distance_to(source.global_position)
+			<= _global_combat_stats.close_range_mitigation_radius
+	):
+		resolved_amount *= (
+			1.0 - _global_combat_stats.close_range_damage_reduction
+		)
+	_last_damage_amount = resolved_amount
 	_damage_flash_remaining = maxf(damage_feedback_duration, 0.01)
-	damage_taken_label.text = "-%.1f 寿元" % amount
+	damage_taken_label.text = "-%.1f 寿元" % resolved_amount
 	damage_taken_label.show()
 	_update_damage_feedback_presentation()
 	queue_redraw()
-	melee_damage_received.emit(amount)
+	melee_damage_received.emit(resolved_amount)
 
 
 ## Returns whether the player-centered direct-damage reaction is active.
@@ -339,19 +388,61 @@ func get_weapon_name() -> String:
 
 
 func get_current_weapon_damage() -> int:
-	return (
-		int(_get_current_equipment()["damage"])
-		+ maxi(weapon_power_bonus, 0)
-	)
+	return _current_weapon_combat_stats.resolved_damage
 
 
 func get_current_attack_range() -> float:
-	var weapon_data := _get_current_weapon_data()
-	return (
-		weapon_data.attack_range
-		+ float(maxi(weapon_upgrade_level, 0))
-			* weapon_data.range_increase_per_upgrade
+	return _current_weapon_combat_stats.attack_range
+
+
+## Returns the latest player-wide read-only combat snapshot.
+func get_global_combat_stats() -> PlayerGlobalCombatStatsResource:
+	return _global_combat_stats
+
+
+## Returns the latest read-only snapshot for the equipped weapon.
+func get_current_weapon_combat_stats() -> WeaponCombatStatsResource:
+	return _current_weapon_combat_stats
+
+
+## Connects final weapon-stat calculation to the existing run-state owner.
+## Progression remains in RunResources; this class only consumes snapshots.
+func bind_cultivation(resources: RunResources) -> void:
+	if (
+		_cultivation_resources != null
+		and _cultivation_resources.cultivation_stats_changed.is_connected(
+			_on_cultivation_stats_changed
+		)
+	):
+		_cultivation_resources.cultivation_stats_changed.disconnect(
+			_on_cultivation_stats_changed
+		)
+	_cultivation_resources = resources
+	if _cultivation_resources != null:
+		_cultivation_resources.cultivation_stats_changed.connect(
+			_on_cultivation_stats_changed
+		)
+	_on_cultivation_stats_changed(
+		CultivationTypesResource.CultivationType.JING,
+		0
 	)
+
+
+func get_current_attack_interval() -> float:
+	return _current_weapon_combat_stats.attack_interval
+
+
+func get_current_projectile_speed_multiplier() -> float:
+	return _current_weapon_combat_stats.projectile_speed_multiplier
+
+
+## Returns the equipped weapon's total delivery count after global bonuses.
+func get_current_delivery_count() -> int:
+	return _current_weapon_combat_stats.delivery_count
+
+
+func get_current_aoe_radius() -> float:
+	return _current_weapon_combat_stats.aoe_radius
 
 
 ## Returns the immutable shared definition for the currently equipped weapon.
@@ -359,80 +450,26 @@ func get_current_weapon_data() -> WeaponDataResource:
 	return _get_current_weapon_data()
 
 
-## Returns the original inner dao path plus one new concentric path per
-## absorbed technique fragment.
+## Dao uses its original single orbit; cultivation now modifies generic stats
+## rather than adding weapon-specific legacy paths.
 func get_dao_orbit_count() -> int:
-	var weapon_data := _get_current_weapon_data()
-	return (
-		1
-		+ maxi(weapon_upgrade_level, 0)
-			* maxi(weapon_data.additional_effects_per_upgrade, 0)
-	)
+	return 1
 
 
 ## Returns a stable radius for one dao path. Existing paths keep their radius
 ## when a later fragment adds the next outer path.
 func get_dao_orbit_radius(orbit_index: int) -> float:
-	if orbit_index <= 0:
-		return 52.0
-	var weapon_data := _get_current_weapon_data()
-	return maxf(
-		weapon_data.attack_range - 12.0
-			+ float(orbit_index) * weapon_data.range_increase_per_upgrade,
-		62.0
-	)
+	return 52.0 + float(maxi(orbit_index, 0)) * 12.0
 
 
 ## Returns the number of projectiles launched by one flying-sword volley.
 func get_flying_sword_projectile_count() -> int:
-	var weapon_data := _get_current_weapon_data()
-	return (
-		1
-		+ maxi(weapon_upgrade_level, 0)
-			* maxi(weapon_data.additional_effects_per_upgrade, 0)
-	)
+	return get_current_delivery_count()
 
 
 ## Returns extra enemy-to-enemy bounces before the Universe Ring comes back.
 func get_qiankun_ring_bounce_count() -> int:
-	var weapon_data := _get_current_weapon_data()
-	return (
-		maxi(weapon_upgrade_level, 0)
-		* maxi(weapon_data.additional_effects_per_upgrade, 0)
-	)
-
-
-func get_weapon_upgrade_level() -> int:
-	return weapon_upgrade_level
-
-
-## Absorbs one or more elite technique fragments. This is the only path that
-## upgrades dao, flying-sword, and Universe Ring attack behavior.
-func add_weapon_upgrade_fragments(amount: int = 1) -> void:
-	if amount <= 0:
-		return
-	weapon_upgrade_level += amount
-	_apply_attack_range()
-	_level_up_effect_remaining = maxf(level_up_effect_duration, 0.01)
-	weapon_upgrade_changed.emit(weapon_upgrade_level)
-	_publish_equipment()
-	queue_redraw()
-
-
-func get_weapon_power_bonus() -> int:
-	return weapon_power_bonus
-
-
-## Adds flat base damage to every existing and future weapon. Elite weapon
-## power fragments are the only normal gameplay source of this bonus.
-func add_weapon_power_fragments(amount: int = 1) -> void:
-	if amount <= 0:
-		return
-	weapon_power_bonus += amount
-	_level_up_effect_remaining = maxf(level_up_effect_duration, 0.01)
-	weapon_power_changed.emit(weapon_power_bonus)
-	_publish_equipment()
-	queue_redraw()
+	return maxi(get_current_delivery_count() - 1, 0)
 
 
 func is_qiankun_ring_in_flight() -> bool:
@@ -497,7 +534,7 @@ func get_equipment_inventory_entries() -> Array[String]:
 			"%s%s  伤害 %d" % [
 				marker,
 				weapon_data.display_name,
-				int(equipment["damage"]) + maxi(weapon_power_bonus, 0),
+					_get_equipment_damage(equipment),
 			]
 		)
 	return entries
@@ -534,8 +571,8 @@ func get_active_lateral_bounds() -> Vector2:
 	)
 
 
-## Cultivation expands only collectible attraction. Weapon behavior is
-## upgraded independently by elite technique fragments.
+## Overall Qi cultivation continues to expand collectible attraction. The
+## independent 精/气/神 tracks are consumed through bind_cultivation().
 func apply_cultivation_level(level: int) -> void:
 	var previous_level := current_cultivation_level
 	current_cultivation_level = maxi(level, 1)
@@ -545,6 +582,10 @@ func apply_cultivation_level(level: int) -> void:
 			* attraction_range_increase_per_level
 	)
 	_apply_attraction_range()
+	if is_node_ready() and not _equipment_inventory.is_empty():
+		_rebuild_combat_stats()
+		_apply_attack_range()
+		_publish_equipment()
 	if current_cultivation_level > previous_level:
 		_level_up_effect_remaining = maxf(level_up_effect_duration, 0.01)
 	queue_redraw()
@@ -573,7 +614,7 @@ func _update_weapon_attack(delta: float) -> void:
 		and _qiankun_ring_in_flight
 	):
 		return
-	var damage := get_current_weapon_damage()
+	var damage := _roll_current_attack_damage()
 
 	if attack_kind == WeaponDataResource.AttackKind.DAO:
 		for enemy in targets:
@@ -587,7 +628,7 @@ func _update_weapon_attack(delta: float) -> void:
 		targets[0].take_melee_damage(damage)
 		_attack_flash_remaining = 0.12
 
-	_attack_cooldown_remaining = maxf(weapon_data.attack_interval, 0.1)
+	_attack_cooldown_remaining = get_current_attack_interval()
 	queue_redraw()
 
 
@@ -676,7 +717,12 @@ func _launch_flying_sword(
 	var direction := spawn_position.direction_to(target.global_position)
 	get_parent().add_child(projectile)
 	projectile.global_position = spawn_position
-	projectile.configure(direction, damage, get_current_attack_range())
+	projectile.configure(
+		direction,
+		damage,
+		get_current_attack_range(),
+		get_current_projectile_speed_multiplier()
+	)
 
 
 func _launch_qiankun_ring(
@@ -703,7 +749,9 @@ func _launch_qiankun_ring(
 		target,
 		damage,
 		get_qiankun_ring_bounce_count(),
-		weapon_data.secondary_range
+		_current_weapon_combat_stats.secondary_targeting_range,
+		get_current_aoe_radius(),
+		get_current_projectile_speed_multiplier()
 	)
 	projectile.returned_to_player.connect(
 		_on_qiankun_ring_returned,
@@ -1076,9 +1124,68 @@ func _get_current_weapon_data() -> WeaponDataResource:
 	return _get_current_equipment()["data"] as WeaponDataResource
 
 
+func _get_equipment_damage(equipment: Dictionary) -> int:
+	var weapon_data := equipment["data"] as WeaponDataResource
+	var base_damage := int(equipment["damage"])
+	return CombatStatsResolverResource.resolve_weapon(
+		weapon_data,
+		base_damage,
+		_cultivation_resources,
+		_global_combat_stats
+	).resolved_damage
+
+
+func _rebuild_combat_stats() -> void:
+	_global_combat_stats = CombatStatsResolverResource.resolve_global(
+		_cultivation_resources,
+		combat_config
+	)
+	if _equipment_inventory.is_empty():
+		_current_weapon_combat_stats = WeaponCombatStatsResource.new()
+	else:
+		var equipment := _get_current_equipment()
+		_current_weapon_combat_stats = CombatStatsResolverResource.resolve_weapon(
+			equipment["data"] as WeaponDataResource,
+			int(equipment["damage"]),
+			_cultivation_resources,
+			_global_combat_stats
+		)
+	combat_stats_changed.emit(
+		_global_combat_stats,
+		_current_weapon_combat_stats
+	)
+
+
+func _roll_current_attack_damage() -> int:
+	var damage := _current_weapon_combat_stats.resolved_damage
+	if randf() >= _current_weapon_combat_stats.critical_chance:
+		return damage
+	return maxi(
+		roundi(
+			float(damage)
+				* _current_weapon_combat_stats.critical_damage_multiplier
+		),
+		1
+	)
+
+
+func _on_cultivation_stats_changed(
+	_cultivation_type: int,
+	_level: int
+) -> void:
+	if not is_node_ready() or _equipment_inventory.is_empty():
+		return
+	_rebuild_combat_stats()
+	_apply_attack_range()
+	_level_up_effect_remaining = maxf(level_up_effect_duration, 0.01)
+	_publish_equipment()
+	queue_redraw()
+
+
 func _on_current_equipment_changed() -> void:
 	_attack_cooldown_remaining = 0.0
 	_cancel_flying_sword_sequence()
+	_rebuild_combat_stats()
 	_apply_attack_range()
 	_publish_equipment()
 	queue_redraw()

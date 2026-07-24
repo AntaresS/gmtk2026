@@ -100,7 +100,7 @@ horizontal_alignment = 1
 layout_mode = 1
 anchors_preset = 0
 offset_right = 380.0
-offset_bottom = 430.0
+offset_bottom = 540.0
 theme_override_constants/margin_left = 24
 theme_override_constants/margin_top = 24
 
@@ -159,6 +159,17 @@ layout_mode = 2
 value = 0.0
 show_percentage = false
 
+[node name="CultivationTracksLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.86, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.75)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 18
+text = "精 Lv.0  0/3
+气 Lv.0  0/3
+神 Lv.0  0/3"
+
 [node name="TechniqueLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -171,6 +182,34 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "当前装备  大力掌  · 伤害 1"
 
+[node name="PlayerStatsPanel" type="PanelContainer" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
+layout_mode = 2
+
+[node name="PlayerStatsMargin" type="MarginContainer" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats/PlayerStatsPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 9
+theme_override_constants/margin_top = 7
+theme_override_constants/margin_right = 9
+theme_override_constants/margin_bottom = 7
+
+[node name="PlayerStatsLabel" type="RichTextLabel" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats/PlayerStatsPanel/PlayerStatsMargin"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 146)
+layout_mode = 2
+theme_override_colors/default_color = Color(0.94, 0.95, 0.98, 1)
+theme_override_font_sizes/normal_font_size = 14
+theme_override_font_sizes/bold_font_size = 15
+bbcode_enabled = true
+text = "[b]角色属性[/b]
+基础  练气 Lv.1 · 全局伤害 +0.0 · 大力掌伤害 1
+总览  暴击 0% / 150% · 攻速 +0%
+投射  弹速 ×1.00 · 御器 +0 · 范围 +0% · 索敌 +0%
+[color=#ff7d40]精  暴击 +0% · 暴伤 +0% · 近减 +0%[/color]
+[color=#38d1ff]气  攻速 +0% · 弹速 +0% · 御器 +0[/color]
+[color=#c763ff]神  范围 +0% · 御器 +0 · 索敌 +0%[/color]"
+fit_content = true
+scroll_active = false
+
 [node name="EquipmentLibraryLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -178,9 +217,43 @@ theme_override_colors/font_color = Color(0.82, 0.9, 1, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
 theme_override_constants/outline_size = 2
 theme_override_font_sizes/font_size = 15
-text = "功法碎片强化 +0 · 武器威能 +0
-装备库（Tab 切换）
+text = "装备库（Tab 切换）
 ▶ 大力掌  伤害 1"
+
+[node name="ChannelFeedback" type="VBoxContainer" parent="HudRoot"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -170.0
+offset_top = -170.0
+offset_right = 170.0
+offset_bottom = -105.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 6
+
+[node name="ChannelLabel" type="Label" parent="HudRoot/ChannelFeedback"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.95, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 5
+theme_override_font_sizes/font_size = 22
+text = "精之碎片 · 引导中"
+horizontal_alignment = 1
+
+[node name="ChannelProgress" type="ProgressBar" parent="HudRoot/ChannelFeedback"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(340, 18)
+layout_mode = 2
+max_value = 1.0
+step = 0.001
+show_percentage = false
 
 [node name="LevelMessageCenter" type="CenterContainer" parent="HudRoot"]
 layout_mode = 1
@@ -209,4 +282,10 @@ unique_name_in_owner = true
 wait_time = 1.8
 one_shot = true
 
+[node name="ChannelFeedbackTimer" type="Timer" parent="."]
+unique_name_in_owner = true
+wait_time = 0.8
+one_shot = true
+
 [connection signal="timeout" from="LevelUpTimer" to="." method="_on_level_up_timer_timeout"]
+[connection signal="timeout" from="ChannelFeedbackTimer" to="." method="_on_channel_feedback_timer_timeout"]

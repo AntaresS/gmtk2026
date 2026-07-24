@@ -24,6 +24,8 @@ var _finished: bool = false
 var _lifetime_remaining: float = 8.0
 var _last_hit_enemy_id: int = 0
 var _successful_hit_count: int = 0
+var _aoe_radius: float = 0.0
+var _projectile_speed_multiplier: float = 1.0
 
 
 ## Launches the ring at one enemy. `bounce_count` counts extra enemy hits
@@ -33,13 +35,20 @@ func configure(
 	initial_target: EnemyController,
 	damage: int,
 	bounce_count: int,
-	bounce_search_range: float
+	bounce_search_range: float,
+	aoe_radius: float = 0.0,
+	projectile_speed_multiplier: float = 1.0
 ) -> void:
 	_player = player
 	_target = initial_target
 	_damage = maxi(damage, 1)
 	_remaining_bounces = maxi(bounce_count, 0)
 	_bounce_search_range = maxf(bounce_search_range, 1.0)
+	_aoe_radius = maxf(aoe_radius, 0.0)
+	_projectile_speed_multiplier = maxf(
+		projectile_speed_multiplier,
+		0.01
+	)
 	_lifetime_remaining = maxf(maximum_lifetime, 1.0)
 
 
@@ -92,7 +101,9 @@ func _draw() -> void:
 
 
 func _move_toward_enemy(delta: float) -> void:
-	var step_distance := maxf(travel_speed, 1.0) * delta
+	var step_distance := (
+		maxf(travel_speed, 1.0) * _projectile_speed_multiplier * delta
+	)
 	var next_position := global_position.move_toward(
 		_target.global_position,
 		step_distance
@@ -123,7 +134,7 @@ func _move_toward_enemy(delta: float) -> void:
 func _move_back_to_player(delta: float) -> void:
 	global_position = global_position.move_toward(
 		_player.global_position,
-		maxf(return_speed, 1.0) * delta
+		maxf(return_speed, 1.0) * _projectile_speed_multiplier * delta
 	)
 	if global_position.distance_to(_player.global_position) <= 18.0:
 		_finish_return()
@@ -153,6 +164,7 @@ func _hit_enemy(enemy: EnemyController) -> void:
 	)
 	_successful_hit_count += 1
 	enemy.take_melee_damage(scaled_damage)
+	_apply_aoe_damage(enemy, scaled_damage)
 	enemy_hit.emit(enemy)
 	if _remaining_bounces <= 0:
 		_begin_return()
@@ -163,6 +175,22 @@ func _hit_enemy(enemy: EnemyController) -> void:
 		return
 	_remaining_bounces -= 1
 	_target = next_target
+
+
+func _apply_aoe_damage(primary_enemy: EnemyController, damage: int) -> void:
+	if _aoe_radius <= 0.0:
+		return
+	for enemy_node in get_tree().get_nodes_in_group("enemies"):
+		if enemy_node is not EnemyController:
+			continue
+		var enemy := enemy_node as EnemyController
+		if (
+			enemy == primary_enemy
+			or not enemy.is_combat_active()
+			or enemy.global_position.distance_to(global_position) > _aoe_radius
+		):
+			continue
+		enemy.take_melee_damage(damage)
 
 
 func _select_next_target_or_return() -> void:

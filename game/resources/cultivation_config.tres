@@ -1,0 +1,90 @@
+[gd_resource type="Resource" script_class="CultivationConfig" format=3 uid="uid://cw5fv1yprha66"]
+
+[ext_resource type="Script" uid="uid://cnmpric4cvxkf" path="res://game/scripts/gameplay/cultivation_config.gd" id="1_config"]
+[ext_resource type="Script" uid="uid://ji15x81wrafj" path="res://game/scripts/gameplay/cultivation_type_config.gd" id="2_type"]
+[ext_resource type="Script" uid="uid://bgp507pspsiwr" path="res://game/scripts/gameplay/cultivation_reward.gd" id="3_reward"]
+
+[sub_resource type="Resource" id="RewardJingCritChance"]
+script = ExtResource("3_reward")
+display_name = "暴击率 +2%"
+amount = 0.02
+cap = 0.2
+
+[sub_resource type="Resource" id="RewardJingCritDamage"]
+script = ExtResource("3_reward")
+stat = 1
+display_name = "暴击伤害 +15%"
+amount = 0.15
+cap = 1.5
+
+[sub_resource type="Resource" id="RewardJingReduction"]
+script = ExtResource("3_reward")
+stat = 2
+display_name = "近距离减伤 +3%"
+amount = 0.03
+cap = 0.3
+
+[sub_resource type="Resource" id="TypeJing"]
+script = ExtResource("2_type")
+display_color = Color(1, 0.49, 0.25, 1)
+rewards = Array[ExtResource("3_reward")]([SubResource("RewardJingCritChance"), SubResource("RewardJingCritDamage"), SubResource("RewardJingReduction")])
+
+[sub_resource type="Resource" id="RewardQiAttackSpeed"]
+script = ExtResource("3_reward")
+stat = 3
+display_name = "攻速 +5%"
+amount = 0.05
+cap = 0.5
+
+[sub_resource type="Resource" id="RewardQiProjectileSpeed"]
+script = ExtResource("3_reward")
+stat = 4
+display_name = "飞行速度 +10%"
+amount = 0.1
+cap = 1.0
+
+[sub_resource type="Resource" id="RewardQiDelivery"]
+script = ExtResource("3_reward")
+stat = 5
+display_name = "御器次数 +1"
+amount = 1.0
+cap = 4.0
+
+[sub_resource type="Resource" id="TypeQi"]
+script = ExtResource("2_type")
+cultivation_type = 1
+display_name = "气"
+display_color = Color(0.22, 0.82, 1, 1)
+rewards = Array[ExtResource("3_reward")]([SubResource("RewardQiAttackSpeed"), SubResource("RewardQiProjectileSpeed"), SubResource("RewardQiDelivery")])
+
+[sub_resource type="Resource" id="RewardShenAoe"]
+script = ExtResource("3_reward")
+stat = 6
+display_name = "范围半径 +6%"
+amount = 0.06
+cap = 0.6
+
+[sub_resource type="Resource" id="RewardShenDelivery"]
+script = ExtResource("3_reward")
+stat = 5
+display_name = "御器次数 +1"
+amount = 1.0
+cap = 4.0
+
+[sub_resource type="Resource" id="RewardShenTargeting"]
+script = ExtResource("3_reward")
+stat = 7
+display_name = "索敌范围 +5%"
+amount = 0.05
+cap = 0.5
+
+[sub_resource type="Resource" id="TypeShen"]
+script = ExtResource("2_type")
+cultivation_type = 2
+display_name = "神"
+display_color = Color(0.78, 0.39, 1, 1)
+rewards = Array[ExtResource("3_reward")]([SubResource("RewardShenAoe"), SubResource("RewardShenDelivery"), SubResource("RewardShenTargeting")])
+
+[resource]
+script = ExtResource("1_config")
+type_configs = Array[ExtResource("2_type")]([SubResource("TypeJing"), SubResource("TypeQi"), SubResource("TypeShen")])

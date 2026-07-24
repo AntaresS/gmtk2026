@@ -2,8 +2,13 @@ class_name EnemySpawner
 extends Node2D
 
 signal qi_collected(amount: int)
-signal technique_fragment_collected(amount: int)
-signal weapon_power_fragment_collected(amount: int)
+signal cultivation_fragment_collected(cultivation_type: int)
+signal cultivation_channel_changed(
+	cultivation_type: int,
+	progress: float,
+	active: bool,
+	cancelled: bool
+)
 
 const WeaponDataResource = preload(
 	"res://game/scripts/gameplay/weapon_data.gd"
@@ -29,13 +34,9 @@ const QIANKUN_RING_DATA: WeaponDataResource = preload(
 @export var weapon_pickup_scene: PackedScene = preload(
 	"res://game/scenes/gameplay/weapon_pickup.tscn"
 )
-## Technique fragment created once for every defeated elite enemy.
-@export var technique_fragment_scene: PackedScene = preload(
-	"res://game/scenes/gameplay/technique_fragment.tscn"
-)
-## Weapon-power fragment created once for every defeated elite enemy.
-@export var weapon_power_fragment_scene: PackedScene = preload(
-	"res://game/scenes/gameplay/weapon_power_fragment.tscn"
+## Cycling 精/气/神 fragment created once for every defeated elite enemy.
+@export var cultivation_fragment_scene: PackedScene = preload(
+	"res://game/scenes/gameplay/cultivation_fragment.tscn"
 )
 ## Player reference injected into each spawned enemy.
 @export var player: PlayerController
@@ -121,7 +122,7 @@ const QIANKUN_RING_DATA: WeaponDataResource = preload(
 ## enemy-type multipliers. The default adds one Qi every two steps after rounding.
 @export_range(0.0, 20.0, 0.05) var qi_drop_increase_per_difficulty_step: float = 0.5
 ## Qi multiplier for elite enemies. This deliberately compensates only part of
-## their triple health because elites also grant two permanent upgrade fragments.
+## their triple health because elites also grant one cultivation fragment.
 @export_range(0.0, 5.0, 0.05) var elite_qi_drop_multiplier: float = 1.5
 ## Qi multiplier for enemies spawned while Trial Hell is active. It stacks with
 ## elite and rear-pursuer multipliers and rewards the route's added danger.
@@ -408,12 +409,8 @@ func _on_enemy_defeated(
 		is_instance_valid(defeated_enemy)
 		and defeated_enemy.is_elite_enemy()
 	):
-		_drop_technique_fragment(
-			drop_position + Vector2(-72.0, 50.0),
-			inherited_velocity
-		)
-		_drop_weapon_power_fragment(
-			drop_position + Vector2(72.0, -50.0),
+		_drop_cultivation_fragment(
+			drop_position,
 			inherited_velocity
 		)
 	if _rng.randf() <= clampf(weapon_drop_chance, 0.0, 1.0):
@@ -466,47 +463,30 @@ func _drop_weapon(
 	weapon_pickup.global_position = drop_position
 
 
-func _drop_technique_fragment(
+func _drop_cultivation_fragment(
 	drop_position: Vector2,
 	inherited_velocity: Vector2
 ) -> void:
-	if technique_fragment_scene == null:
+	if cultivation_fragment_scene == null:
 		return
-	var fragment := technique_fragment_scene.instantiate()
-	if fragment == null:
-		push_error(
-			"EnemySpawner technique_fragment_scene must instantiate "
-			+ "TechniqueFragment."
-		)
-		return
-	fragment.call("configure", player, inherited_velocity)
-	add_child(fragment)
-	fragment.global_position = drop_position
-	fragment.connect(
-		"fragment_collected",
-		_on_technique_fragment_collected
+	var fragment := (
+		cultivation_fragment_scene.instantiate()
+		as CultivationFragment
 	)
-
-
-func _drop_weapon_power_fragment(
-	drop_position: Vector2,
-	inherited_velocity: Vector2
-) -> void:
-	if weapon_power_fragment_scene == null:
-		return
-	var fragment := weapon_power_fragment_scene.instantiate()
 	if fragment == null:
 		push_error(
-			"EnemySpawner weapon_power_fragment_scene must instantiate "
-			+ "WeaponPowerFragment."
+			"EnemySpawner cultivation_fragment_scene must instantiate "
+			+ "CultivationFragment."
 		)
 		return
-	fragment.call("configure", player, inherited_velocity)
+	fragment.configure(player, inherited_velocity)
 	add_child(fragment)
 	fragment.global_position = drop_position
-	fragment.connect(
-		"power_fragment_collected",
-		_on_weapon_power_fragment_collected
+	fragment.fragment_collected.connect(
+		_on_cultivation_fragment_collected
+	)
+	fragment.channel_changed.connect(
+		_on_cultivation_channel_changed
 	)
 
 
@@ -514,12 +494,22 @@ func _on_dropped_qi_collected(amount: int) -> void:
 	qi_collected.emit(amount)
 
 
-func _on_technique_fragment_collected(amount: int) -> void:
-	technique_fragment_collected.emit(amount)
+func _on_cultivation_fragment_collected(cultivation_type: int) -> void:
+	cultivation_fragment_collected.emit(cultivation_type)
 
 
-func _on_weapon_power_fragment_collected(amount: int) -> void:
-	weapon_power_fragment_collected.emit(amount)
+func _on_cultivation_channel_changed(
+	cultivation_type: int,
+	progress: float,
+	active: bool,
+	cancelled: bool
+) -> void:
+	cultivation_channel_changed.emit(
+		cultivation_type,
+		progress,
+		active,
+		cancelled
+	)
 
 
 func _remove_enemies_outside_active_route() -> void:

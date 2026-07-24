@@ -2,6 +2,18 @@ class_name GameplayHud
 extends CanvasLayer
 
 const DAMAGE_FLASH_DURATION: float = 0.38
+const CultivationTypesResource = preload(
+	"res://game/scripts/gameplay/cultivation_types.gd"
+)
+const CultivationBonusStatsResource = preload(
+	"res://game/scripts/gameplay/cultivation_bonus_stats.gd"
+)
+const PlayerGlobalCombatStatsResource = preload(
+	"res://game/scripts/gameplay/player_global_combat_stats.gd"
+)
+const WeaponCombatStatsResource = preload(
+	"res://game/scripts/gameplay/weapon_combat_stats.gd"
+)
 
 ## Current-to-maximum lifespan ratio below which the persistent screen-edge
 ## danger warning activates. The default represents fifteen percent.
@@ -16,27 +28,35 @@ const DAMAGE_FLASH_DURATION: float = 0.38
 @onready var cultivation_label: Label = %CultivationLabel
 @onready var qi_label: Label = %QiLabel
 @onready var qi_bar: ProgressBar = %QiBar
+@onready var cultivation_tracks_label: Label = %CultivationTracksLabel
 @onready var technique_label: Label = %TechniqueLabel
 @onready var weapon_label: Label = %WeaponLabel
+@onready var player_stats_label: RichTextLabel = %PlayerStatsLabel
 @onready var equipment_library_label: Label = %EquipmentLibraryLabel
 @onready var level_up_message: Label = %LevelUpMessage
 @onready var level_up_timer: Timer = %LevelUpTimer
+@onready var channel_feedback: VBoxContainer = %ChannelFeedback
+@onready var channel_label: Label = %ChannelLabel
+@onready var channel_progress: ProgressBar = %ChannelProgress
+@onready var channel_feedback_timer: Timer = %ChannelFeedbackTimer
 
 var _resources: RunResources
 var _player: PlayerController
 var _equipment_entries: Array[String] = []
-var _weapon_upgrade_level: int = 0
-var _weapon_power_bonus: int = 0
 var _damage_flash_remaining: float = 0.0
 var _damage_flash_strength: float = 0.0
 var _danger_active: bool = false
 var _danger_pulse_time: float = 0.0
+var _cultivation_levels: Array[int] = [0, 0, 0]
+var _cultivation_fragments: Array[int] = [0, 0, 0]
+var _cultivation_required: int = 3
 
 
 func _ready() -> void:
 	damage_flash.color.a = 0.0
 	danger_border.hide()
 	danger_warning_label.hide()
+	channel_feedback.hide()
 	set_process(false)
 
 
@@ -89,6 +109,12 @@ func bind_resources(resources: RunResources) -> void:
 		_on_cultivation_level_changed
 	)
 	_resources.level_up_occurred.connect(_on_level_up_occurred)
+	_resources.cultivation_fragment_progress_changed.connect(
+		_on_cultivation_fragment_progress_changed
+	)
+	_resources.cultivation_type_level_changed.connect(
+		_on_cultivation_type_level_changed
+	)
 	_resources.breakthrough_reward_granted.connect(
 		_on_breakthrough_reward_granted
 	)
@@ -108,18 +134,14 @@ func bind_player(player: PlayerController) -> void:
 		_player.equipment_inventory_changed.disconnect(
 			_on_equipment_inventory_changed
 		)
-	if _player != null and _player.weapon_upgrade_changed.is_connected(
-		_on_weapon_upgrade_changed
-	):
-		_player.weapon_upgrade_changed.disconnect(_on_weapon_upgrade_changed)
-	if _player != null and _player.weapon_power_changed.is_connected(
-		_on_weapon_power_changed
-	):
-		_player.weapon_power_changed.disconnect(_on_weapon_power_changed)
 	if _player != null and _player.melee_damage_received.is_connected(
 		_on_player_damaged
 	):
 		_player.melee_damage_received.disconnect(_on_player_damaged)
+	if _player != null and _player.combat_stats_changed.is_connected(
+		_on_combat_stats_changed
+	):
+		_player.combat_stats_changed.disconnect(_on_combat_stats_changed)
 	_player = player
 	if _player == null:
 		return
@@ -127,15 +149,16 @@ func bind_player(player: PlayerController) -> void:
 	_player.equipment_inventory_changed.connect(
 		_on_equipment_inventory_changed
 	)
-	_player.weapon_upgrade_changed.connect(_on_weapon_upgrade_changed)
-	_player.weapon_power_changed.connect(_on_weapon_power_changed)
 	_player.melee_damage_received.connect(_on_player_damaged)
-	_weapon_upgrade_level = _player.get_weapon_upgrade_level()
-	_weapon_power_bonus = _player.get_weapon_power_bonus()
+	_player.combat_stats_changed.connect(_on_combat_stats_changed)
 	_on_equipment_changed(
 		_player.get_technique_name(),
 		_player.get_weapon_name(),
 		_player.get_current_weapon_damage()
+	)
+	_on_combat_stats_changed(
+		_player.get_global_combat_stats(),
+		_player.get_current_weapon_combat_stats()
 	)
 	_on_equipment_inventory_changed(
 		_player.get_equipment_inventory_entries(),
@@ -166,6 +189,18 @@ func _disconnect_resources() -> void:
 		)
 	if _resources.level_up_occurred.is_connected(_on_level_up_occurred):
 		_resources.level_up_occurred.disconnect(_on_level_up_occurred)
+	if _resources.cultivation_fragment_progress_changed.is_connected(
+		_on_cultivation_fragment_progress_changed
+	):
+		_resources.cultivation_fragment_progress_changed.disconnect(
+			_on_cultivation_fragment_progress_changed
+		)
+	if _resources.cultivation_type_level_changed.is_connected(
+		_on_cultivation_type_level_changed
+	):
+		_resources.cultivation_type_level_changed.disconnect(
+			_on_cultivation_type_level_changed
+		)
 	if (
 		_resources.breakthrough_reward_granted.is_connected(
 			_on_breakthrough_reward_granted
@@ -192,6 +227,15 @@ func _sync_all() -> void:
 		_resources.get_current_qi_requirement()
 	)
 	_on_cultivation_level_changed(_resources.cultivation_level)
+	_cultivation_required = _resources.get_cultivation_fragments_required()
+	for cultivation_type in CultivationTypesResource.ORDER:
+		_cultivation_levels[cultivation_type] = (
+			_resources.get_cultivation_level(cultivation_type)
+		)
+		_cultivation_fragments[cultivation_type] = (
+			_resources.get_cultivation_fragments(cultivation_type)
+		)
+	_render_cultivation_tracks()
 
 
 func _on_lifespan_changed(current: float, maximum: float) -> void:
@@ -223,6 +267,60 @@ func _on_cultivation_level_changed(level: int) -> void:
 	cultivation_label.text = "练气 %d" % level
 
 
+func _on_cultivation_fragment_progress_changed(
+	cultivation_type: int,
+	current: int,
+	required: int
+) -> void:
+	if not CultivationTypesResource.is_valid_type(cultivation_type):
+		return
+	_cultivation_fragments[cultivation_type] = maxi(current, 0)
+	_cultivation_required = maxi(required, 1)
+	_render_cultivation_tracks()
+
+
+func _on_cultivation_type_level_changed(
+	cultivation_type: int,
+	level: int,
+	reward_name: String
+) -> void:
+	if not CultivationTypesResource.is_valid_type(cultivation_type):
+		return
+	_cultivation_levels[cultivation_type] = maxi(level, 0)
+	_render_cultivation_tracks()
+	level_up_message.text = "%s Lv.%d\n%s" % [
+		CultivationTypesResource.get_name_zh(cultivation_type),
+		level,
+		reward_name,
+	]
+	level_up_message.show()
+	level_up_timer.start()
+
+
+## Receives routed pickup-channel state without holding a direct fragment
+## reference. Cancellation remains visible briefly as explicit feedback.
+func on_cultivation_channel_changed(
+	cultivation_type: int,
+	progress: float,
+	active: bool,
+	cancelled: bool
+) -> void:
+	var type_name := CultivationTypesResource.get_name_zh(cultivation_type)
+	if cancelled:
+		channel_label.text = "%s之碎片 · 引导中断" % type_name
+		channel_progress.value = 0.0
+		channel_feedback.show()
+		channel_feedback_timer.start()
+		return
+	channel_feedback_timer.stop()
+	if not active:
+		channel_feedback.hide()
+		return
+	channel_label.text = "%s之碎片 · 引导中" % type_name
+	channel_progress.value = clampf(progress, 0.0, 1.0)
+	channel_feedback.show()
+
+
 func _on_equipment_changed(
 	technique_name: String,
 	equipment_name: String,
@@ -235,21 +333,129 @@ func _on_equipment_changed(
 	]
 
 
+func _on_combat_stats_changed(
+	global_stats: PlayerGlobalCombatStatsResource,
+	weapon_stats: WeaponCombatStatsResource
+) -> void:
+	if global_stats == null or weapon_stats == null:
+		player_stats_label.text = "角色属性\n暂无战斗数据"
+		return
+	var lines: Array[String] = [
+		"[b]角色属性[/b]",
+		"基础  练气 Lv.%d · 全局伤害 +%.1f · %s伤害 %d" % [
+			global_stats.overall_cultivation_level,
+			global_stats.global_damage_bonus,
+			weapon_stats.display_name,
+			weapon_stats.resolved_damage,
+		],
+		"总览  暴击 %s / %s · 攻速 %s" % [
+			_format_percent(global_stats.critical_chance, false),
+			_format_percent(
+				global_stats.critical_damage_multiplier,
+				false
+			),
+			_format_percent(global_stats.attack_speed_bonus),
+		],
+		"投射  弹速 ×%.2f · 御器 +%d · 范围 %s · 索敌 %s" % [
+			global_stats.projectile_speed_multiplier,
+			global_stats.delivery_count_bonus,
+			_format_percent(global_stats.aoe_radius_bonus),
+			_format_percent(global_stats.targeting_range_bonus),
+		],
+	]
+	for cultivation_type in CultivationTypesResource.ORDER:
+		lines.append(
+			_render_cultivation_bonus_line(
+				cultivation_type,
+				global_stats.get_cultivation_bonuses(cultivation_type),
+				weapon_stats
+			)
+		)
+	player_stats_label.text = "\n".join(lines)
+
+
+func _render_cultivation_bonus_line(
+	cultivation_type: int,
+	bonuses: CultivationBonusStatsResource,
+	weapon_stats: WeaponCombatStatsResource
+) -> String:
+	var entries: Array[String] = []
+	match cultivation_type:
+		CultivationTypesResource.CultivationType.JING:
+			entries = [
+				"暴击 %s" % _format_percent(bonuses.critical_chance),
+				"暴伤 %s" % _format_percent(
+					bonuses.critical_damage_bonus
+				),
+				"近减 %s" % _format_percent(
+					bonuses.close_range_damage_reduction
+				),
+			]
+		CultivationTypesResource.CultivationType.QI:
+			entries = [
+				"攻速 %s" % _format_percent(bonuses.attack_speed_bonus),
+				"弹速 %s" % _format_percent(
+					bonuses.projectile_speed_bonus
+				),
+				"御器 +%d" % bonuses.delivery_count_bonus,
+			]
+		CultivationTypesResource.CultivationType.SHEN:
+			entries = [
+				"范围 %s" % _format_percent(bonuses.aoe_radius_bonus),
+				"御器 +%d" % bonuses.delivery_count_bonus,
+				"索敌 %s" % _format_percent(
+					bonuses.targeting_range_bonus
+				),
+			]
+	if (
+		weapon_stats != null
+		and cultivation_type in weapon_stats.cultivation_types
+	):
+		entries.append(
+			"同源伤害 %s" % _format_percent(
+				weapon_stats.matching_damage_bonus
+			)
+		)
+	var color := _get_cultivation_color(cultivation_type)
+	return "[color=#%s]%s  %s[/color]" % [
+		color.to_html(false),
+		CultivationTypesResource.get_name_zh(cultivation_type),
+		" · ".join(entries),
+	]
+
+
+func _get_cultivation_color(cultivation_type: int) -> Color:
+	if _resources != null and _resources.cultivation_config != null:
+		var type_config := (
+			_resources.cultivation_config.get_type_config(cultivation_type)
+		)
+		if type_config != null:
+			return type_config.display_color
+	match cultivation_type:
+		CultivationTypesResource.CultivationType.JING:
+			return Color("ff7d40")
+		CultivationTypesResource.CultivationType.QI:
+			return Color("38d1ff")
+		CultivationTypesResource.CultivationType.SHEN:
+			return Color("c763ff")
+	return Color.WHITE
+
+
+func _format_percent(value: float, include_sign: bool = true) -> String:
+	var percentage := value * 100.0
+	var formatted := (
+		"%.0f%%" % percentage
+		if is_equal_approx(percentage, roundf(percentage))
+		else "%.1f%%" % percentage
+	)
+	return "+%s" % formatted if include_sign else formatted
+
+
 func _on_equipment_inventory_changed(
 	entries: Array[String],
 	_current_index: int
 ) -> void:
 	_equipment_entries = entries
-	_render_equipment_library()
-
-
-func _on_weapon_upgrade_changed(level: int) -> void:
-	_weapon_upgrade_level = maxi(level, 0)
-	_render_equipment_library()
-
-
-func _on_weapon_power_changed(bonus_damage: int) -> void:
-	_weapon_power_bonus = maxi(bonus_damage, 0)
 	_render_equipment_library()
 
 
@@ -299,13 +505,20 @@ func is_damage_flash_active() -> bool:
 
 func _render_equipment_library() -> void:
 	equipment_library_label.text = (
-		"功法碎片强化 +%d · 武器威能 +%d\n装备库（Tab 切换）\n%s"
-		% [
-		_weapon_upgrade_level,
-		_weapon_power_bonus,
-		"\n".join(_equipment_entries),
-		]
+		"装备库（Tab 切换）\n%s" % "\n".join(_equipment_entries)
 	)
+
+
+func _render_cultivation_tracks() -> void:
+	var lines: Array[String] = []
+	for cultivation_type in CultivationTypesResource.ORDER:
+		lines.append("%s Lv.%d  %d/%d" % [
+			CultivationTypesResource.get_name_zh(cultivation_type),
+			_cultivation_levels[cultivation_type],
+			_cultivation_fragments[cultivation_type],
+			_cultivation_required,
+		])
+	cultivation_tracks_label.text = "\n".join(lines)
 
 
 func _on_level_up_occurred(level: int, restored_lifespan: float) -> void:
@@ -328,3 +541,7 @@ func _on_breakthrough_reward_granted(
 
 func _on_level_up_timer_timeout() -> void:
 	level_up_message.hide()
+
+
+func _on_channel_feedback_timer_timeout() -> void:
+	channel_feedback.hide()

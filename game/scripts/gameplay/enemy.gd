@@ -62,7 +62,10 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector2.ZERO
 		return
 
-	velocity = Vector2(0.0, -maxf(cruise_speed, 1.0))
+	velocity = Vector2(
+		0.0,
+		-maxf(cruise_speed, 1.0)
+	)
 	move_and_slide()
 
 	var distance_to_player := global_position.distance_to(player.global_position)
@@ -196,7 +199,7 @@ func _finish_melee_attack(distance_to_player: float) -> void:
 	attack_warning_label.hide()
 	_attack_flash_remaining = ATTACK_FLASH_DURATION
 	if distance_to_player <= melee_attack_range:
-		player.take_melee_damage(melee_damage)
+		player.take_melee_damage(melee_damage, self)
 	_melee_cooldown_remaining = _get_recovery_duration()
 	queue_redraw()
 

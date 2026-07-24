@@ -8,6 +8,24 @@ signal qi_changed(current: int, required: int)
 signal cultivation_level_changed(level: int)
 signal level_up_occurred(level: int, restored_lifespan: float)
 signal breakthrough_reward_granted(current: float, maximum: float)
+signal cultivation_fragment_progress_changed(
+	cultivation_type: int,
+	current: int,
+	required: int
+)
+signal cultivation_type_level_changed(
+	cultivation_type: int,
+	level: int,
+	reward_name: String
+)
+signal cultivation_stats_changed(cultivation_type: int, level: int)
+
+const CultivationTypesResource = preload(
+	"res://game/scripts/gameplay/cultivation_types.gd"
+)
+const DEFAULT_CULTIVATION_CONFIG: CultivationConfig = preload(
+	"res://game/resources/cultivation_config.tres"
+)
 
 @export_category("Lifespan")
 ## Maximum lifespan for the current run, measured in seconds. Lifespan restores
@@ -49,10 +67,17 @@ signal breakthrough_reward_granted(current: float, maximum: float)
 ## Forward-speed decay scaling is applied after this realm pressure.
 @export_range(0.0, 10.0, 0.05) var lifespan_decay_increase_per_breakthrough: float = 0.25
 
+@export_category("Threefold Cultivation")
+## Shared reward, cap, color, and per-level tuning for 精, 气, and 神. This
+## resource is read-only at runtime; fragment counts and levels remain run state.
+@export var cultivation_config: CultivationConfig = DEFAULT_CULTIVATION_CONFIG
+
 var current_lifespan: float = 0.0
 var current_qi: int = 0
 var cultivation_level: int = 1
 var breakthroughs_completed: int = 0
+var cultivation_fragments: Array[int] = [0, 0, 0]
+var cultivation_levels: Array[int] = [0, 0, 0]
 
 var _run_active: bool = false
 var _depletion_emitted: bool = false
@@ -178,6 +203,82 @@ func add_qi(amount: int) -> void:
 		required = get_current_qi_requirement()
 	qi_changed.emit(current_qi, required)
 
+
+## Adds run-local fragments to one cultivation track. Every third fragment
+## advances only that type, resets its progress, and publishes the generic
+## reward selected by the shared repeating cycle.
+func add_cultivation_fragment(
+	cultivation_type: int,
+	amount: int = 1
+) -> void:
+	if (
+		not _run_active
+		or amount <= 0
+		or not CultivationTypesResource.is_valid_type(cultivation_type)
+	):
+		return
+	var required := get_cultivation_fragments_required()
+	for _fragment in amount:
+		cultivation_fragments[cultivation_type] += 1
+		if cultivation_fragments[cultivation_type] < required:
+			cultivation_fragment_progress_changed.emit(
+				cultivation_type,
+				cultivation_fragments[cultivation_type],
+				required
+			)
+			continue
+		cultivation_fragments[cultivation_type] = 0
+		cultivation_levels[cultivation_type] += 1
+		cultivation_fragment_progress_changed.emit(
+			cultivation_type,
+			0,
+			required
+		)
+		var level := cultivation_levels[cultivation_type]
+		var reward_name := (
+			cultivation_config.get_reward_message(cultivation_type, level)
+			if cultivation_config != null
+			else ""
+		)
+		cultivation_type_level_changed.emit(
+			cultivation_type,
+			level,
+			reward_name
+		)
+		cultivation_stats_changed.emit(cultivation_type, level)
+
+
+func get_cultivation_fragments(cultivation_type: int) -> int:
+	if not CultivationTypesResource.is_valid_type(cultivation_type):
+		return 0
+	return cultivation_fragments[cultivation_type]
+
+
+func get_cultivation_level(cultivation_type: int) -> int:
+	if not CultivationTypesResource.is_valid_type(cultivation_type):
+		return 0
+	return cultivation_levels[cultivation_type]
+
+
+func get_cultivation_fragments_required() -> int:
+	if cultivation_config == null:
+		return 3
+	return cultivation_config.get_fragments_required()
+
+
+## Returns the generic stat snapshot for one cultivation type at its live run
+## level. Weapon scripts do not branch on type-specific reward order.
+func get_cultivation_stats(cultivation_type: int) -> Dictionary:
+	if (
+		cultivation_config == null
+		or not CultivationTypesResource.is_valid_type(cultivation_type)
+	):
+		return {"stats": {}, "damage_bonus": 0.0}
+	return cultivation_config.resolve_level(
+		cultivation_type,
+		get_cultivation_level(cultivation_type)
+	)
+
 ## Increases maximum lifespan within its run cap and restores the configured
 ## amount.
 func level_up() -> void:
@@ -204,12 +305,21 @@ func reset_resources() -> void:
 	current_qi = 0
 	cultivation_level = 1
 	breakthroughs_completed = 0
+	cultivation_fragments = [0, 0, 0]
+	cultivation_levels = [0, 0, 0]
 	_run_active = current_lifespan > 0.0
 	_depletion_emitted = false
 	lifespan_changed.emit(current_lifespan, maximum)
 	lifespan_decay_rate_changed.emit(get_current_lifespan_decay_rate())
 	qi_changed.emit(current_qi, get_current_qi_requirement())
 	cultivation_level_changed.emit(cultivation_level)
+	for cultivation_type in CultivationTypesResource.ORDER:
+		cultivation_fragment_progress_changed.emit(
+			cultivation_type,
+			0,
+			get_cultivation_fragments_required()
+		)
+		cultivation_stats_changed.emit(cultivation_type, 0)
 
 
 func is_run_active() -> bool:

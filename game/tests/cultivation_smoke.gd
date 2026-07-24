@@ -1,0 +1,767 @@
+extends SceneTree
+
+const CultivationTypesResource = preload(
+	"res://game/scripts/gameplay/cultivation_types.gd"
+)
+const CultivationRewardResource = preload(
+	"res://game/scripts/gameplay/cultivation_reward.gd"
+)
+const PlayerGlobalCombatStatsResource = preload(
+	"res://game/scripts/gameplay/player_global_combat_stats.gd"
+)
+const WeaponCombatStatsResource = preload(
+	"res://game/scripts/gameplay/weapon_combat_stats.gd"
+)
+const PlayerCombatConfigResource = preload(
+	"res://game/scripts/gameplay/player_combat_config.gd"
+)
+const CombatStatsResolverResource = preload(
+	"res://game/scripts/gameplay/combat_stats_resolver.gd"
+)
+const PALM_DATA: WeaponData = preload(
+	"res://game/resources/great_strength_palm.tres"
+)
+const DAO_DATA: WeaponData = preload(
+	"res://game/resources/weapon/dao.tres"
+)
+const FLYING_SWORD_DATA: WeaponData = preload(
+	"res://game/resources/weapon/flying_sword.tres"
+)
+const QIANKUN_RING_DATA: WeaponData = preload(
+	"res://game/resources/weapon/qiankun_ring.tres"
+)
+
+var _failures: Array[String] = []
+var _fragment_completions: int = 0
+var _completed_fragment_type: int = -1
+var _combat_stats_updates: int = 0
+var _ring_delivery_hits: int = 0
+
+
+func _initialize() -> void:
+	call_deferred("_run")
+
+
+func _check(condition: bool, message: String) -> void:
+	if condition:
+		return
+	_failures.append(message)
+	push_error("CULTIVATION TEST: %s" % message)
+
+
+func _wait_physics_frames(count: int) -> void:
+	for _frame in count:
+		await physics_frame
+
+
+func _wait_process_frames(count: int) -> void:
+	for _frame in count:
+		await process_frame
+
+
+func _run() -> void:
+	var change_error := change_scene_to_file(
+		"res://game/scenes/gameplay/game.tscn"
+	)
+	_check(change_error == OK, "Gameplay scene could not be opened.")
+	await _wait_process_frames(4)
+
+	var game := current_scene
+	var player := game.get_node("Player") as PlayerController
+	var resources := game.get_node("RunResources") as RunResources
+	var enemy_spawner := game.get_node("EnemySpawner") as EnemySpawner
+	var hud := game.get_node("GameplayHud") as GameplayHud
+	enemy_spawner.set_spawning_enabled(false)
+	player.combat_stats_changed.connect(_on_combat_stats_changed)
+
+	var initial_global_stats := player.get_global_combat_stats()
+	var initial_weapon_stats := player.get_current_weapon_combat_stats()
+	_check(
+		player.combat_config != null
+		and is_zero_approx(initial_global_stats.global_damage_bonus)
+		and is_zero_approx(initial_global_stats.critical_chance)
+		and is_equal_approx(
+			initial_global_stats.critical_damage_multiplier,
+			1.5
+		)
+		and is_zero_approx(initial_global_stats.attack_speed_bonus)
+		and is_equal_approx(
+			initial_global_stats.projectile_speed_multiplier,
+			1.0
+		)
+		and initial_global_stats.delivery_count_bonus == 0
+		and is_zero_approx(initial_global_stats.aoe_radius_bonus)
+		and is_zero_approx(initial_global_stats.targeting_range_bonus)
+		and initial_global_stats.overall_cultivation_level == 1
+		and is_zero_approx(
+			initial_global_stats.overall_level_damage_bonus
+		)
+		and not initial_global_stats.jing_bonuses.has_any_bonus()
+		and not initial_global_stats.qi_bonuses.has_any_bonus()
+		and not initial_global_stats.shen_bonuses.has_any_bonus()
+		and is_zero_approx(
+			initial_global_stats.close_range_damage_reduction
+		)
+		and initial_weapon_stats.weapon_id == PALM_DATA.weapon_id
+		and initial_weapon_stats.cultivation_types.is_empty()
+		and initial_weapon_stats.resolved_damage
+			== player.get_current_weapon_damage(),
+		"Initial typed combat-stat snapshots did not mirror live player state."
+	)
+
+	var tuned_combat_config := PlayerCombatConfigResource.new()
+	tuned_combat_config.global_damage_bonus = 2.0
+	tuned_combat_config.base_critical_chance = 0.10
+	tuned_combat_config.base_critical_damage_multiplier = 1.75
+	tuned_combat_config.maximum_critical_chance = 0.12
+	tuned_combat_config.maximum_critical_damage_multiplier = 1.8
+	tuned_combat_config.base_attack_speed_bonus = 0.20
+	tuned_combat_config.base_projectile_speed_bonus = 0.25
+	tuned_combat_config.base_delivery_count_bonus = 2
+	tuned_combat_config.base_aoe_radius_bonus = 0.30
+	tuned_combat_config.base_targeting_range_bonus = 0.50
+	tuned_combat_config.base_close_range_damage_reduction = 0.04
+	tuned_combat_config.maximum_close_range_damage_reduction = 0.05
+	tuned_combat_config.close_range_mitigation_radius = 120.0
+	tuned_combat_config.minimum_attack_interval = 0.6
+	var tuned_global_stats := CombatStatsResolverResource.resolve_global(
+		resources,
+		tuned_combat_config
+	)
+	var tuned_weapon_stats := CombatStatsResolverResource.resolve_weapon(
+		DAO_DATA,
+		10,
+		resources,
+		tuned_global_stats
+	)
+	_check(
+		is_equal_approx(tuned_global_stats.global_damage_bonus, 2.0)
+		and is_equal_approx(tuned_global_stats.critical_chance, 0.10)
+		and is_equal_approx(
+			tuned_global_stats.critical_damage_multiplier,
+			1.75
+		)
+		and is_equal_approx(tuned_global_stats.attack_speed_bonus, 0.20)
+		and is_equal_approx(
+			tuned_global_stats.projectile_speed_multiplier,
+			1.25
+		)
+		and tuned_global_stats.delivery_count_bonus == 2
+		and is_equal_approx(tuned_global_stats.aoe_radius_bonus, 0.30)
+		and is_equal_approx(
+			tuned_global_stats.targeting_range_bonus,
+			0.50
+		)
+		and is_equal_approx(
+			tuned_global_stats.close_range_damage_reduction,
+			0.04
+		)
+		and is_equal_approx(
+			tuned_global_stats.close_range_mitigation_radius,
+			120.0
+		)
+		and tuned_weapon_stats.resolved_damage == 12
+		and is_equal_approx(tuned_weapon_stats.critical_chance, 0.10)
+		and is_equal_approx(
+			tuned_weapon_stats.critical_damage_multiplier,
+			1.75
+		)
+		and is_equal_approx(tuned_weapon_stats.attack_speed_bonus, 0.20)
+		and is_equal_approx(
+			tuned_weapon_stats.projectile_speed_multiplier,
+			1.25
+		)
+		and tuned_weapon_stats.delivery_count == 3
+		and is_equal_approx(
+			tuned_weapon_stats.attack_range,
+			DAO_DATA.attack_range * 1.8
+		)
+		and is_equal_approx(tuned_weapon_stats.attack_interval, 0.6),
+		"PlayerCombatConfig was not the source of resolved global combat stats."
+	)
+
+	_check(
+		PALM_DATA.cultivation_type == CultivationTypesResource.NEUTRAL
+		and DAO_DATA.cultivation_type
+			== CultivationTypesResource.CultivationType.JING
+		and FLYING_SWORD_DATA.cultivation_type
+			== CultivationTypesResource.CultivationType.QI
+		and QIANKUN_RING_DATA.cultivation_type
+			== CultivationTypesResource.CultivationType.SHEN,
+		"Weapon resources did not map neutral/精/气/神 correctly."
+	)
+	_check(
+		resources.get_cultivation_fragments_required() == 3
+		and resources.cultivation_config.type_configs.size() == 3,
+		"Cultivation did not load its three-fragment data resource."
+	)
+	_check(
+		hud.cultivation_tracks_label.text
+			== "精 Lv.0  0/3\n气 Lv.0  0/3\n神 Lv.0  0/3",
+		"HUD did not present all three initial cultivation tracks."
+	)
+
+	_check(player.collect_weapon(DAO_DATA, 10), "Dao could not be equipped.")
+	var dao_before_level := player.get_current_weapon_combat_stats()
+	_check(
+		dao_before_level.weapon_id == DAO_DATA.weapon_id
+		and dao_before_level.rolled_damage == 10
+		and dao_before_level.resolved_damage == 10
+		and is_zero_approx(dao_before_level.matching_damage_bonus)
+		and dao_before_level.cultivation_types == [
+			CultivationTypesResource.CultivationType.JING
+		],
+		"Dao snapshot did not preserve its roll, affinity, and base values."
+	)
+	resources.add_cultivation_fragment(
+		CultivationTypesResource.CultivationType.JING,
+		2
+	)
+	_check(
+		resources.get_cultivation_level(
+			CultivationTypesResource.CultivationType.JING
+		) == 0
+		and resources.get_cultivation_fragments(
+			CultivationTypesResource.CultivationType.JING
+		) == 2
+		and player.get_current_weapon_damage() == 10,
+		"精 advanced or changed damage before its third fragment."
+	)
+	resources.add_cultivation_fragment(
+		CultivationTypesResource.CultivationType.JING
+	)
+	var jing_level_one := resources.get_cultivation_stats(
+		CultivationTypesResource.CultivationType.JING
+	)
+	var dao_level_one := player.get_current_weapon_combat_stats()
+	_check(
+		resources.get_cultivation_level(
+			CultivationTypesResource.CultivationType.JING
+		) == 1
+		and resources.get_cultivation_fragments(
+			CultivationTypesResource.CultivationType.JING
+		) == 0
+		and player.get_current_weapon_damage() == 11
+		and is_equal_approx(
+			float(jing_level_one["damage_bonus"]),
+			0.10
+		)
+		and is_equal_approx(
+			float(
+				(jing_level_one["stats"] as Dictionary).get(
+					CultivationRewardResource.Stat.CRITICAL_CHANCE,
+					0.0
+				)
+			),
+			0.02
+		),
+		"Third 精 fragment did not reset progress and grant level-one stats."
+	)
+	_check(
+		dao_level_one != dao_before_level
+		and is_zero_approx(dao_before_level.matching_damage_bonus)
+		and is_equal_approx(dao_level_one.matching_damage_bonus, 0.10)
+		and dao_level_one.resolved_damage == 11
+		and is_equal_approx(dao_level_one.critical_chance, 0.02)
+		and is_equal_approx(
+			dao_level_one.critical_damage_multiplier,
+			1.5
+		)
+		and _combat_stats_updates >= 2,
+		"Cultivation did not publish a fresh typed Dao stat snapshot."
+	)
+	_check(
+		hud.level_up_message.text.contains("精 Lv.1")
+		and hud.level_up_message.text.contains("暴击率"),
+		"HUD did not show the 精 level and newly granted reward."
+	)
+
+	_check(
+		player.collect_weapon(FLYING_SWORD_DATA, 10),
+		"Flying Sword could not be equipped."
+	)
+	var flying_before_qi := player.get_current_weapon_combat_stats()
+	_check(
+		is_zero_approx(flying_before_qi.matching_damage_bonus)
+		and is_equal_approx(flying_before_qi.critical_chance, 0.02),
+		"精 critical chance did not remain a player-global weapon stat."
+	)
+	resources.add_cultivation_fragment(
+		CultivationTypesResource.CultivationType.QI,
+		3
+	)
+	_check(
+		player.get_current_weapon_damage() == 11
+		and is_equal_approx(
+			player.get_global_combat_stats().attack_speed_bonus,
+			0.05
+		)
+		and player.get_current_attack_interval()
+			< FLYING_SWORD_DATA.attack_interval
+		and is_equal_approx(
+			player.get_current_projectile_speed_multiplier(),
+			1.0
+		)
+		and player.get_flying_sword_projectile_count() == 1,
+		"气 level one did not grant only damage and attack speed."
+	)
+	resources.add_cultivation_fragment(
+		CultivationTypesResource.CultivationType.QI,
+		6
+	)
+	var qi_global_stats := player.get_global_combat_stats()
+	_check(
+		resources.get_cultivation_level(
+			CultivationTypesResource.CultivationType.QI
+		) == 3
+		and is_equal_approx(qi_global_stats.attack_speed_bonus, 0.05)
+		and is_equal_approx(
+			qi_global_stats.projectile_speed_multiplier,
+			1.10
+		)
+		and qi_global_stats.delivery_count_bonus == 1
+		and is_zero_approx(qi_global_stats.global_damage_bonus)
+		and player.get_current_projectile_speed_multiplier() > 1.0
+		and player.get_flying_sword_projectile_count() == 2,
+		"气 reward cycle did not add projectile speed and delivery count."
+	)
+
+	_check(
+		player.collect_weapon(QIANKUN_RING_DATA, 10),
+		"Universe Ring could not be equipped."
+	)
+	var ring_before_shen := player.get_current_weapon_combat_stats()
+	_check(
+		is_zero_approx(ring_before_shen.matching_damage_bonus)
+		and is_equal_approx(ring_before_shen.critical_chance, 0.02)
+		and is_equal_approx(ring_before_shen.attack_speed_bonus, 0.05)
+		and is_equal_approx(
+			ring_before_shen.projectile_speed_multiplier,
+			1.10
+		)
+		and ring_before_shen.delivery_count == 2
+		and is_equal_approx(
+			ring_before_shen.aoe_radius,
+			QIANKUN_RING_DATA.base_aoe_radius
+		)
+		and player.get_qiankun_ring_bounce_count() == 1,
+		"Player-global 精/气 bonuses did not carry to the Universe Ring."
+	)
+	resources.add_cultivation_fragment(
+		CultivationTypesResource.CultivationType.SHEN,
+		3
+	)
+	var dao_aoe_stats := CombatStatsResolverResource.resolve_weapon(
+		DAO_DATA,
+		10,
+		resources,
+		player.get_global_combat_stats()
+	)
+	_check(
+		player.get_current_weapon_damage() == 11
+		and player.get_current_aoe_radius()
+			> QIANKUN_RING_DATA.base_aoe_radius
+		and is_equal_approx(
+			dao_aoe_stats.attack_range,
+			DAO_DATA.attack_range * 1.06
+		),
+		"神 level one did not expand Ring and Dao area radii."
+	)
+	resources.add_cultivation_fragment(
+		CultivationTypesResource.CultivationType.SHEN,
+		6
+	)
+	var shen_global_stats := player.get_global_combat_stats()
+	_check(
+		player.get_current_attack_range()
+			> QIANKUN_RING_DATA.attack_range
+		and is_equal_approx(shen_global_stats.aoe_radius_bonus, 0.06)
+		and shen_global_stats.delivery_count_bonus == 2
+		and player.get_current_delivery_count() == 3
+		and player.get_qiankun_ring_bounce_count() == 2
+		and is_equal_approx(
+			shen_global_stats.targeting_range_bonus,
+			0.05
+		)
+		and is_zero_approx(shen_global_stats.global_damage_bonus),
+		"神 reward cycle did not add delivery count and targeting range."
+	)
+	_check(
+		resources.get_cultivation_level(
+			CultivationTypesResource.CultivationType.JING
+		) == 1
+		and resources.get_cultivation_level(
+			CultivationTypesResource.CultivationType.QI
+		) == 3
+		and resources.get_cultivation_level(
+			CultivationTypesResource.CultivationType.SHEN
+		) == 3,
+		"Cultivation types did not remain independent."
+	)
+
+	resources.add_cultivation_fragment(
+		CultivationTypesResource.CultivationType.JING,
+		6
+	)
+	var close_source := Node2D.new()
+	game.add_child(close_source)
+	close_source.global_position = player.global_position
+	var received_damage: Array[float] = []
+	player.melee_damage_received.connect(
+		func(amount: float) -> void:
+			received_damage.append(amount),
+		CONNECT_ONE_SHOT
+	)
+	player.take_melee_damage(10.0, close_source)
+	var defensive_stats := player.get_global_combat_stats()
+	_check(
+		received_damage.size() == 1
+		and is_equal_approx(received_damage[0], 9.7),
+		"精 close-range damage reduction was not applied centrally."
+	)
+	_check(
+		is_equal_approx(
+			defensive_stats.close_range_damage_reduction,
+			0.03
+		)
+		and is_equal_approx(defensive_stats.critical_chance, 0.02)
+		and is_equal_approx(
+			defensive_stats.critical_damage_multiplier,
+			1.65
+		)
+		and is_equal_approx(
+			defensive_stats.close_range_mitigation_radius,
+			player.combat_config.close_range_mitigation_radius
+		),
+		"Global combat snapshot did not expose 精 defensive progression."
+	)
+	close_source.queue_free()
+
+	var stats_updates_before_overall := _combat_stats_updates
+	var damage_before_overall := player.get_current_weapon_damage()
+	resources.add_qi(100)
+	var overall_global_stats := player.get_global_combat_stats()
+	var weapon_definitions: Array[WeaponData] = [
+		PALM_DATA,
+		DAO_DATA,
+		FLYING_SWORD_DATA,
+		QIANKUN_RING_DATA,
+	]
+	var expected_damage_after_overall: Array[int] = [11, 14, 14, 14]
+	for weapon_index in weapon_definitions.size():
+		var resolved_weapon := CombatStatsResolverResource.resolve_weapon(
+			weapon_definitions[weapon_index],
+			10,
+			resources,
+			overall_global_stats
+		)
+		_check(
+			resolved_weapon.resolved_damage
+				== expected_damage_after_overall[weapon_index],
+			"Overall-level global damage did not reach %s." % (
+				weapon_definitions[weapon_index].display_name
+			)
+		)
+	var jing_color := (
+		resources.cultivation_config.get_type_config(
+			CultivationTypesResource.CultivationType.JING
+		).display_color.to_html(false)
+	)
+	var qi_color := (
+		resources.cultivation_config.get_type_config(
+			CultivationTypesResource.CultivationType.QI
+		).display_color.to_html(false)
+	)
+	var shen_color := (
+		resources.cultivation_config.get_type_config(
+			CultivationTypesResource.CultivationType.SHEN
+		).display_color.to_html(false)
+	)
+	var stats_panel_text := hud.player_stats_label.text
+	_check(
+		resources.cultivation_level == 2
+		and overall_global_stats.overall_cultivation_level == 2
+		and is_equal_approx(
+			overall_global_stats.overall_level_damage_bonus,
+			player.combat_config.global_damage_bonus_per_overall_level
+		)
+		and is_equal_approx(overall_global_stats.global_damage_bonus, 1.0)
+		and damage_before_overall == 13
+		and player.get_current_weapon_damage() == 14
+		and _combat_stats_updates > stats_updates_before_overall,
+		"Overall cultivation did not reactively increase player global damage."
+	)
+	_check(
+		is_equal_approx(
+			overall_global_stats.jing_bonuses.critical_chance,
+			0.02
+		)
+		and is_equal_approx(
+			overall_global_stats.jing_bonuses.critical_damage_bonus,
+			0.15
+		)
+		and is_equal_approx(
+			overall_global_stats.jing_bonuses.close_range_damage_reduction,
+			0.03
+		)
+		and is_equal_approx(
+			overall_global_stats.qi_bonuses.attack_speed_bonus,
+			0.05
+		)
+		and is_equal_approx(
+			overall_global_stats.qi_bonuses.projectile_speed_bonus,
+			0.10
+		)
+		and overall_global_stats.qi_bonuses.delivery_count_bonus == 1
+		and is_equal_approx(
+			overall_global_stats.shen_bonuses.aoe_radius_bonus,
+			0.06
+		)
+		and overall_global_stats.shen_bonuses.delivery_count_bonus == 1
+		and is_equal_approx(
+			overall_global_stats.shen_bonuses.targeting_range_bonus,
+			0.05
+		),
+		"Source-specific global bonus snapshots did not preserve every reward."
+	)
+	_check(
+		stats_panel_text.contains("全局伤害 +1.0")
+		and stats_panel_text.contains("[color=#%s]精" % jing_color)
+		and stats_panel_text.contains("[color=#%s]气" % qi_color)
+		and stats_panel_text.contains("[color=#%s]神" % shen_color)
+		and stats_panel_text.contains("暴击 +2%")
+		and stats_panel_text.contains("弹速 +10%")
+		and stats_panel_text.contains("范围 +6%")
+		and stats_panel_text.contains("同源伤害 +30%"),
+		"Compact player-stat panel did not show live color-coded bonuses."
+	)
+
+	var capped_resources := RunResources.new()
+	game.add_child(capped_resources)
+	capped_resources.add_cultivation_fragment(
+		CultivationTypesResource.CultivationType.JING,
+		31 * 3
+	)
+	var capped_jing := capped_resources.get_cultivation_stats(
+		CultivationTypesResource.CultivationType.JING
+	)
+	var capped_jing_stats := capped_jing["stats"] as Dictionary
+	_check(
+		capped_resources.get_cultivation_level(
+			CultivationTypesResource.CultivationType.JING
+		) == 31
+		and is_equal_approx(
+			float(
+				capped_jing_stats.get(
+					CultivationRewardResource.Stat.CRITICAL_CHANCE,
+					0.0
+				)
+			),
+			0.2
+		)
+		and is_equal_approx(
+			float(capped_jing["damage_bonus"]),
+			3.12
+		),
+		"Capped rewards did not convert later occurrences to type damage."
+	)
+
+	_check(
+		player.collect_weapon(FLYING_SWORD_DATA, 11),
+		"Flying Sword could not be re-equipped for delivery testing."
+	)
+	var volley_target := preload(
+		"res://game/scenes/gameplay/enemy.tscn"
+	).instantiate() as EnemyController
+	volley_target.player = player
+	volley_target.max_health = 999
+	volley_target.cruise_speed = 1.0
+	game.add_child(volley_target)
+	volley_target.global_position = (
+		player.global_position + Vector2(0.0, -40.0)
+	)
+	var saw_multi_sword_sequence := false
+	for _frame in 30:
+		await physics_frame
+		saw_multi_sword_sequence = (
+			saw_multi_sword_sequence
+			or player.get_pending_flying_sword_count() >= 2
+		)
+	_check(
+		player.get_flying_sword_projectile_count() == 3
+		and saw_multi_sword_sequence,
+		"Delivery count did not produce a three-sword sequential volley."
+	)
+	volley_target.queue_free()
+	await _wait_process_frames(2)
+
+	player.set_movement_enabled(false)
+	_check(
+		player.collect_weapon(QIANKUN_RING_DATA, 11),
+		"Universe Ring could not be re-equipped for delivery testing."
+	)
+	var ring_target_a := preload(
+		"res://game/scenes/gameplay/enemy.tscn"
+	).instantiate() as EnemyController
+	var ring_target_b := preload(
+		"res://game/scenes/gameplay/enemy.tscn"
+	).instantiate() as EnemyController
+	for ring_target in [ring_target_a, ring_target_b]:
+		ring_target.player = player
+		ring_target.max_health = 999
+		ring_target.cruise_speed = 1.0
+		game.add_child(ring_target)
+	ring_target_a.global_position = (
+		player.global_position + Vector2(0.0, -70.0)
+	)
+	ring_target_b.global_position = (
+		player.global_position + Vector2(70.0, -90.0)
+	)
+	var test_ring := preload(
+		"res://game/scenes/gameplay/qiankun_ring_projectile.tscn"
+	).instantiate() as QiankunRingProjectile
+	game.add_child(test_ring)
+	test_ring.global_position = player.global_position
+	test_ring.enemy_hit.connect(_on_test_ring_enemy_hit)
+	test_ring.configure(
+		player,
+		ring_target_a,
+		1,
+		player.get_qiankun_ring_bounce_count(),
+		player.get_current_weapon_combat_stats().secondary_targeting_range,
+		0.0
+	)
+	await _wait_physics_frames(120)
+	_check(
+		player.get_current_delivery_count() == 3
+		and player.get_qiankun_ring_bounce_count() == 2
+		and _ring_delivery_hits == 3,
+		"Delivery count did not produce two Universe Ring bounces."
+	)
+	if is_instance_valid(test_ring):
+		test_ring.queue_free()
+	ring_target_a.queue_free()
+	ring_target_b.queue_free()
+	await _wait_process_frames(2)
+
+	var splash_primary := preload(
+		"res://game/scenes/gameplay/enemy.tscn"
+	).instantiate() as EnemyController
+	var splash_secondary := preload(
+		"res://game/scenes/gameplay/enemy.tscn"
+	).instantiate() as EnemyController
+	for splash_target in [splash_primary, splash_secondary]:
+		splash_target.player = player
+		splash_target.max_health = 999
+		splash_target.cruise_speed = 1.0
+		game.add_child(splash_target)
+	splash_primary.global_position = (
+		player.global_position + Vector2(0.0, -70.0)
+	)
+	splash_secondary.global_position = (
+		splash_primary.global_position + Vector2(24.0, 0.0)
+	)
+	var splash_ring := preload(
+		"res://game/scenes/gameplay/qiankun_ring_projectile.tscn"
+	).instantiate() as QiankunRingProjectile
+	game.add_child(splash_ring)
+	splash_ring.global_position = player.global_position
+	splash_ring.configure(
+		player,
+		splash_primary,
+		1,
+		0,
+		player.get_current_weapon_combat_stats().secondary_targeting_range,
+		player.get_current_aoe_radius(),
+		player.get_current_projectile_speed_multiplier()
+	)
+	await _wait_physics_frames(80)
+	_check(
+		splash_primary.current_health == 998
+		and splash_secondary.current_health == 998,
+		"Resolved 神 area radius did not produce Universe Ring splash damage."
+	)
+	if is_instance_valid(splash_ring):
+		splash_ring.queue_free()
+	splash_primary.queue_free()
+	splash_secondary.queue_free()
+	await _wait_process_frames(2)
+
+	var fragment := preload(
+		"res://game/scenes/gameplay/cultivation_fragment.tscn"
+	).instantiate() as CultivationFragment
+	fragment.cycle_interval = 0.1
+	fragment.channel_duration = 0.6
+	fragment.configure(player, Vector2.ZERO)
+	fragment.fragment_collected.connect(_on_fragment_collected)
+	fragment.fragment_collected.connect(resources.add_cultivation_fragment)
+	fragment.channel_changed.connect(hud.on_cultivation_channel_changed)
+	game.add_child(fragment)
+	fragment.global_position = player.global_position + Vector2(300.0, 0.0)
+	await _wait_physics_frames(8)
+	_check(
+		fragment.current_type
+			== CultivationTypesResource.CultivationType.QI,
+		"Fragment did not cycle deterministically from 精 to 气."
+	)
+
+	fragment.cycle_interval = 1.0
+	fragment.global_position = player.global_position
+	await _wait_physics_frames(2)
+	var locked_type := int(fragment.current_type)
+	await _wait_physics_frames(10)
+	_check(
+		fragment.is_type_locked()
+		and int(fragment.current_type) == locked_type
+		and fragment.get_channel_progress() > 0.0
+		and hud.channel_feedback.visible,
+		"Remaining in range did not lock the fragment and publish progress."
+	)
+	fragment.global_position = player.global_position + Vector2(300.0, 0.0)
+	await _wait_physics_frames(1)
+	_check(
+		not fragment.is_type_locked()
+		and is_zero_approx(fragment.get_channel_progress())
+		and int(fragment.current_type) == locked_type
+		and hud.channel_label.text.contains("引导中断"),
+		"Leaving range did not cancel, unlock, and preserve cycle position."
+	)
+
+	var fragments_before_completion := resources.get_cultivation_fragments(
+		locked_type
+	)
+	fragment.global_position = player.global_position
+	await _wait_physics_frames(40)
+	await _wait_process_frames(2)
+	_check(
+		_fragment_completions == 1
+		and _completed_fragment_type == locked_type
+		and not is_instance_valid(fragment)
+		and resources.get_cultivation_fragments(locked_type)
+			== (fragments_before_completion + 1) % 3,
+		"Completed channel did not collect exactly once and clean up safely."
+	)
+	player.set_movement_enabled(true)
+
+	if _failures.is_empty():
+		print("CULTIVATION TEST: PASS")
+		quit(0)
+	else:
+		print("CULTIVATION TEST: FAIL (%d failures)" % _failures.size())
+		quit(1)
+
+
+func _on_fragment_collected(cultivation_type: int) -> void:
+	_fragment_completions += 1
+	_completed_fragment_type = cultivation_type
+
+
+func _on_combat_stats_changed(
+	_global_stats: PlayerGlobalCombatStatsResource,
+	_weapon_stats: WeaponCombatStatsResource
+) -> void:
+	_combat_stats_updates += 1
+
+
+func _on_test_ring_enemy_hit(_enemy: EnemyController) -> void:
+	_ring_delivery_hits += 1

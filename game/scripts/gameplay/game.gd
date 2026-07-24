@@ -54,13 +54,14 @@ func _ready() -> void:
 	enemy_spawner.set_route_center_x(_active_route_center_x)
 	gameplay_hud.bind_resources(run_resources)
 	gameplay_hud.bind_player(player)
+	player.bind_cultivation(run_resources)
 	infinite_world.qi_collected.connect(run_resources.add_qi)
 	enemy_spawner.qi_collected.connect(run_resources.add_qi)
-	enemy_spawner.technique_fragment_collected.connect(
-		player.add_weapon_upgrade_fragments
+	enemy_spawner.cultivation_fragment_collected.connect(
+		run_resources.add_cultivation_fragment
 	)
-	enemy_spawner.weapon_power_fragment_collected.connect(
-		player.add_weapon_power_fragments
+	enemy_spawner.cultivation_channel_changed.connect(
+		gameplay_hud.on_cultivation_channel_changed
 	)
 	player.melee_damage_received.connect(run_resources.apply_lifespan_damage)
 	player.lifespan_decay_multiplier_changed.connect(
