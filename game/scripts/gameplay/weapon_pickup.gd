@@ -5,7 +5,7 @@ const WeaponDataResource = preload(
 	"res://game/scripts/gameplay/weapon_data.gd"
 )
 const DEFAULT_WEAPON_DATA: WeaponDataResource = preload(
-	"res://game/resources/dao.tres"
+	"res://game/resources/weapon/dao.tres"
 )
 
 ## Shared definition used for this pickup's identity, display, and combat

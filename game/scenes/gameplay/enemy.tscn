@@ -25,3 +25,16 @@ theme_override_constants/outline_size = 4
 theme_override_font_sizes/font_size = 16
 text = "精英"
 horizontal_alignment = 1
+
+[node name="AttackWarningLabel" type="Label" parent="."]
+visible = false
+position = Vector2(-18, -77)
+offset_right = 36.0
+offset_bottom = 42.0
+pivot_offset = Vector2(18, 21)
+theme_override_colors/font_color = Color(1, 0.82, 0.16, 1)
+theme_override_colors/font_outline_color = Color(0.18, 0.01, 0.01, 1)
+theme_override_constants/outline_size = 7
+theme_override_font_sizes/font_size = 34
+text = "!"
+horizontal_alignment = 1

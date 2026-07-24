@@ -69,6 +69,19 @@ scale = Vector2(0.22, 0.22)
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_player")
 
+[node name="DamageTakenLabel" type="Label" parent="."]
+visible = false
+z_index = 20
+position = Vector2(-52, -70)
+offset_right = 104.0
+offset_bottom = 32.0
+theme_override_colors/font_color = Color(1, 0.26, 0.16, 1)
+theme_override_colors/font_outline_color = Color(0.15, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 24
+text = "-3.0 寿元"
+horizontal_alignment = 1
+
 [node name="AttackArea" type="Area2D" parent="."]
 collision_layer = 0
 collision_mask = 8

@@ -5,8 +5,8 @@ extends Node2D
 @export var camera_forward_look_ahead: float = 180.0
 ## Shows the runtime speed, traveled distance, and active chunk count overlay.
 @export var show_debug_ui: bool = false
-## Nine-strike warning and lightning sequence used when advancing beyond
-## cultivation level nine.
+## Nine-strike warning and lightning sequence used at each cultivation-realm
+## breakthrough milestone.
 @export var heavenly_tribulation_scene: PackedScene = preload(
 	"res://game/scenes/gameplay/heavenly_tribulation.tscn"
 )
@@ -29,17 +29,17 @@ extends Node2D
 @onready var debug_label: Label = %DebugLabel
 
 var _run_ended: bool = false
+var _run_won: bool = false
 var _transition_started: bool = false
 var _active_route_center_x: float = 0.0
-var _tribulation_triggered: bool = false
 var _active_tribulation: HeavenlyTribulation
 
 
 func _ready() -> void:
 	get_tree().paused = false
 	_run_ended = false
+	_run_won = false
 	_transition_started = false
-	_tribulation_triggered = false
 	_active_tribulation = null
 	_active_route_center_x = infinite_world.get_route_center_x()
 	player.set_movement_enabled(true)
@@ -126,10 +126,15 @@ func _on_route_committed(
 
 
 func _on_cultivation_level_changed(level: int) -> void:
+	_try_start_next_tribulation(level)
+
+
+func _try_start_next_tribulation(level: int) -> void:
 	if (
-		level <= 9
-		or _tribulation_triggered
+		_run_ended
+		or is_instance_valid(_active_tribulation)
 		or heavenly_tribulation_scene == null
+		or not run_resources.has_pending_breakthrough(level)
 	):
 		return
 	var tribulation := (
@@ -141,25 +146,40 @@ func _on_cultivation_level_changed(level: int) -> void:
 			"Game heavenly_tribulation_scene must create HeavenlyTribulation."
 		)
 		return
-	_tribulation_triggered = true
 	_active_tribulation = tribulation
 	add_child(tribulation)
 	tribulation.tribulation_completed.connect(
 		_on_heavenly_tribulation_completed
 	)
-	tribulation.start(player)
+	tribulation.start(player, run_resources.max_lifespan)
 
 
 func _on_heavenly_tribulation_completed() -> void:
 	_active_tribulation = null
-	run_resources.double_lifespan_after_breakthrough()
+	run_resources.grant_breakthrough_reward()
 	player.play_breakthrough_effect()
+	if (
+		run_resources.breakthroughs_completed
+		>= maxi(run_resources.maximum_breakthroughs, 1)
+	):
+		_finish_run(true)
+		return
+	call_deferred(
+		"_try_start_next_tribulation",
+		run_resources.cultivation_level
+	)
 
 
 func _on_lifespan_depleted() -> void:
 	if _run_ended:
 		return
+	_finish_run(false)
+
+
+func _finish_run(ascended: bool) -> void:
 	_run_ended = true
+	_run_won = ascended
+	run_resources.complete_run()
 	player.set_movement_enabled(false)
 	infinite_world.set_progression_enabled(false)
 	enemy_spawner.set_spawning_enabled(false)
@@ -168,7 +188,14 @@ func _on_lifespan_depleted() -> void:
 		_active_tribulation.cancel()
 		_active_tribulation = null
 	pause_menu.call("set_pause_enabled", false)
-	run_ended_overlay.show_run_ended()
+	_show_run_outcome()
+
+
+func _show_run_outcome() -> void:
+	if _run_won:
+		run_ended_overlay.show_ascension()
+	else:
+		run_ended_overlay.show_defeat()
 
 
 func _on_restart_requested() -> void:
@@ -177,7 +204,7 @@ func _on_restart_requested() -> void:
 	var error := get_tree().reload_current_scene()
 	if error != OK:
 		_transition_started = false
-		run_ended_overlay.show_run_ended()
+		_show_run_outcome()
 		push_error("Could not restart gameplay scene: %s" % error_string(error))
 
 
@@ -187,7 +214,7 @@ func _on_main_menu_requested() -> void:
 	var error := get_tree().change_scene_to_file(main_menu_scene_path)
 	if error != OK:
 		_transition_started = false
-		run_ended_overlay.show_run_ended()
+		_show_run_outcome()
 		push_error("Could not open main menu scene: %s" % error_string(error))
 
 

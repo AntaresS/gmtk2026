@@ -6,12 +6,12 @@ const WeaponDataResource = preload(
 const PALM_DATA: WeaponDataResource = preload(
 	"res://game/resources/great_strength_palm.tres"
 )
-const DAO_DATA: WeaponDataResource = preload("res://game/resources/dao.tres")
+const DAO_DATA: WeaponDataResource = preload("res://game/resources/weapon/dao.tres")
 const FLYING_SWORD_DATA: WeaponDataResource = preload(
-	"res://game/resources/flying_sword.tres"
+	"res://game/resources/weapon/flying_sword.tres"
 )
 const QIANKUN_RING_DATA: WeaponDataResource = preload(
-	"res://game/resources/qiankun_ring.tres"
+	"res://game/resources/weapon/qiankun_ring.tres"
 )
 
 var _failures: Array[String] = []
@@ -92,6 +92,23 @@ func _run() -> void:
 		"Lifespan did not start at three minutes."
 	)
 	_check(
+		hud.lifespan_label.text
+			== "寿元  %.1fs / %.1fs" % [
+				resources.current_lifespan,
+				resources.max_lifespan,
+			],
+		"HUD did not show current and maximum lifespan."
+	)
+	_check(
+		is_equal_approx(resources.maximum_lifespan_cap, 900.0)
+		and is_equal_approx(resources.level_up_maxHP_increase, 2.0)
+		and is_equal_approx(
+			resources.breakthrough_max_lifespan_increase,
+			60.0
+		),
+		"Bounded lifespan progression did not use the tuned MVP defaults."
+	)
+	_check(
 		hud.technique_label.text == "功法  大力掌",
 		"HUD did not show the starting Great Strength Palm technique."
 	)
@@ -109,6 +126,11 @@ func _run() -> void:
 	_check(
 		player.is_level_up_effect_active(),
 		"Cultivation level-up did not start the player aura effect."
+	)
+	_check(
+		resources.get_current_qi_requirement() == 125
+		and hud.qi_label.text == "灵气  0 / 125",
+		"Qi requirement did not increase after the first level."
 	)
 	_check(
 		player.get_attraction_range()
@@ -148,8 +170,70 @@ func _run() -> void:
 		"Enemy spawn frequency was not slightly increased."
 	)
 	_check(
-		enemy_spawner.enemy_qi_drop_amount == 15,
-		"Enemy qi drop amount was not reduced."
+		enemy_spawner.enemy_qi_drop_amount == 15
+		and is_equal_approx(
+			enemy_spawner.qi_drop_increase_per_difficulty_step,
+			0.5
+		)
+		and is_equal_approx(
+			enemy_spawner.elite_qi_drop_multiplier,
+			1.5
+		)
+		and is_equal_approx(
+			enemy_spawner.trial_qi_drop_multiplier,
+			1.2
+		)
+		and is_equal_approx(
+			enemy_spawner.rear_qi_drop_multiplier,
+			1.15
+		)
+		and enemy_spawner.maximum_enemy_qi_drop == 88,
+		"Enemy Qi progression defaults were not configured."
+	)
+	_check(
+		enemy_spawner.get_enemy_qi_drop_amount(
+			0,
+			false,
+			false,
+			false
+		) == 15
+		and enemy_spawner.get_enemy_qi_drop_amount(
+			18,
+			false,
+			false,
+			false
+		) == 24
+		and enemy_spawner.get_enemy_qi_drop_amount(
+			18,
+			true,
+			false,
+			false
+		) == 36
+		and enemy_spawner.get_enemy_qi_drop_amount(
+			18,
+			false,
+			true,
+			false
+		) == 29
+		and enemy_spawner.get_enemy_qi_drop_amount(
+			18,
+			false,
+			false,
+			true
+		) == 28
+		and enemy_spawner.get_enemy_qi_drop_amount(
+			18,
+			true,
+			true,
+			true
+		) == 50
+		and enemy_spawner.get_enemy_qi_drop_amount(
+			10000,
+			true,
+			true,
+			true
+		) == enemy_spawner.maximum_enemy_qi_drop,
+		"Enemy Qi progression did not apply step, type, and cap modifiers."
 	)
 	_check(
 		enemy_spawner.elite_spawn_chance > 0.0
@@ -186,8 +270,10 @@ func _run() -> void:
 	Input.action_press("slow_down")
 	await _wait_physics_frames(30)
 	_check(
-		resources.get_current_lifespan_decay_rate() < normal_decay_rate,
-		"Slowing down did not reduce lifespan consumption."
+		absf(
+			resources.get_current_lifespan_decay_rate() - normal_decay_rate
+		) < 0.02,
+		"Slowing down reduced baseline lifespan consumption."
 	)
 	Input.action_release("slow_down")
 	await _wait_physics_frames(30)
@@ -258,6 +344,39 @@ func _run() -> void:
 	root.add_child(isolated_resources)
 	await process_frame
 	isolated_resources.set_process(false)
+
+	var precision_resources := RunResources.new()
+	precision_resources.max_lifespan = 2000.0
+	precision_resources.starting_lifespan = 1000.0
+	precision_resources.maximum_lifespan_cap = 2000.0
+	root.add_child(precision_resources)
+	await process_frame
+	precision_resources.set_process(false)
+	precision_resources.apply_lifespan_damage(1.0 / 120.0)
+	_check(
+		precision_resources.current_lifespan < 1000.0,
+		"High lifespan swallowed one 120 FPS countdown decrement."
+	)
+	precision_resources.queue_free()
+
+	var balance_resources := RunResources.new()
+	root.add_child(balance_resources)
+	await process_frame
+	balance_resources.set_process(false)
+	for _realm in 9:
+		for _level in 9:
+			balance_resources.level_up()
+		balance_resources.grant_breakthrough_reward()
+	_check(
+		is_equal_approx(balance_resources.max_lifespan, 882.0)
+		and is_equal_approx(
+			balance_resources.get_current_lifespan_decay_rate(),
+			3.25
+		),
+		"Nine realms did not resolve to 882 lifespan and 3.25 decay."
+	)
+	balance_resources.queue_free()
+
 	isolated_resources.apply_lifespan_damage(25.0)
 	_levels_emitted = 0
 	isolated_resources.level_up_occurred.connect(_on_isolated_level_up)
@@ -267,18 +386,24 @@ func _run() -> void:
 		"A single qi addition did not support multiple level-ups."
 	)
 	_check(
-		isolated_resources.current_qi == 50,
-		"Qi overflow was not preserved."
+		isolated_resources.current_qi == 25
+		and isolated_resources.get_current_qi_requirement() == 150,
+		"Progressive qi thresholds did not preserve the correct overflow."
 	)
 	_check(_levels_emitted == 2, "Level-up signals did not match levels gained.")
 	_check(
 		is_equal_approx(isolated_resources.current_lifespan, 175.0),
 		"Each level-up did not restore ten lifespan."
 	)
-	isolated_resources.add_qi(100)
+	isolated_resources.add_qi(125)
 	_check(
-		isolated_resources.current_lifespan
-		<= isolated_resources.max_lifespan,
+		isolated_resources.cultivation_level == 4
+		and isolated_resources.current_qi == 0
+		and isolated_resources.get_current_qi_requirement() == 175,
+		"Overflow did not resolve against each successive qi threshold."
+	)
+	_check(
+		isolated_resources.current_lifespan <= isolated_resources.max_lifespan,
 		"Lifespan restore exceeded the configured maximum."
 	)
 	_depletion_emissions = 0
@@ -370,6 +495,12 @@ func _run() -> void:
 	)
 	enemy_spawner.elite_spawn_chance = 1.0
 	var camera := game.get_node("Camera2D") as Camera2D
+	var spawned_enemy_qi_reward := enemy_spawner.get_enemy_qi_drop_amount(
+		enemy_spawner.get_difficulty_step(),
+		true,
+		false,
+		false
+	)
 	enemy_spawner.call("_spawn_enemy")
 	await _wait_physics_frames(2)
 	var spawned_enemies := get_nodes_in_group("enemies")
@@ -401,6 +532,10 @@ func _run() -> void:
 		)
 		enemy_spawner.weapon_drop_chance = 1.0
 		var inherited_enemy_velocity := spawned_enemy.velocity
+		enemy_spawner.set(
+			"_elapsed_run_time",
+			enemy_spawner.difficulty_step_seconds * 8.0
+		)
 		spawned_enemy.take_melee_damage(999)
 		await _wait_process_frames(2)
 		var saw_enemy_qi_drop := false
@@ -412,7 +547,7 @@ func _run() -> void:
 				var qi_drop := drop_node as QiPickup
 				saw_enemy_qi_drop = (
 					qi_drop.get_qi_value()
-					== enemy_spawner.enemy_qi_drop_amount
+					== spawned_enemy_qi_reward
 				)
 			elif drop_node is WeaponPickup:
 				var weapon_drop := drop_node as WeaponPickup
@@ -480,6 +615,10 @@ func _run() -> void:
 			saw_weapon_power_fragment,
 			"Elite enemy did not drop its weapon-power fragment."
 		)
+	enemy_spawner.set(
+		"_elapsed_run_time",
+		enemy_spawner.difficulty_step_seconds * 2.0
+	)
 	await _wait_process_frames(12)
 	enemy_spawner.elite_spawn_chance = 0.0
 
@@ -711,20 +850,89 @@ func _run() -> void:
 	combat_enemy.max_health = 99
 	combat_enemy.cruise_speed = 1.0
 	combat_enemy.melee_attack_interval = 0.1
+	combat_enemy.melee_windup_duration = 0.6
 	root.add_child(combat_enemy)
 	combat_enemy.global_position = player.global_position + Vector2(0.0, -30.0)
 	var lifespan_before_enemy_attack := resources.current_lifespan
-	await _wait_physics_frames(20)
+	await _wait_physics_frames(10)
+	_check(
+		is_equal_approx(
+			resources.current_lifespan,
+			lifespan_before_enemy_attack
+		),
+		"Enemy melee dealt damage before its wind-up completed."
+	)
+	_check(
+		combat_enemy.is_threat_indicator_visible()
+		and combat_enemy.is_attack_winding_up()
+		and combat_enemy.attack_warning_label.visible,
+		"Nearby enemy did not expose its range and active wind-up warning."
+	)
+	var early_windup_progress := combat_enemy.get_attack_windup_progress()
+	await _wait_physics_frames(8)
+	_check(
+		combat_enemy.get_attack_windup_progress() > early_windup_progress,
+		"Enemy melee warning did not visibly advance toward its strike."
+	)
+	combat_enemy.global_position = (
+		player.global_position
+		+ Vector2(combat_enemy.melee_attack_range + 24.0, 0.0)
+	)
+	await _wait_physics_frames(30)
+	_check(
+		is_equal_approx(
+			resources.current_lifespan,
+			lifespan_before_enemy_attack
+		),
+		"Escaping the announced enemy threat range did not dodge the strike."
+	)
+	_check(
+		float(combat_enemy.get("_attack_flash_remaining")) > 0.0,
+		"Missed enemy melee did not still play its committed strike effect."
+	)
+	combat_enemy.global_position = player.global_position + Vector2(0.0, -30.0)
+	await _wait_physics_frames(48)
 	_check(
 		resources.current_lifespan < lifespan_before_enemy_attack,
-		"A nearby enemy did not deal melee lifespan damage."
+		"Enemy melee did not deal lifespan damage after its warning completed."
 	)
 	_check(
 		float(combat_enemy.get("_attack_flash_remaining")) > 0.0,
 		"Enemy melee attack did not expose a visible attack flash."
 	)
+	_check(
+		player.is_damage_feedback_active()
+		and player.damage_taken_label.visible
+		and player.damage_taken_label.text.contains("寿元"),
+		"Taking direct damage did not show the player hit reaction and loss."
+	)
+	_check(
+		hud.is_damage_flash_active(),
+		"Taking direct damage did not flash the HUD screen edge."
+	)
 	combat_enemy.queue_free()
 	await _wait_process_frames(2)
+
+	var danger_lifespan := resources.max_lifespan * 0.14
+	resources.apply_lifespan_damage(
+		resources.current_lifespan - danger_lifespan
+	)
+	await _wait_process_frames(2)
+	_check(
+		hud.is_danger_warning_active()
+		and hud.danger_border.visible
+		and hud.danger_warning_label.visible
+		and hud.lifespan_label.modulate.r > hud.lifespan_label.modulate.g,
+		"Below-fifteen-percent lifespan did not activate the danger warning."
+	)
+	resources.restore_lifespan(resources.max_lifespan)
+	await _wait_process_frames(2)
+	_check(
+		not hud.is_danger_warning_active()
+		and not hud.danger_border.visible
+		and not hud.danger_warning_label.visible,
+		"Restoring lifespan above fifteen percent did not clear the warning."
+	)
 
 	var player_target := preload(
 		"res://game/scenes/gameplay/enemy.tscn"
@@ -735,7 +943,7 @@ func _run() -> void:
 	player_target.melee_attack_interval = 10.0
 	root.add_child(player_target)
 	player_target.global_position = player.global_position + Vector2(0.0, -30.0)
-	await _wait_physics_frames(70)
+	await _wait_physics_frames(100)
 	_check(
 		not is_instance_valid(player_target)
 		or not player_target.is_combat_active(),
@@ -1047,6 +1255,28 @@ func _run() -> void:
 
 	var lifespan_before_tribulation := resources.current_lifespan
 	var maximum_before_tribulation := resources.max_lifespan
+	var decay_before_tribulation := (
+		resources.get_current_lifespan_decay_rate()
+	)
+	resources.breakthrough_level_interval = 5
+	resources.maximum_breakthroughs = 3
+	_check(
+		resources.get_unlocked_breakthrough_count(5) == 0
+		and resources.get_unlocked_breakthrough_count(6) == 1
+		and resources.get_unlocked_breakthrough_count(11) == 2
+		and resources.get_unlocked_breakthrough_count(1000) == 3,
+		"RunResources did not apply its tuned breakthrough interval and cap."
+	)
+	resources.breakthrough_level_interval = 9
+	resources.maximum_breakthroughs = 9
+	_check(
+		resources.get_unlocked_breakthrough_count(9) == 0
+		and resources.get_unlocked_breakthrough_count(10) == 1
+		and resources.get_unlocked_breakthrough_count(19) == 2
+		and resources.get_unlocked_breakthrough_count(82) == 9
+		and resources.get_unlocked_breakthrough_count(1000) == 9,
+		"Tribulation milestones were not spaced every nine levels or capped at nine."
+	)
 	game.call("_on_cultivation_level_changed", 10)
 	await _wait_process_frames(2)
 	var tribulation_nodes := get_nodes_in_group("heavenly_tribulations")
@@ -1061,12 +1291,28 @@ func _run() -> void:
 			and tribulation.warning_label.visible,
 			"Tribulation did not show a ground warning for nine strikes."
 		)
+		_check(
+			is_equal_approx(
+				tribulation.get_current_strike_damage(),
+				maxf(
+					tribulation.strike_damage,
+					maximum_before_tribulation
+						* tribulation.maximum_lifespan_damage_ratio
+				)
+			)
+			and is_equal_approx(
+				tribulation.get_strike_damage_for_maximum_lifespan(354.0),
+				14.16
+			),
+			"Tribulation damage did not use its 12-point or four-percent maximum."
+		)
 		tribulation.warning_duration_min = 0.03
 		tribulation.warning_duration_max = 0.03
 		tribulation.flash_duration = 0.02
 		tribulation.inter_strike_delay = 0.01
 		tribulation.random_landing_offset = 0.0
 		tribulation.strike_damage = 1.0
+		tribulation.maximum_lifespan_damage_ratio = 0.0
 		_thunder_strikes_landed = 0
 		_thunder_strikes_hit = 0
 		_tribulation_completions = 0
@@ -1086,41 +1332,91 @@ func _run() -> void:
 		)
 		_check(
 			player.is_breakthrough_effect_active(),
-			"Successful level-nine breakthrough did not start its grand effect."
+			"Successful realm breakthrough did not start its grand effect."
 		)
 		_check(
 			is_equal_approx(
 				resources.max_lifespan,
-				maximum_before_tribulation * 2.0
+				minf(
+					maximum_before_tribulation
+						+ resources.breakthrough_max_lifespan_increase,
+					resources.maximum_lifespan_cap
+				)
 			)
 			and is_equal_approx(
 				resources.current_lifespan,
 				minf(
 					lifespan_before_tribulation
 						- 9.0
-						+ maximum_before_tribulation,
-					maximum_before_tribulation * 2.0
+						+ resources.max_lifespan
+							* resources.breakthrough_lifespan_restore_ratio,
+					resources.max_lifespan
 				)
 			),
-			"Breakthrough did not double maximum lifespan and grant half of it."
+			"Breakthrough did not add bounded maximum lifespan and restore half."
+		)
+		_check(
+			resources.get_current_lifespan_decay_rate()
+				> decay_before_tribulation,
+			"Breakthrough did not increase passive lifespan pressure."
+		)
+		_check(
+			resources.breakthroughs_completed == 1,
+			"First tribulation completion was not recorded."
 		)
 
-	resources.reset_resources()
-	resources.add_qi(30)
-	_check(
-		hud.qi_label.text == "灵气  30 / 100",
-		"HUD qi text did not synchronize through resource signals."
-	)
-	resources.apply_lifespan_damage(1000.0)
-	await _wait_process_frames(2)
-	_check(not resources.is_run_active(), "Run resources remained active at zero.")
-	_check(end_overlay.visible, "Run-ended overlay was not displayed.")
-	var ended_position := player.global_position
-	await _wait_physics_frames(4)
-	_check(
-		player.global_position.is_equal_approx(ended_position),
-		"Player movement continued after lifespan depletion."
-	)
+		for breakthrough_number in range(2, 10):
+			var milestone_level := 1 + breakthrough_number * 9
+			var maximum_before_repeat := resources.max_lifespan
+			game.call("_on_cultivation_level_changed", milestone_level)
+			await _wait_process_frames(2)
+			var repeat_tribulation := (
+				game.get("_active_tribulation") as HeavenlyTribulation
+			)
+			_check(
+				repeat_tribulation != null,
+				"Realm milestone %d did not start tribulation %d."
+					% [milestone_level, breakthrough_number]
+			)
+			if repeat_tribulation == null:
+				continue
+			repeat_tribulation.cancel()
+			game.call("_on_heavenly_tribulation_completed")
+			await _wait_process_frames(2)
+			_check(
+				resources.breakthroughs_completed == breakthrough_number
+				and is_equal_approx(
+					resources.max_lifespan,
+					minf(
+						maximum_before_repeat
+							+ resources.breakthrough_max_lifespan_increase,
+						resources.maximum_lifespan_cap
+					)
+				),
+				"Tribulation %d did not grant its bounded lifespan increase."
+					% breakthrough_number
+			)
+
+		game.call("_on_cultivation_level_changed", 1000)
+		await _wait_process_frames(2)
+		_check(
+			game.get("_active_tribulation") == null
+			and resources.breakthroughs_completed == 9
+			and not resources.is_run_active()
+			and end_overlay.visible
+			and end_overlay.title_label.text == "Ascension Complete",
+			"Ninth breakthrough did not end the run with ascension."
+		)
+		var maximum_after_nine := resources.max_lifespan
+		resources.grant_breakthrough_reward()
+		_check(
+			resources.breakthroughs_completed == 9
+			and is_equal_approx(
+				resources.max_lifespan,
+				maximum_after_nine
+			),
+			"RunResources granted a reward beyond its breakthrough cap."
+		)
 
 	game.call("_on_restart_requested")
 	await _wait_process_frames(5)
@@ -1129,6 +1425,10 @@ func _run() -> void:
 		"Restart did not reload gameplay."
 	)
 	var restarted_resources := current_scene.get_node("RunResources") as RunResources
+	var restarted_player := current_scene.get_node("Player") as PlayerController
+	var restarted_overlay := (
+		current_scene.get_node("RunEndedOverlay") as RunEndedOverlay
+	)
 	_check(
 		absf(restarted_resources.current_lifespan - 180.0) < 0.5,
 		"Restart did not create a clean resource state."
@@ -1140,6 +1440,21 @@ func _run() -> void:
 
 	restarted_resources.apply_lifespan_damage(1000.0)
 	await _wait_process_frames(2)
+	_check(
+		not restarted_resources.is_run_active(),
+		"Run resources remained active at zero."
+	)
+	_check(
+		restarted_overlay.visible
+		and restarted_overlay.title_label.text == "Lifespan Depleted",
+		"Lifespan depletion did not display the defeat outcome."
+	)
+	var ended_position := restarted_player.global_position
+	await _wait_physics_frames(4)
+	_check(
+		restarted_player.global_position.is_equal_approx(ended_position),
+		"Player movement continued after lifespan depletion."
+	)
 	current_scene.call("_on_main_menu_requested")
 	await _wait_process_frames(5)
 	_check(not paused, "Run-ended Main Menu left the tree paused.")

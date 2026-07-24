@@ -8,12 +8,12 @@ signal weapon_power_fragment_collected(amount: int)
 const WeaponDataResource = preload(
 	"res://game/scripts/gameplay/weapon_data.gd"
 )
-const DAO_DATA: WeaponDataResource = preload("res://game/resources/dao.tres")
+const DAO_DATA: WeaponDataResource = preload("res://game/resources/weapon/dao.tres")
 const FLYING_SWORD_DATA: WeaponDataResource = preload(
-	"res://game/resources/flying_sword.tres"
+	"res://game/resources/weapon/flying_sword.tres"
 )
 const QIANKUN_RING_DATA: WeaponDataResource = preload(
-	"res://game/resources/qiankun_ring.tres"
+	"res://game/resources/weapon/qiankun_ring.tres"
 )
 
 ## Enemy scene created beyond either camera edge. It must instantiate an
@@ -115,8 +115,21 @@ const QIANKUN_RING_DATA: WeaponDataResource = preload(
 @export var rear_enemy_forward_speed: float = 300.0
 
 @export_category("Enemy Drops")
-## Qi granted by the single qi pickup dropped from every defeated enemy.
+## Base Qi granted by a normal enemy before difficulty and type adjustments.
 @export_range(1, 1000, 1) var enemy_qi_drop_amount: int = 15
+## Additional Qi added per combined time-and-cultivation difficulty step before
+## enemy-type multipliers. The default adds one Qi every two steps after rounding.
+@export_range(0.0, 20.0, 0.05) var qi_drop_increase_per_difficulty_step: float = 0.5
+## Qi multiplier for elite enemies. This deliberately compensates only part of
+## their triple health because elites also grant two permanent upgrade fragments.
+@export_range(0.0, 5.0, 0.05) var elite_qi_drop_multiplier: float = 1.5
+## Qi multiplier for enemies spawned while Trial Hell is active. It stacks with
+## elite and rear-pursuer multipliers and rewards the route's added danger.
+@export_range(0.0, 5.0, 0.05) var trial_qi_drop_multiplier: float = 1.2
+## Qi multiplier for faster enemies spawned behind the player.
+@export_range(0.0, 5.0, 0.05) var rear_qi_drop_multiplier: float = 1.15
+## Hard upper bound for one enemy's Qi reward after every modifier.
+@export_range(1, 5000, 1) var maximum_enemy_qi_drop: int = 200
 ## Probability from zero to one that a defeated enemy also drops one definition
 ## selected evenly from weapon_drop_pool.
 @export_range(0.0, 1.0, 0.05) var weapon_drop_chance: float = 0.35
@@ -291,7 +304,15 @@ func _spawn_enemy(from_behind: bool = false) -> void:
 			elite_attack_range_multiplier,
 			elite_visual_scale
 		)
-	enemy.defeated.connect(_on_enemy_defeated.bind(enemy))
+	var qi_reward := get_enemy_qi_drop_amount(
+		get_difficulty_step(),
+		enemy.is_elite_enemy(),
+		_trial_hell_active,
+		from_behind
+	)
+	enemy.defeated.connect(
+		_on_enemy_defeated.bind(enemy, qi_reward)
+	)
 
 	var viewport_height := get_viewport_rect().size.y
 	var vertical_zoom := maxf(camera.zoom.y, 0.01)
@@ -349,12 +370,40 @@ func _apply_current_difficulty(enemy: EnemyController) -> void:
 		)
 
 
+## Calculates one spawn-time Qi reward from the combined difficulty step and
+## enemy traits. EnemySpawner snapshots this value so later route or difficulty
+## changes cannot alter an already spawned enemy's payout.
+func get_enemy_qi_drop_amount(
+	difficulty_step: int,
+	is_elite: bool,
+	is_trial_hell: bool,
+	is_rear_pursuer: bool
+) -> int:
+	var reward := (
+		float(maxi(enemy_qi_drop_amount, 1))
+		+ float(maxi(difficulty_step, 0))
+			* maxf(qi_drop_increase_per_difficulty_step, 0.0)
+	)
+	if is_elite:
+		reward *= maxf(elite_qi_drop_multiplier, 0.0)
+	if is_trial_hell:
+		reward *= maxf(trial_qi_drop_multiplier, 0.0)
+	if is_rear_pursuer:
+		reward *= maxf(rear_qi_drop_multiplier, 0.0)
+	return clampi(
+		roundi(reward),
+		1,
+		maxi(maximum_enemy_qi_drop, 1)
+	)
+
+
 func _on_enemy_defeated(
 	drop_position: Vector2,
 	inherited_velocity: Vector2,
-	defeated_enemy: EnemyController
+	defeated_enemy: EnemyController,
+	qi_reward: int
 ) -> void:
-	_drop_qi(drop_position)
+	_drop_qi(drop_position, qi_reward)
 	if (
 		is_instance_valid(defeated_enemy)
 		and defeated_enemy.is_elite_enemy()
@@ -371,16 +420,16 @@ func _on_enemy_defeated(
 		_drop_weapon(drop_position, inherited_velocity)
 
 
-func _drop_qi(drop_position: Vector2) -> void:
+func _drop_qi(drop_position: Vector2, qi_reward: int) -> void:
 	if qi_pickup_scene == null:
 		return
 	var qi_pickup := qi_pickup_scene.instantiate() as QiPickup
 	if qi_pickup == null:
 		push_error("EnemySpawner qi_pickup_scene must instantiate QiPickup.")
 		return
-	add_child(qi_pickup)
+	call_deferred("add_child", qi_pickup)
 	qi_pickup.global_position = drop_position
-	qi_pickup.configure_value(enemy_qi_drop_amount)
+	qi_pickup.configure_value(qi_reward)
 	qi_pickup.qi_collected.connect(_on_dropped_qi_collected)
 
 
@@ -413,7 +462,7 @@ func _drop_weapon(
 		inherited_velocity,
 		player
 	)
-	add_child(weapon_pickup)
+	call_deferred("add_child", weapon_pickup)
 	weapon_pickup.global_position = drop_position
 
 

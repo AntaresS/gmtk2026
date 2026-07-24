@@ -3,7 +3,11 @@ extends CharacterBody2D
 
 signal defeated(drop_position: Vector2, inherited_velocity: Vector2)
 
+const ATTACK_FLASH_DURATION: float = 0.28
+const THREAT_RING_DASH_COUNT: int = 18
+
 @onready var elite_label: Label = $EliteLabel
+@onready var attack_warning_label: Label = $AttackWarningLabel
 
 ## Player pursued and attacked by this enemy. EnemySpawner injects the active
 ## player when the enemy is created.
@@ -16,9 +20,16 @@ signal defeated(drop_position: Vector2, inherited_velocity: Vector2)
 @export_range(1, 100, 1) var max_health: int = 3
 ## Radius, in world pixels, within which the enemy can strike the player.
 @export_range(20.0, 120.0, 1.0) var melee_attack_range: float = 55.0
-## Seconds between enemy melee attacks. This is longer than the player's
-## interval, giving the player a deliberate frequency advantage.
+## Seconds from one enemy melee strike to the next, including its telegraphed
+## wind-up. This is longer than the player's interval, giving the player a
+## deliberate frequency advantage.
 @export_range(0.1, 5.0, 0.05) var melee_attack_interval: float = 1.0
+## Warning time, in seconds, between committing to a melee attack and applying
+## damage. The target may escape the visible threat circle during this window.
+@export_range(0.2, 2.0, 0.05) var melee_windup_duration: float = 0.6
+## Extra distance, in world pixels, outside melee range over which the threat
+## boundary fades into view. Larger values reveal dangerous enemies sooner.
+@export_range(20.0, 240.0, 1.0) var threat_indicator_margin: float = 100.0
 ## Lifespan removed by each successful enemy melee attack.
 @export_range(0.1, 30.0, 0.1) var melee_damage: float = 3.0
 ## Distance behind the player, in world pixels, at which this enemy is removed
@@ -29,16 +40,20 @@ var current_health: int = 0
 var is_elite: bool = false
 var _combat_active: bool = true
 var _melee_cooldown_remaining: float = 0.0
+var _attack_windup_remaining: float = 0.0
+var _is_attack_winding_up: bool = false
 var _hit_flash_remaining: float = 0.0
 var _attack_flash_remaining: float = 0.0
 var _attack_direction: Vector2 = Vector2.DOWN
+var _indicator_time: float = 0.0
 
 
 func _ready() -> void:
 	add_to_group("enemies")
 	current_health = maxi(max_health, 1)
 	elite_label.visible = is_elite
-	_melee_cooldown_remaining = maxf(melee_attack_interval, 0.1)
+	attack_warning_label.hide()
+	_melee_cooldown_remaining = _get_recovery_duration()
 	queue_redraw()
 
 
@@ -51,23 +66,14 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 	var distance_to_player := global_position.distance_to(player.global_position)
-	_melee_cooldown_remaining = maxf(
-		_melee_cooldown_remaining - delta,
-		0.0
-	)
-	if (
-		distance_to_player <= melee_attack_range
-		and _melee_cooldown_remaining <= 0.0
-	):
-		_attack_direction = global_position.direction_to(player.global_position)
-		_attack_flash_remaining = 0.24
-		player.take_melee_damage(melee_damage)
-		_melee_cooldown_remaining = maxf(melee_attack_interval, 0.1)
-		queue_redraw()
+	_update_melee_attack(delta, distance_to_player)
 
 	if global_position.y > player.global_position.y + despawn_behind_distance:
 		queue_free()
 
+	_indicator_time = fmod(_indicator_time + delta, TAU)
+	if is_threat_indicator_visible() or _is_attack_winding_up:
+		queue_redraw()
 	if _hit_flash_remaining > 0.0:
 		_hit_flash_remaining = maxf(_hit_flash_remaining - delta, 0.0)
 		queue_redraw()
@@ -77,11 +83,17 @@ func _physics_process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var body_color := (
-		Color("fff2a8")
-		if _hit_flash_remaining > 0.0
-		else Color("e6a326") if is_elite else Color("d94b55")
-	)
+	_draw_threat_indicator()
+
+	var body_color := Color("e6a326") if is_elite else Color("d94b55")
+	if _is_attack_winding_up:
+		var warning_pulse := 0.5 + 0.5 * sin(_indicator_time * 9.0)
+		body_color = body_color.lerp(
+			Color("fff0a6"),
+			0.35 + warning_pulse * 0.5
+		)
+	if _hit_flash_remaining > 0.0:
+		body_color = Color("fff2a8")
 	if is_elite:
 		draw_circle(Vector2.ZERO, 28.0, Color(1.0, 0.68, 0.12, 0.18))
 		draw_arc(
@@ -108,23 +120,219 @@ func _draw() -> void:
 		Color("6aff86")
 	)
 	if _attack_flash_remaining > 0.0:
+		var local_attack_range := _get_local_melee_range()
+		var flash_progress := 1.0 - (
+			_attack_flash_remaining / ATTACK_FLASH_DURATION
+		)
+		draw_circle(
+			Vector2.ZERO,
+			lerpf(10.0, local_attack_range, flash_progress),
+			Color(1.0, 0.08, 0.04, (1.0 - flash_progress) * 0.26)
+		)
+		draw_arc(
+			Vector2.ZERO,
+			lerpf(local_attack_range * 0.7, local_attack_range, flash_progress),
+			0.0,
+			TAU,
+			48,
+			Color(1.0, 0.24, 0.08, 1.0 - flash_progress),
+			6.0,
+			true
+		)
 		var attack_angle := _attack_direction.angle()
 		draw_arc(
 			Vector2.ZERO,
-			38.0,
+			local_attack_range * 0.72,
 			attack_angle - 0.72,
 			attack_angle + 0.72,
 			20,
-			Color(1.0, 0.18, 0.12, 0.95),
-			7.0,
+			Color(1.0, 0.82, 0.25, 1.0 - flash_progress),
+			8.0,
 			true
 		)
 		draw_line(
 			Vector2.ZERO,
-			_attack_direction * melee_attack_range,
-			Color(1.0, 0.5, 0.18, 0.8),
-			3.0
+			_attack_direction * local_attack_range,
+			Color(1.0, 0.8, 0.18, 1.0 - flash_progress),
+			4.0
 		)
+
+
+func _update_melee_attack(delta: float, distance_to_player: float) -> void:
+	if _is_attack_winding_up:
+		_attack_direction = global_position.direction_to(player.global_position)
+		_attack_windup_remaining = maxf(
+			_attack_windup_remaining - delta,
+			0.0
+		)
+		_update_attack_warning_label()
+		if _attack_windup_remaining <= 0.0:
+			_finish_melee_attack(distance_to_player)
+		return
+
+	_melee_cooldown_remaining = maxf(
+		_melee_cooldown_remaining - delta,
+		0.0
+	)
+	if (
+		distance_to_player <= melee_attack_range
+		and _melee_cooldown_remaining <= 0.0
+	):
+		_begin_melee_attack()
+
+
+func _begin_melee_attack() -> void:
+	_is_attack_winding_up = true
+	_attack_windup_remaining = maxf(melee_windup_duration, 0.2)
+	_attack_direction = global_position.direction_to(player.global_position)
+	attack_warning_label.show()
+	_update_attack_warning_label()
+	queue_redraw()
+
+
+func _finish_melee_attack(distance_to_player: float) -> void:
+	_is_attack_winding_up = false
+	_attack_windup_remaining = 0.0
+	attack_warning_label.hide()
+	_attack_flash_remaining = ATTACK_FLASH_DURATION
+	if distance_to_player <= melee_attack_range:
+		player.take_melee_damage(melee_damage)
+	_melee_cooldown_remaining = _get_recovery_duration()
+	queue_redraw()
+
+
+func _update_attack_warning_label() -> void:
+	if not _is_attack_winding_up:
+		attack_warning_label.hide()
+		return
+	var progress := get_attack_windup_progress()
+	var pulse := 0.5 + 0.5 * sin(_indicator_time * 12.0)
+	attack_warning_label.modulate = Color(
+		1.0,
+		lerpf(0.88, 0.2, progress),
+		lerpf(0.25, 0.08, progress),
+		0.78 + pulse * 0.22
+	)
+	attack_warning_label.scale = Vector2.ONE * lerpf(0.9, 1.3, progress)
+
+
+func _draw_threat_indicator() -> void:
+	var visibility := _get_threat_indicator_visibility()
+	if visibility <= 0.0 and not _is_attack_winding_up:
+		return
+	var local_attack_range := _get_local_melee_range()
+	var pulse := 0.5 + 0.5 * sin(_indicator_time * 7.0)
+	var base_alpha := visibility * (0.3 + pulse * 0.12)
+	var dash_step := TAU / float(THREAT_RING_DASH_COUNT)
+	var dash_rotation := _indicator_time * 0.16
+	for dash_index in THREAT_RING_DASH_COUNT:
+		var dash_start := dash_rotation + float(dash_index) * dash_step
+		draw_arc(
+			Vector2.ZERO,
+			local_attack_range,
+			dash_start,
+			dash_start + dash_step * 0.62,
+			4,
+			Color(1.0, 0.2, 0.12, base_alpha),
+			3.0,
+			true
+		)
+
+	var readiness := 1.0 - clampf(
+		_melee_cooldown_remaining / _get_recovery_duration(),
+		0.0,
+		1.0
+	)
+	if not _is_attack_winding_up and readiness > 0.0:
+		draw_arc(
+			Vector2.ZERO,
+			local_attack_range + 5.0,
+			-PI * 0.5,
+			-PI * 0.5 + TAU * readiness,
+			36,
+			Color(1.0, 0.66, 0.16, visibility * 0.7),
+			3.0,
+			true
+		)
+
+	if not _is_attack_winding_up:
+		return
+	var windup_progress := get_attack_windup_progress()
+	var warning_color := Color(
+		1.0,
+		lerpf(0.72, 0.08, windup_progress),
+		0.05,
+		lerpf(0.16, 0.34, windup_progress)
+	)
+	draw_circle(Vector2.ZERO, local_attack_range, warning_color)
+	draw_arc(
+		Vector2.ZERO,
+		local_attack_range,
+		-PI * 0.5,
+		-PI * 0.5 + TAU * windup_progress,
+		48,
+		Color(1.0, 0.86, 0.2, 0.95),
+		6.0,
+		true
+	)
+	draw_arc(
+		Vector2.ZERO,
+		lerpf(local_attack_range, 18.0, windup_progress),
+		0.0,
+		TAU,
+		40,
+		Color(1.0, 0.92, 0.5, 0.85),
+		3.0,
+		true
+	)
+
+
+func _get_recovery_duration() -> float:
+	return maxf(
+		maxf(melee_attack_interval, 0.1)
+			- maxf(melee_windup_duration, 0.2),
+		0.1
+	)
+
+
+func _get_local_melee_range() -> float:
+	var world_scale_x := maxf(absf(global_transform.get_scale().x), 0.01)
+	return melee_attack_range / world_scale_x
+
+
+func _get_threat_indicator_visibility() -> float:
+	if not is_instance_valid(player):
+		return 0.0
+	var distance_to_player := global_position.distance_to(player.global_position)
+	return 1.0 - clampf(
+		(distance_to_player - melee_attack_range)
+			/ maxf(threat_indicator_margin, 1.0),
+		0.0,
+		1.0
+	)
+
+
+## Returns whether the player is close enough to see this enemy's exact melee
+## threat boundary.
+func is_threat_indicator_visible() -> bool:
+	return _combat_active and _get_threat_indicator_visibility() > 0.0
+
+
+## Returns whether this enemy has committed to an announced melee strike.
+func is_attack_winding_up() -> bool:
+	return _combat_active and _is_attack_winding_up
+
+
+## Returns the current wind-up completion from zero to one for presentation and
+## automated combat-contract checks.
+func get_attack_windup_progress() -> float:
+	if not _is_attack_winding_up:
+		return 0.0
+	return 1.0 - clampf(
+		_attack_windup_remaining / maxf(melee_windup_duration, 0.2),
+		0.0,
+		1.0
+	)
 
 
 ## Converts this enemy into a visibly larger elite while preserving all
@@ -185,3 +393,8 @@ func set_combat_enabled(enabled: bool) -> void:
 	_combat_active = enabled and current_health > 0
 	if not _combat_active:
 		velocity = Vector2.ZERO
+		_is_attack_winding_up = false
+		_attack_windup_remaining = 0.0
+		if is_node_ready():
+			attack_warning_label.hide()
+		queue_redraw()

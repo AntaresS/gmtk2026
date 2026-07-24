@@ -4,6 +4,7 @@ extends CanvasLayer
 signal restart_requested
 signal main_menu_requested
 
+@onready var title_label: Label = %Title
 @onready var restart_button: Button = %RestartButton
 @onready var main_menu_button: Button = %MainMenuButton
 
@@ -13,9 +14,18 @@ func _ready() -> void:
 	hide()
 
 
-## Reveals the non-pausing end-of-run controls and moves keyboard focus to
-## Restart.
-func show_run_ended() -> void:
+## Reveals the non-pausing controls for a lifespan-depletion defeat.
+func show_defeat() -> void:
+	_show_outcome("Lifespan Depleted")
+
+
+## Reveals the non-pausing controls for completing the ninth breakthrough.
+func show_ascension() -> void:
+	_show_outcome("Ascension Complete")
+
+
+func _show_outcome(title: String) -> void:
+	title_label.text = title
 	restart_button.disabled = false
 	main_menu_button.disabled = false
 	show()

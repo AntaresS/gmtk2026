@@ -61,11 +61,19 @@ const DEFAULT_STARTING_WEAPON_DATA: WeaponDataResource = preload(
 @export_range(0.2, 2.0, 0.05) var level_up_effect_duration: float = 0.8
 ## Final radius, in world pixels, reached by the expanding level-up ring.
 @export_range(36.0, 140.0, 1.0) var level_up_effect_radius: float = 76.0
-## Duration, in seconds, of the larger effect played after surviving the
-## level-nine breakthrough tribulation.
+## Duration, in seconds, of the larger effect played after surviving any
+## cultivation-realm breakthrough tribulation.
 @export_range(0.5, 5.0, 0.1) var breakthrough_effect_duration: float = 2.4
 ## Outer radius, in world pixels, of the breakthrough rings and light rays.
 @export_range(80.0, 260.0, 1.0) var breakthrough_effect_radius: float = 156.0
+
+@export_category("Damage Feedback")
+## Duration, in seconds, of the player blink, shake, expanding hit burst, and
+## floating lifespan-loss number after taking direct damage.
+@export_range(0.2, 1.5, 0.05) var damage_feedback_duration: float = 0.55
+## Final radius, in world pixels, reached by the direct-damage impact burst.
+## Larger values make hits more prominent among nearby combat effects.
+@export_range(36.0, 120.0, 1.0) var damage_feedback_radius: float = 68.0
 
 @onready var attack_area: Area2D = $AttackArea
 @onready var attack_shape: CollisionShape2D = $AttackArea/CollisionShape2D
@@ -73,6 +81,8 @@ const DEFAULT_STARTING_WEAPON_DATA: WeaponDataResource = preload(
 @onready var attraction_shape: CollisionShape2D = (
 	$AttractionArea/CollisionShape2D
 )
+@onready var character_sprite: AnimatedSprite2D = $CharacterSprite
+@onready var damage_taken_label: Label = $DamageTakenLabel
 
 var current_forward_speed: float = 0.0
 var distance_traveled: float = 0.0
@@ -86,6 +96,9 @@ var _movement_enabled: bool = true
 var _attack_cooldown_remaining: float = 0.0
 var _attack_flash_remaining: float = 0.0
 var _damage_flash_remaining: float = 0.0
+var _last_damage_amount: float = 0.0
+var _character_sprite_rest_position: Vector2 = Vector2.ZERO
+var _character_sprite_rest_modulate: Color = Color.WHITE
 var _dao_attack_remaining: float = 0.0
 var _companion_phase: float = 0.0
 var _equipment_inventory: Array[Dictionary] = []
@@ -106,6 +119,9 @@ var _qiankun_ring_in_flight: bool = false
 
 func _ready() -> void:
 	_movement_enabled = true
+	_character_sprite_rest_position = character_sprite.position
+	_character_sprite_rest_modulate = character_sprite.modulate
+	damage_taken_label.hide()
 	current_forward_speed = maxf(base_forward_speed, 1.0)
 	_last_lifespan_decay_multiplier = get_lifespan_decay_multiplier()
 	current_attraction_range = base_attraction_range
@@ -123,6 +139,10 @@ func _ready() -> void:
 	_apply_attraction_range()
 	_publish_equipment()
 	queue_redraw()
+
+
+func _process(delta: float) -> void:
+	_update_visual_state(delta)
 
 
 func _input(event: InputEvent) -> void:
@@ -172,7 +192,6 @@ func _physics_process(delta: float) -> void:
 	distance_traveled += current_forward_speed * delta
 	_update_weapon_attack(delta)
 	_attract_collectibles(delta)
-	_update_visual_state(delta)
 
 
 func _draw() -> void:
@@ -235,7 +254,7 @@ func _draw() -> void:
 				true
 			)
 	if _damage_flash_remaining > 0.0:
-		draw_circle(Vector2.ZERO, 30.0, Color(1.0, 0.12, 0.12, 0.38))
+		_draw_damage_feedback()
 	if _level_up_effect_remaining > 0.0:
 		_draw_level_up_effect()
 	if _breakthrough_effect_remaining > 0.0:
@@ -254,9 +273,18 @@ func set_movement_enabled(enabled: bool) -> void:
 func take_melee_damage(amount: float) -> void:
 	if not _movement_enabled or amount <= 0.0:
 		return
-	_damage_flash_remaining = 0.2
+	_last_damage_amount = amount
+	_damage_flash_remaining = maxf(damage_feedback_duration, 0.01)
+	damage_taken_label.text = "-%.1f 寿元" % amount
+	damage_taken_label.show()
+	_update_damage_feedback_presentation()
 	queue_redraw()
 	melee_damage_received.emit(amount)
+
+
+## Returns whether the player-centered direct-damage reaction is active.
+func is_damage_feedback_active() -> bool:
+	return _damage_flash_remaining > 0.0
 
 
 ## Keeps only the strongest collected copy of each weapon type. A new or
@@ -433,7 +461,7 @@ func is_level_up_effect_active() -> bool:
 	return _level_up_effect_remaining > 0.0
 
 
-## Starts the elaborate aura reserved for a successful level-nine breakthrough.
+## Starts the elaborate aura reserved for a successful realm breakthrough.
 func play_breakthrough_effect() -> void:
 	_breakthrough_effect_remaining = maxf(
 		breakthrough_effect_duration,
@@ -451,9 +479,12 @@ func get_attraction_range() -> float:
 
 
 ## Returns lifespan-decay scaling from actual forward speed relative to normal
-## speed. Boosting raises it while slowing lowers it.
+## speed. Boosting raises it, while slowing never reduces baseline decay.
 func get_lifespan_decay_multiplier() -> float:
-	return current_forward_speed / maxf(base_forward_speed, 1.0)
+	return maxf(
+		current_forward_speed / maxf(base_forward_speed, 1.0),
+		1.0
+	)
 
 
 func get_equipment_inventory_entries() -> Array[String]:
@@ -715,7 +746,88 @@ func _update_visual_state(delta: float) -> void:
 		_breakthrough_effect_remaining - delta,
 		0.0
 	)
+	_update_damage_feedback_presentation()
 	queue_redraw()
+
+
+func _update_damage_feedback_presentation() -> void:
+	if _damage_flash_remaining <= 0.0:
+		character_sprite.position = _character_sprite_rest_position
+		character_sprite.modulate = _character_sprite_rest_modulate
+		damage_taken_label.hide()
+		return
+	var duration := maxf(damage_feedback_duration, 0.01)
+	var progress := 1.0 - clampf(
+		_damage_flash_remaining / duration,
+		0.0,
+		1.0
+	)
+	var shake_strength := (1.0 - progress) * 6.0
+	character_sprite.position = (
+		_character_sprite_rest_position
+		+ Vector2(
+			sin(progress * TAU * 7.0),
+			cos(progress * TAU * 5.0)
+		) * shake_strength
+	)
+	var blink_on := int(progress * 12.0) % 2 == 0
+	character_sprite.modulate = (
+		Color(1.0, 0.18, 0.16, 1.0)
+		if blink_on
+		else Color(1.0, 0.92, 0.72, 1.0)
+	)
+	damage_taken_label.position = Vector2(-52.0, lerpf(-70.0, -102.0, progress))
+	damage_taken_label.modulate = Color(
+		1.0,
+		lerpf(0.78, 0.22, progress),
+		0.18,
+		1.0 - pow(progress, 2.0)
+	)
+
+
+func _draw_damage_feedback() -> void:
+	var duration := maxf(damage_feedback_duration, 0.01)
+	var progress := 1.0 - clampf(
+		_damage_flash_remaining / duration,
+		0.0,
+		1.0
+	)
+	var alpha := 1.0 - progress
+	var burst_radius := lerpf(26.0, damage_feedback_radius, progress)
+	draw_circle(
+		Vector2.ZERO,
+		burst_radius * 0.82,
+		Color(1.0, 0.03, 0.02, alpha * 0.2)
+	)
+	draw_arc(
+		Vector2.ZERO,
+		burst_radius,
+		0.0,
+		TAU,
+		56,
+		Color(1.0, 0.18, 0.08, alpha * 0.95),
+		lerpf(8.0, 3.0, progress),
+		true
+	)
+	draw_arc(
+		Vector2.ZERO,
+		burst_radius * 0.64,
+		-progress * TAU,
+		TAU - progress * TAU,
+		40,
+		Color(1.0, 0.9, 0.62, alpha * 0.9),
+		3.0,
+		true
+	)
+	for ray_index in 8:
+		var ray_angle := float(ray_index) / 8.0 * TAU + progress * 0.5
+		var ray_direction := Vector2.from_angle(ray_angle)
+		draw_line(
+			ray_direction * (burst_radius * 0.78),
+			ray_direction * (burst_radius + 12.0 + _last_damage_amount * 0.4),
+			Color(1.0, 0.34, 0.12, alpha * 0.9),
+			3.0
+		)
 
 
 func _draw_level_up_effect() -> void:

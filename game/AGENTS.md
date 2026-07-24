@@ -83,8 +83,10 @@ manually.
   controller, run resources, HUD, pause menu, run-ended flow, and optional
   debug overlay.
 - `run_resources.gd` owns lifespan, qi, cultivation level, level-up recovery,
-  lifespan damage routed from enemy attacks, and the one-time post-tribulation
-  lifespan doubling. `gameplay_hud.tscn` only presents its signals.
+  lifespan damage routed from enemy attacks, realm-breakthrough interval and
+  cap, completed-breakthrough count, and each post-tribulation lifespan
+  doubling. `game.gd` only orchestrates the active tribulation scene;
+  `gameplay_hud.tscn` only presents resource signals.
 - `player.tscn` is a reusable `CharacterBody2D`. `player.gd` owns movement,
   speed modes, accumulated distance, lateral clamping, incoming melee damage
   signals, the best collected copy of each equipment type, Tab cycling,
@@ -97,12 +99,14 @@ manually.
   frames converted from the root `chara_fly.gif`, and cultivation increases
   trigger a short expanding aura.
 - `EnemySpawner` creates bounded enemies beyond both camera edges, injects the
-  player reference, owns enemy qi drops and the designer-managed pool of
-  droppable `WeaponData`, routes dropped qi upward, and freezes all enemies
-  when the run ends. It selects weapon definitions evenly and asks the selected
-  resource to roll its configured damage. Forward enemies are slower than the
-  player; periodic rear pursuers are slightly faster. Route migration removes
-  enemies left on roads outside the player's newly active route.
+  player reference, owns progressive enemy qi drops and the designer-managed
+  pool of droppable `WeaponData`, routes dropped qi upward, and freezes all
+  enemies when the run ends. Each enemy snapshots its difficulty-, elite-,
+  Trial Hell-, and rear-adjusted qi reward when spawned. It selects weapon
+  definitions evenly and asks the selected resource to roll its configured
+  damage. Forward enemies are slower than the player; periodic rear pursuers
+  are slightly faster. Route migration removes enemies left on roads outside
+  the player's newly active route.
   Unpaused elapsed time and current cultivation level jointly scale new enemy
   health, count, damage, attack frequency, and spawn frequency. Eight percent
   of new enemies become gold-labeled elites with triple health, 1.6-times
@@ -154,11 +158,13 @@ manually.
   projectile references. Treat these shared definitions as immutable at
   runtime; rolled damage, collection state, and upgrade levels belong to the
   player.
-- `heavenly_tribulation.tscn` runs once when cultivation advances beyond level
-  nine. It warns nine predicted, slightly randomized ground positions before
-  applying lightning damage. Surviving all strikes doubles maximum lifespan
-  and adds half of that new maximum directly to current lifespan, then asks
-  `player.gd` to play a larger multi-ring breakthrough effect.
+- `heavenly_tribulation.tscn` runs at nine realm milestones: cultivation levels
+  10, 19, 28, 37, 46, 55, 64, 73, and 82. Sequences never overlap; milestones
+  crossed during an active sequence are handled afterward. Each sequence warns
+  nine predicted, slightly randomized ground positions before applying
+  lightning damage. Surviving all strikes doubles maximum lifespan and adds
+  half of that new maximum directly to current lifespan, then asks `player.gd`
+  to play a larger multi-ring breakthrough effect.
 - `RoadForkSpawner` periodically places `road_fork.tscn` beyond the camera on
   the active route. Events alternate between normal roads and a red-black
   `试炼地狱`, while also alternating their full-width left/right placement

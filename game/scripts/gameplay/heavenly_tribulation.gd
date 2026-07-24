@@ -12,7 +12,7 @@ enum Phase {
 	GAP,
 }
 
-## Number of lightning strikes in the level-nine breakthrough.
+## Number of lightning strikes in each cultivation-realm breakthrough.
 @export_range(1, 20, 1) var strike_count: int = 9
 ## Minimum ground-warning duration, in seconds. The exact duration is random
 ## for each strike and is also used to predict the player's landing position.
@@ -24,8 +24,13 @@ enum Phase {
 ## Maximum random offset from the predicted player position, in world pixels.
 ## Runtime clamps it inside the damage radius so unchanged movement still hits.
 @export_range(0.0, 80.0, 1.0) var random_landing_offset: float = 24.0
-## Lifespan removed when the player remains inside one lightning strike.
+## Minimum lifespan removed by one lightning strike. The resolved damage is
+## whichever is greater: this floor or maximum_lifespan_damage_ratio of the
+## maximum lifespan snapshotted when the tribulation starts.
 @export_range(0.1, 100.0, 0.5) var strike_damage: float = 12.0
+## Portion of the player's maximum lifespan removed by each lightning strike.
+## The default four percent begins exceeding the 12-point floor in later realms.
+@export_range(0.0, 1.0, 0.005) var maximum_lifespan_damage_ratio: float = 0.04
 ## Duration of the bright lightning impact, in seconds.
 @export_range(0.05, 0.8, 0.05) var flash_duration: float = 0.18
 ## Pause between one impact fading and the next warning, in seconds.
@@ -39,6 +44,7 @@ var _phase_time_remaining: float = 0.0
 var _warning_duration: float = 0.0
 var _current_strike_index: int = 0
 var _landing_position: Vector2 = Vector2.ZERO
+var _maximum_lifespan_snapshot: float = 0.0
 var _rng := RandomNumberGenerator.new()
 
 
@@ -49,13 +55,18 @@ func _ready() -> void:
 	set_physics_process(false)
 
 
-## Starts one nine-strike sequence against the supplied active player.
-func start(active_player: PlayerController) -> void:
+## Starts one complete strike sequence and snapshots the supplied maximum
+## lifespan so damage remains stable throughout all nine warnings and strikes.
+func start(
+	active_player: PlayerController,
+	maximum_lifespan: float = 0.0
+) -> void:
 	if not is_instance_valid(active_player):
 		push_error("HeavenlyTribulation requires an active PlayerController.")
 		queue_free()
 		return
 	_player = active_player
+	_maximum_lifespan_snapshot = maxf(maximum_lifespan, 0.0)
 	_current_strike_index = 0
 	set_physics_process(true)
 	_prepare_next_warning()
@@ -70,6 +81,25 @@ func cancel() -> void:
 ## Returns the world-space center of the currently warned strike.
 func get_current_landing_position() -> Vector2:
 	return _landing_position
+
+
+## Returns the damage one strike resolves from a supplied maximum lifespan.
+## This pure helper is also the designer-facing preview of the scaling curve.
+func get_strike_damage_for_maximum_lifespan(
+	maximum_lifespan: float
+) -> float:
+	return maxf(
+		maxf(strike_damage, 0.0),
+		maxf(maximum_lifespan, 0.0)
+			* clampf(maximum_lifespan_damage_ratio, 0.0, 1.0)
+	)
+
+
+## Returns the live sequence's damage using its start-time lifespan snapshot.
+func get_current_strike_damage() -> float:
+	return get_strike_damage_for_maximum_lifespan(
+		_maximum_lifespan_snapshot
+	)
 
 
 func _physics_process(delta: float) -> void:
@@ -144,7 +174,7 @@ func _land_current_strike() -> void:
 		<= strike_radius
 	)
 	if hit_player:
-		_player.take_melee_damage(strike_damage)
+		_player.take_melee_damage(get_current_strike_damage())
 	strike_landed.emit(_current_strike_index + 1, hit_player)
 	queue_redraw()
 
