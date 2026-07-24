@@ -5,6 +5,12 @@ signal defeated(drop_position: Vector2, inherited_velocity: Vector2)
 
 const ATTACK_FLASH_DURATION: float = 0.28
 const THREAT_RING_DASH_COUNT: int = 18
+const CriticalHitVfxResource = preload(
+	"res://game/scripts/gameplay/critical_hit_vfx.gd"
+)
+const DEFAULT_CRITICAL_HIT_VFX_SCENE: PackedScene = preload(
+	"res://game/scenes/gameplay/critical_hit_vfx.tscn"
+)
 
 @onready var elite_label: Label = $EliteLabel
 @onready var attack_warning_label: Label = $AttackWarningLabel
@@ -35,6 +41,13 @@ const THREAT_RING_DASH_COUNT: int = 18
 ## Distance behind the player, in world pixels, at which this enemy is removed
 ## if it was passed without being defeated.
 @export var despawn_behind_distance: float = 900.0
+
+@export_category("Damage Feedback")
+## World-space presentation spawned for confirmed player critical hits. The
+## shared scene survives long enough to remain readable after enemy defeat.
+@export var critical_hit_vfx_scene: PackedScene = (
+	DEFAULT_CRITICAL_HIT_VFX_SCENE
+)
 
 var current_health: int = 0
 var is_elite: bool = false
@@ -362,13 +375,15 @@ func is_elite_enemy() -> bool:
 	return is_elite
 
 
-## Applies player melee damage exactly once per strike and removes the enemy
-## after its health reaches zero.
-func take_melee_damage(amount: int) -> void:
+## Applies player damage exactly once per hit and removes the enemy after its
+## health reaches zero. Critical metadata changes presentation only.
+func take_melee_damage(amount: int, is_critical: bool = false) -> void:
 	if not _combat_active or amount <= 0:
 		return
+	if is_critical:
+		_spawn_critical_hit_vfx(amount)
 	current_health = maxi(current_health - amount, 0)
-	_hit_flash_remaining = 0.12
+	_hit_flash_remaining = 0.2 if is_critical else 0.12
 	queue_redraw()
 	if current_health > 0:
 		return
@@ -384,6 +399,23 @@ func take_melee_damage(amount: int) -> void:
 	tween.tween_property(self, "scale", Vector2.ONE * 1.4, 0.18)
 	tween.tween_property(self, "modulate:a", 0.0, 0.18)
 	tween.chain().tween_callback(queue_free)
+
+
+func _spawn_critical_hit_vfx(amount: int) -> void:
+	if critical_hit_vfx_scene == null or get_parent() == null:
+		return
+	var critical_vfx := (
+		critical_hit_vfx_scene.instantiate()
+		as CriticalHitVfxResource
+	)
+	if critical_vfx == null:
+		push_error(
+			"Enemy critical_hit_vfx_scene must instantiate CriticalHitVfx."
+		)
+		return
+	get_parent().add_child(critical_vfx)
+	critical_vfx.global_position = global_position
+	critical_vfx.play(amount)
 
 
 ## Returns whether this enemy may be targeted or attack.

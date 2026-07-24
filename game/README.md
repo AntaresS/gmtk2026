@@ -96,6 +96,10 @@ The minimal run loop is owned by separate gameplay systems:
   a 240-pixel range. Delivery-count rewards add sequential swords to each
   volley. Swept queries prevent tunneling between physics frames. Regardless of
   weapon count, only one idle weapon accompanies the player.
+- Critical chance is rolled once per attack and its resolved critical-damage
+  multiplier is preserved across that attack's direct, volley, bounce, and AoE
+  deliveries. Every critical impact shows a gold burst and outlined `暴击!`
+  world-space damage number that remains readable after an immediate defeat.
 - The Universe Ring homes into an enemy and then returns to the moving player.
   Delivery count adds enemy-to-enemy bounces before its return, while 神 area
   and targeting rewards expand its impact and search radii. Player-global

@@ -1,14 +1,12 @@
-[gd_resource type="Resource" script_class="WeaponData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="WeaponData" format=3 uid="uid://kacuolh3dqn8"]
 
-[ext_resource type="Script" path="res://game/scripts/gameplay/weapon_data.gd" id="1_weapon_data"]
+[ext_resource type="Script" uid="uid://ddr0tj47oo4w8" path="res://game/scripts/gameplay/weapon_data.gd" id="1_weapon_data"]
 
 [resource]
 script = ExtResource("1_weapon_data")
 weapon_id = &"great_strength_palm"
 display_name = "大力掌"
-attack_kind = 0
 display_color = Color(0.490196, 1, 0.847059, 1)
-minimum_damage = 1
-maximum_damage = 1
-attack_range = 72.0
-attack_interval = 0.7
+minimum_damage = 5
+maximum_damage = 5
+attack_range = 81.0

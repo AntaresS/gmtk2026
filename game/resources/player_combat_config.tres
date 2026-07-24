@@ -4,3 +4,4 @@
 
 [resource]
 script = ExtResource("1_config")
+base_critical_chance = 0.05

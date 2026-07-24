@@ -9,6 +9,7 @@ var _damage: int = 1
 var _maximum_distance: float = 240.0
 var _distance_traveled: float = 0.0
 var _spent: bool = false
+var _is_critical: bool = false
 
 
 func _physics_process(delta: float) -> void:
@@ -57,12 +58,14 @@ func configure(
 	direction: Vector2,
 	damage: int,
 	maximum_distance: float,
-	speed_multiplier: float = 1.0
+	speed_multiplier: float = 1.0,
+	is_critical: bool = false
 ) -> void:
 	_direction = direction.normalized()
 	_damage = maxi(damage, 1)
 	_maximum_distance = maxf(maximum_distance, 1.0)
 	travel_speed *= maxf(speed_multiplier, 0.01)
+	_is_critical = is_critical
 	rotation = _direction.angle()
 
 
@@ -78,7 +81,7 @@ func _on_body_entered(body: Node2D) -> void:
 func _hit_enemy(enemy: EnemyController) -> void:
 	if _spent or not enemy.is_combat_active():
 		return
-	enemy.take_melee_damage(_damage)
+	enemy.take_melee_damage(_damage, _is_critical)
 	_spent = true
 	collision_layer = 0
 	collision_mask = 0

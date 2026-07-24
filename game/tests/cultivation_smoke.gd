@@ -73,6 +73,12 @@ func _run() -> void:
 	var hud := game.get_node("GameplayHud") as GameplayHud
 	enemy_spawner.set_spawning_enabled(false)
 	player.combat_stats_changed.connect(_on_combat_stats_changed)
+	var test_cultivation_config := (
+		resources.cultivation_config.duplicate(true) as CultivationConfig
+	)
+	test_cultivation_config.fragments_per_level = 3
+	resources.cultivation_config = test_cultivation_config
+	resources.reset_resources()
 
 	var initial_global_stats := player.get_global_combat_stats()
 	var initial_weapon_stats := player.get_current_weapon_combat_stats()
@@ -108,6 +114,61 @@ func _run() -> void:
 			== player.get_current_weapon_damage(),
 		"Initial typed combat-stat snapshots did not mirror live player state."
 	)
+
+	var original_combat_config := player.combat_config
+	var guaranteed_crit_config := (
+		original_combat_config.duplicate(true) as PlayerCombatConfigResource
+	)
+	guaranteed_crit_config.base_critical_chance = 1.0
+	guaranteed_crit_config.base_critical_damage_multiplier = 2.0
+	player.combat_config = guaranteed_crit_config
+	player.apply_cultivation_level(resources.cultivation_level)
+	var critical_base_damage := player.get_current_weapon_damage()
+	var guaranteed_critical := player._roll_current_attack_damage()
+	var critical_target := preload(
+		"res://game/scenes/gameplay/enemy.tscn"
+	).instantiate() as EnemyController
+	critical_target.player = player
+	critical_target.max_health = 999
+	critical_target.cruise_speed = 1.0
+	game.add_child(critical_target)
+	critical_target.global_position = (
+		player.global_position + Vector2(320.0, 0.0)
+	)
+	critical_target.take_melee_damage(
+		guaranteed_critical.damage,
+		guaranteed_critical.is_critical
+	)
+	await _wait_process_frames(1)
+	var critical_vfx_nodes := get_nodes_in_group("critical_hit_vfx")
+	var critical_vfx_label: Label = null
+	if not critical_vfx_nodes.is_empty():
+		critical_vfx_label = (
+			critical_vfx_nodes[0].get_node("CriticalHitLabel") as Label
+		)
+	_check(
+		guaranteed_critical.is_critical
+		and guaranteed_critical.damage == critical_base_damage * 2
+		and critical_target.current_health
+			== 999 - guaranteed_critical.damage,
+		"Guaranteed critical roll did not multiply and apply final damage."
+	)
+	_check(
+		critical_vfx_nodes.size() == 1
+		and critical_vfx_label != null
+		and critical_vfx_label.visible
+		and critical_vfx_label.text.contains("暴击!")
+		and critical_vfx_label.text.contains(
+			str(guaranteed_critical.damage)
+		),
+		"Critical damage did not spawn readable world-space feedback."
+	)
+	critical_target.queue_free()
+	for critical_vfx in critical_vfx_nodes:
+		critical_vfx.queue_free()
+	player.combat_config = original_combat_config
+	player.apply_cultivation_level(resources.cultivation_level)
+	await _wait_process_frames(1)
 
 	var tuned_combat_config := PlayerCombatConfigResource.new()
 	tuned_combat_config.global_damage_bonus = 2.0
@@ -537,6 +598,7 @@ func _run() -> void:
 	)
 
 	var capped_resources := RunResources.new()
+	capped_resources.cultivation_config = test_cultivation_config
 	game.add_child(capped_resources)
 	capped_resources.add_cultivation_fragment(
 		CultivationTypesResource.CultivationType.JING,

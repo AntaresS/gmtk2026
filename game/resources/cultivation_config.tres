@@ -87,4 +87,5 @@ rewards = Array[ExtResource("3_reward")]([SubResource("RewardShenAoe"), SubResou
 
 [resource]
 script = ExtResource("1_config")
+fragments_per_level = 1
 type_configs = Array[ExtResource("2_type")]([SubResource("TypeJing"), SubResource("TypeQi"), SubResource("TypeShen")])

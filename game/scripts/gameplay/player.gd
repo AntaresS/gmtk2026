@@ -37,6 +37,9 @@ const CombatStatsResolverResource = preload(
 const PlayerCombatConfigResource = preload(
 	"res://game/scripts/gameplay/player_combat_config.gd"
 )
+const AttackDamageResultResource = preload(
+	"res://game/scripts/gameplay/attack_damage_result.gd"
+)
 const DEFAULT_PLAYER_COMBAT_CONFIG: PlayerCombatConfigResource = preload(
 	"res://game/resources/player_combat_config.tres"
 )
@@ -138,6 +141,7 @@ var _pending_flying_swords: int = 0
 var _flying_sword_sequence_total: int = 0
 var _flying_sword_sequence_launched: int = 0
 var _flying_sword_sequence_damage: int = 1
+var _flying_sword_sequence_is_critical: bool = false
 var _flying_sword_sequence_timer: float = 0.0
 var _level_up_effect_remaining: float = 0.0
 var _breakthrough_effect_remaining: float = 0.0
@@ -518,10 +522,11 @@ func get_attraction_range() -> float:
 ## Returns lifespan-decay scaling from actual forward speed relative to normal
 ## speed. Boosting raises it, while slowing never reduces baseline decay.
 func get_lifespan_decay_multiplier() -> float:
-	return maxf(
-		current_forward_speed / maxf(base_forward_speed, 1.0),
-		1.0
-	)
+	return 1.0
+	#return maxf(
+		#current_forward_speed / maxf(base_forward_speed, 1.0),
+		#1.0
+	#)
 
 
 func get_equipment_inventory_entries() -> Array[String]:
@@ -614,29 +619,38 @@ func _update_weapon_attack(delta: float) -> void:
 		and _qiankun_ring_in_flight
 	):
 		return
-	var damage := _roll_current_attack_damage()
+	var attack_damage := _roll_current_attack_damage()
 
 	if attack_kind == WeaponDataResource.AttackKind.DAO:
 		for enemy in targets:
-			enemy.take_melee_damage(damage)
+			enemy.take_melee_damage(
+				attack_damage.damage,
+				attack_damage.is_critical
+			)
 		_dao_attack_remaining = 0.28
 	elif attack_kind == WeaponDataResource.AttackKind.FLYING_SWORD:
-		_begin_flying_sword_sequence(damage)
+		_begin_flying_sword_sequence(attack_damage)
 	elif attack_kind == WeaponDataResource.AttackKind.QIANKUN_RING:
-		_launch_qiankun_ring(targets[0], damage)
+		_launch_qiankun_ring(targets[0], attack_damage)
 	else:
-		targets[0].take_melee_damage(damage)
+		targets[0].take_melee_damage(
+			attack_damage.damage,
+			attack_damage.is_critical
+		)
 		_attack_flash_remaining = 0.12
 
 	_attack_cooldown_remaining = get_current_attack_interval()
 	queue_redraw()
 
 
-func _begin_flying_sword_sequence(damage: int) -> void:
+func _begin_flying_sword_sequence(
+	attack_damage: AttackDamageResultResource
+) -> void:
 	_flying_sword_sequence_total = get_flying_sword_projectile_count()
 	_pending_flying_swords = _flying_sword_sequence_total
 	_flying_sword_sequence_launched = 0
-	_flying_sword_sequence_damage = maxi(damage, 1)
+	_flying_sword_sequence_damage = maxi(attack_damage.damage, 1)
+	_flying_sword_sequence_is_critical = attack_damage.is_critical
 	_flying_sword_sequence_timer = 0.0
 	_launch_next_flying_sword()
 
@@ -654,6 +668,7 @@ func _launch_next_flying_sword() -> void:
 	_launch_flying_sword(
 		target,
 		_flying_sword_sequence_damage,
+		_flying_sword_sequence_is_critical,
 		_flying_sword_sequence_launched,
 		_flying_sword_sequence_total
 	)
@@ -670,6 +685,7 @@ func _cancel_flying_sword_sequence() -> void:
 	_pending_flying_swords = 0
 	_flying_sword_sequence_total = 0
 	_flying_sword_sequence_launched = 0
+	_flying_sword_sequence_is_critical = false
 	_flying_sword_sequence_timer = 0.0
 
 
@@ -690,6 +706,7 @@ func _get_attack_targets() -> Array[EnemyController]:
 func _launch_flying_sword(
 	target: EnemyController,
 	damage: int,
+	is_critical: bool,
 	projectile_index: int,
 	projectile_count: int
 ) -> void:
@@ -721,13 +738,14 @@ func _launch_flying_sword(
 		direction,
 		damage,
 		get_current_attack_range(),
-		get_current_projectile_speed_multiplier()
+		get_current_projectile_speed_multiplier(),
+		is_critical
 	)
 
 
 func _launch_qiankun_ring(
 	target: EnemyController,
-	damage: int
+	attack_damage: AttackDamageResultResource
 ) -> void:
 	var weapon_data := _get_current_weapon_data()
 	if weapon_data.projectile_scene == null:
@@ -747,11 +765,12 @@ func _launch_qiankun_ring(
 	projectile.configure(
 		self,
 		target,
-		damage,
+		attack_damage.damage,
 		get_qiankun_ring_bounce_count(),
 		_current_weapon_combat_stats.secondary_targeting_range,
 		get_current_aoe_radius(),
-		get_current_projectile_speed_multiplier()
+		get_current_projectile_speed_multiplier(),
+		attack_damage.is_critical
 	)
 	projectile.returned_to_player.connect(
 		_on_qiankun_ring_returned,
@@ -1156,17 +1175,20 @@ func _rebuild_combat_stats() -> void:
 	)
 
 
-func _roll_current_attack_damage() -> int:
+func _roll_current_attack_damage() -> AttackDamageResultResource:
 	var damage := _current_weapon_combat_stats.resolved_damage
-	if randf() >= _current_weapon_combat_stats.critical_chance:
-		return damage
-	return maxi(
-		roundi(
-			float(damage)
-				* _current_weapon_combat_stats.critical_damage_multiplier
-		),
-		1
+	var is_critical := (
+		randf() < _current_weapon_combat_stats.critical_chance
 	)
+	if is_critical:
+		damage = maxi(
+			roundi(
+				float(damage)
+					* _current_weapon_combat_stats.critical_damage_multiplier
+			),
+			1
+		)
+	return AttackDamageResultResource.new(damage, is_critical)
 
 
 func _on_cultivation_stats_changed(

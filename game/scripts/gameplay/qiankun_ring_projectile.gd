@@ -26,6 +26,7 @@ var _last_hit_enemy_id: int = 0
 var _successful_hit_count: int = 0
 var _aoe_radius: float = 0.0
 var _projectile_speed_multiplier: float = 1.0
+var _is_critical: bool = false
 
 
 ## Launches the ring at one enemy. `bounce_count` counts extra enemy hits
@@ -37,7 +38,8 @@ func configure(
 	bounce_count: int,
 	bounce_search_range: float,
 	aoe_radius: float = 0.0,
-	projectile_speed_multiplier: float = 1.0
+	projectile_speed_multiplier: float = 1.0,
+	is_critical: bool = false
 ) -> void:
 	_player = player
 	_target = initial_target
@@ -49,6 +51,7 @@ func configure(
 		projectile_speed_multiplier,
 		0.01
 	)
+	_is_critical = is_critical
 	_lifetime_remaining = maxf(maximum_lifetime, 1.0)
 
 
@@ -163,7 +166,7 @@ func _hit_enemy(enemy: EnemyController) -> void:
 		1
 	)
 	_successful_hit_count += 1
-	enemy.take_melee_damage(scaled_damage)
+	enemy.take_melee_damage(scaled_damage, _is_critical)
 	_apply_aoe_damage(enemy, scaled_damage)
 	enemy_hit.emit(enemy)
 	if _remaining_bounces <= 0:
@@ -190,7 +193,7 @@ func _apply_aoe_damage(primary_enemy: EnemyController, damage: int) -> void:
 			or enemy.global_position.distance_to(global_position) > _aoe_radius
 		):
 			continue
-		enemy.take_melee_damage(damage)
+		enemy.take_melee_damage(damage, _is_critical)
 
 
 func _select_next_target_or_return() -> void:
