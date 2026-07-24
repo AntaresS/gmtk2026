@@ -6,16 +6,27 @@ enum AttackKind {
 	DAO,
 	FLYING_SWORD,
 	QIANKUN_RING,
+	GOLDEN_BELL,
+	THUNDER_HAMMER,
+	FANTIAN_SEAL,
+}
+
+enum AttackDomain {
+	MELEE,
+	RANGED,
 }
 
 @export_category("Identity")
-## Stable identifier used to keep the strongest collected copy of this weapon.
+## Stable identifier used to combine same-type pickups into weapon quantity.
 ## IDs must be unique across every WeaponData available in one run.
 @export var weapon_id: StringName = &"weapon"
 ## Designer-facing name shown on pickups and the equipment HUD.
 @export var display_name: String = "Weapon"
 ## Existing attack implementation selected when this weapon is equipped.
 @export var attack_kind: AttackKind = AttackKind.GREAT_STRENGTH_PALM
+## Optional realm-gating category. Current default realms permit both domains;
+## future realm definitions can restrict equipment without checking weapon IDs.
+@export var attack_domain: AttackDomain = AttackDomain.MELEE
 ## Primary color used by the player's current attack-range presentation.
 @export var display_color: Color = Color("7dffd8")
 ## Color used by the world pickup representation. This may differ slightly
@@ -36,17 +47,24 @@ var cultivation_type: int = -1
 @export_range(1, 100, 1) var maximum_damage: int = 1
 ## Base automatic-attack radius in world pixels before technique strengthening.
 @export_range(24.0, 600.0, 1.0) var attack_range: float = 72.0
+## Full angle, in degrees, of a directional attack. Great Strength Palm uses
+## this cone instead of damaging through its complete detection circle.
+@export_range(1.0, 180.0, 1.0) var directional_arc_degrees: float = 64.0
 ## Minimum seconds between automatic attacks while a valid target is present.
 @export_range(0.05, 5.0, 0.01) var attack_interval: float = 0.7
 
 @export_category("Delivery")
 ## Optional projectile scene used by projectile-based attack kinds.
 @export var projectile_scene: PackedScene
-## Seconds between projectiles in one sequential volley. Used by Flying Sword.
+## Seconds between projectiles in one sequential volley. Used by Flying Sword
+## and Universe Ring duplicate-weapon volleys.
 @export_range(0.01, 0.5, 0.01) var projectile_sequence_interval: float = 0.12
-## Base number of deliveries in one attack before player bonuses. Flying Sword
-## uses total volley projectiles; Universe Ring counts its initial target as one.
+## Base number of weapon copies delivered in one attack. Runtime duplicate
+## pickups add to this value without mutating the shared weapon definition.
 @export_range(1, 100, 1) var base_delivery_count: int = 1
+## Fixed extra enemy-to-enemy bounces made by each Universe Ring projectile.
+## This is deliberately independent from duplicate-weapon delivery count.
+@export_range(0, 20, 1) var base_bounce_count: int = 0
 ## Weapon-specific secondary search radius in world pixels. Used for Universe
 ## Ring bounce targeting; zero disables a secondary search.
 @export_range(0.0, 600.0, 1.0) var secondary_range: float = 0.0

@@ -30,6 +30,9 @@ const FLYING_SWORD_DATA: WeaponData = preload(
 const QIANKUN_RING_DATA: WeaponData = preload(
 	"res://game/resources/weapon/qiankun_ring.tres"
 )
+const GOLDEN_BELL_DATA: WeaponData = preload(
+	"res://game/resources/weapon/golden_bell.tres"
+)
 
 var _failures: Array[String] = []
 var _fragment_completions: int = 0
@@ -73,12 +76,28 @@ func _run() -> void:
 	var hud := game.get_node("GameplayHud") as GameplayHud
 	enemy_spawner.set_spawning_enabled(false)
 	player.combat_stats_changed.connect(_on_combat_stats_changed)
+	var test_player_combat_config := (
+		player.combat_config.duplicate(true) as PlayerCombatConfigResource
+	)
+	test_player_combat_config.base_critical_chance = 0.0
+	player.combat_config = test_player_combat_config
 	var test_cultivation_config := (
 		resources.cultivation_config.duplicate(true) as CultivationConfig
 	)
 	test_cultivation_config.fragments_per_level = 3
 	resources.cultivation_config = test_cultivation_config
+	var test_realm_config := (
+		resources.realm_progression_config.duplicate(true)
+		as RealmProgressionConfig
+	)
+	test_realm_config.get_realm(0).melee_weapons_only = false
+	resources.realm_progression_config = test_realm_config
 	resources.reset_resources()
+	player.call(
+		"_on_cultivation_stats_changed",
+		CultivationTypesResource.CultivationType.JING,
+		0
+	)
 
 	var initial_global_stats := player.get_global_combat_stats()
 	var initial_weapon_stats := player.get_current_weapon_combat_stats()
@@ -207,7 +226,7 @@ func _run() -> void:
 			tuned_global_stats.projectile_speed_multiplier,
 			1.25
 		)
-		and tuned_global_stats.delivery_count_bonus == 2
+		and tuned_global_stats.delivery_count_bonus == 0
 		and is_equal_approx(tuned_global_stats.aoe_radius_bonus, 0.30)
 		and is_equal_approx(
 			tuned_global_stats.targeting_range_bonus,
@@ -232,7 +251,7 @@ func _run() -> void:
 			tuned_weapon_stats.projectile_speed_multiplier,
 			1.25
 		)
-		and tuned_weapon_stats.delivery_count == 3
+		and tuned_weapon_stats.delivery_count == 1
 		and is_equal_approx(
 			tuned_weapon_stats.attack_range,
 			DAO_DATA.attack_range * 1.8
@@ -257,9 +276,10 @@ func _run() -> void:
 		"Cultivation did not load its three-fragment data resource."
 	)
 	_check(
-		hud.cultivation_tracks_label.text
-			== "精 Lv.0  0/3\n气 Lv.0  0/3\n神 Lv.0  0/3",
-		"HUD did not present all three initial cultivation tracks."
+		hud.cultivation_tracks_label.text.contains("通用碎片")
+		and hud.cultivation_tracks_label.text.contains("攻速 Lv.0")
+		and hud.cultivation_tracks_label.text.contains("加减速 Lv.0"),
+		"HUD did not present the explained universal-fragment system."
 	)
 
 	_check(player.collect_weapon(DAO_DATA, 10), "Dao could not be equipped.")
@@ -375,16 +395,16 @@ func _run() -> void:
 		resources.get_cultivation_level(
 			CultivationTypesResource.CultivationType.QI
 		) == 3
-		and is_equal_approx(qi_global_stats.attack_speed_bonus, 0.05)
+		and is_equal_approx(qi_global_stats.attack_speed_bonus, 0.10)
 		and is_equal_approx(
 			qi_global_stats.projectile_speed_multiplier,
 			1.10
 		)
-		and qi_global_stats.delivery_count_bonus == 1
+		and qi_global_stats.delivery_count_bonus == 0
 		and is_zero_approx(qi_global_stats.global_damage_bonus)
 		and player.get_current_projectile_speed_multiplier() > 1.0
-		and player.get_flying_sword_projectile_count() == 2,
-		"气 reward cycle did not add projectile speed and delivery count."
+		and player.get_flying_sword_projectile_count() == 1,
+		"气 reward cycle changed weapon quantity without a duplicate pickup."
 	)
 
 	_check(
@@ -395,17 +415,17 @@ func _run() -> void:
 	_check(
 		is_zero_approx(ring_before_shen.matching_damage_bonus)
 		and is_equal_approx(ring_before_shen.critical_chance, 0.02)
-		and is_equal_approx(ring_before_shen.attack_speed_bonus, 0.05)
+		and is_equal_approx(ring_before_shen.attack_speed_bonus, 0.10)
 		and is_equal_approx(
 			ring_before_shen.projectile_speed_multiplier,
 			1.10
 		)
-		and ring_before_shen.delivery_count == 2
+		and ring_before_shen.delivery_count == 1
 		and is_equal_approx(
 			ring_before_shen.aoe_radius,
 			QIANKUN_RING_DATA.base_aoe_radius
 		)
-		and player.get_qiankun_ring_bounce_count() == 1,
+		and player.get_qiankun_ring_bounce_count() == 2,
 		"Player-global 精/气 bonuses did not carry to the Universe Ring."
 	)
 	resources.add_cultivation_fragment(
@@ -436,16 +456,16 @@ func _run() -> void:
 	_check(
 		player.get_current_attack_range()
 			> QIANKUN_RING_DATA.attack_range
-		and is_equal_approx(shen_global_stats.aoe_radius_bonus, 0.06)
-		and shen_global_stats.delivery_count_bonus == 2
-		and player.get_current_delivery_count() == 3
+		and is_equal_approx(shen_global_stats.aoe_radius_bonus, 0.12)
+		and shen_global_stats.delivery_count_bonus == 0
+		and player.get_current_delivery_count() == 1
 		and player.get_qiankun_ring_bounce_count() == 2
 		and is_equal_approx(
 			shen_global_stats.targeting_range_bonus,
 			0.05
 		)
 		and is_zero_approx(shen_global_stats.global_damage_bonus),
-		"神 reward cycle did not add delivery count and targeting range."
+		"神 reward cycle changed weapon quantity without a duplicate pickup."
 	)
 	_check(
 		resources.get_cultivation_level(
@@ -508,7 +528,7 @@ func _run() -> void:
 		FLYING_SWORD_DATA,
 		QIANKUN_RING_DATA,
 	]
-	var expected_damage_after_overall: Array[int] = [11, 14, 14, 14]
+	var expected_damage_after_overall: Array[int] = [10, 13, 13, 13]
 	for weapon_index in weapon_definitions.size():
 		var resolved_weapon := CombatStatsResolverResource.resolve_weapon(
 			weapon_definitions[weapon_index],
@@ -523,21 +543,6 @@ func _run() -> void:
 				weapon_definitions[weapon_index].display_name
 			)
 		)
-	var jing_color := (
-		resources.cultivation_config.get_type_config(
-			CultivationTypesResource.CultivationType.JING
-		).display_color.to_html(false)
-	)
-	var qi_color := (
-		resources.cultivation_config.get_type_config(
-			CultivationTypesResource.CultivationType.QI
-		).display_color.to_html(false)
-	)
-	var shen_color := (
-		resources.cultivation_config.get_type_config(
-			CultivationTypesResource.CultivationType.SHEN
-		).display_color.to_html(false)
-	)
 	var stats_panel_text := hud.player_stats_label.text
 	_check(
 		resources.cultivation_level == 2
@@ -546,11 +551,11 @@ func _run() -> void:
 			overall_global_stats.overall_level_damage_bonus,
 			player.combat_config.global_damage_bonus_per_overall_level
 		)
-		and is_equal_approx(overall_global_stats.global_damage_bonus, 1.0)
+		and is_equal_approx(overall_global_stats.global_damage_bonus, 0.0)
 		and damage_before_overall == 13
-		and player.get_current_weapon_damage() == 14
+		and player.get_current_weapon_damage() == 13
 		and _combat_stats_updates > stats_updates_before_overall,
-		"Overall cultivation did not reactively increase player global damage."
+		"Overall cultivation incorrectly changed non-Palm global damage."
 	)
 	_check(
 		is_equal_approx(
@@ -567,18 +572,18 @@ func _run() -> void:
 		)
 		and is_equal_approx(
 			overall_global_stats.qi_bonuses.attack_speed_bonus,
-			0.05
+			0.10
 		)
 		and is_equal_approx(
 			overall_global_stats.qi_bonuses.projectile_speed_bonus,
 			0.10
 		)
-		and overall_global_stats.qi_bonuses.delivery_count_bonus == 1
+		and overall_global_stats.qi_bonuses.delivery_count_bonus == 0
 		and is_equal_approx(
 			overall_global_stats.shen_bonuses.aoe_radius_bonus,
-			0.06
+			0.12
 		)
-		and overall_global_stats.shen_bonuses.delivery_count_bonus == 1
+		and overall_global_stats.shen_bonuses.delivery_count_bonus == 0
 		and is_equal_approx(
 			overall_global_stats.shen_bonuses.targeting_range_bonus,
 			0.05
@@ -586,15 +591,11 @@ func _run() -> void:
 		"Source-specific global bonus snapshots did not preserve every reward."
 	)
 	_check(
-		stats_panel_text.contains("全局伤害 +1.0")
-		and stats_panel_text.contains("[color=#%s]精" % jing_color)
-		and stats_panel_text.contains("[color=#%s]气" % qi_color)
-		and stats_panel_text.contains("[color=#%s]神" % shen_color)
-		and stats_panel_text.contains("暴击 +2%")
-		and stats_panel_text.contains("弹速 +10%")
-		and stats_panel_text.contains("范围 +6%")
-		and stats_panel_text.contains("同源伤害 +30%"),
-		"Compact player-stat panel did not show live color-coded bonuses."
+		stats_panel_text.contains("碎片  攻速")
+		and stats_panel_text.contains("身法")
+		and stats_panel_text.contains("加减速")
+		and stats_panel_text.contains("移动  横向"),
+		"Compact player-stat panel did not replace 精气神 with universal stats."
 	)
 
 	var capped_resources := RunResources.new()
@@ -632,6 +633,10 @@ func _run() -> void:
 		player.collect_weapon(FLYING_SWORD_DATA, 11),
 		"Flying Sword could not be re-equipped for delivery testing."
 	)
+	_check(
+		player.collect_weapon(FLYING_SWORD_DATA, 9),
+		"Weaker duplicate Flying Sword did not add another projectile."
+	)
 	var volley_target := preload(
 		"res://game/scenes/gameplay/enemy.tscn"
 	).instantiate() as EnemyController
@@ -652,15 +657,18 @@ func _run() -> void:
 	_check(
 		player.get_flying_sword_projectile_count() == 3
 		and saw_multi_sword_sequence,
-		"Delivery count did not produce a three-sword sequential volley."
+		"Duplicate pickups did not produce a three-sword sequential volley."
 	)
 	volley_target.queue_free()
 	await _wait_process_frames(2)
 
-	player.set_movement_enabled(false)
 	_check(
 		player.collect_weapon(QIANKUN_RING_DATA, 11),
 		"Universe Ring could not be re-equipped for delivery testing."
+	)
+	_check(
+		player.collect_weapon(QIANKUN_RING_DATA, 9),
+		"Weaker duplicate Universe Ring did not add another projectile."
 	)
 	var ring_target_a := preload(
 		"res://game/scenes/gameplay/enemy.tscn"
@@ -679,6 +687,24 @@ func _run() -> void:
 	ring_target_b.global_position = (
 		player.global_position + Vector2(70.0, -90.0)
 	)
+	player.set("_attack_cooldown_remaining", 999.0)
+	await _wait_physics_frames(3)
+	player.call(
+		"_begin_qiankun_ring_sequence",
+		player.call("_roll_current_attack_damage")
+	)
+	_check(
+		player.get_current_delivery_count() == 3
+		and player.get_active_qiankun_ring_count() == 1
+		and player.get_pending_qiankun_ring_count() == 2,
+		"Duplicate Universe Rings did not begin a sequential three-ring volley."
+	)
+	player.call("_cancel_qiankun_ring_sequence")
+	for projectile_node in game.get_children():
+		if projectile_node is QiankunRingProjectile:
+			projectile_node.queue_free()
+	await _wait_process_frames(2)
+	player.set_movement_enabled(false)
 	var test_ring := preload(
 		"res://game/scenes/gameplay/qiankun_ring_projectile.tscn"
 	).instantiate() as QiankunRingProjectile
@@ -698,7 +724,7 @@ func _run() -> void:
 		player.get_current_delivery_count() == 3
 		and player.get_qiankun_ring_bounce_count() == 2
 		and _ring_delivery_hits == 3,
-		"Delivery count did not produce two Universe Ring bounces."
+		"Universe Ring did not keep two constant-damage bounces."
 	)
 	if is_instance_valid(test_ring):
 		test_ring.queue_free()
@@ -748,6 +774,158 @@ func _run() -> void:
 	splash_primary.queue_free()
 	splash_secondary.queue_free()
 	await _wait_process_frames(2)
+
+	var sword_energy_target_a := preload(
+		"res://game/scenes/gameplay/enemy.tscn"
+	).instantiate() as EnemyController
+	var sword_energy_target_b := preload(
+		"res://game/scenes/gameplay/enemy.tscn"
+	).instantiate() as EnemyController
+	for sword_energy_target in [
+		sword_energy_target_a,
+		sword_energy_target_b,
+	]:
+		sword_energy_target.player = player
+		sword_energy_target.max_health = 999
+		sword_energy_target.cruise_speed = 1.0
+		game.add_child(sword_energy_target)
+	sword_energy_target_a.global_position = (
+		player.global_position + Vector2(45.0, 0.0)
+	)
+	sword_energy_target_b.global_position = (
+		player.global_position + Vector2(90.0, 0.0)
+	)
+	var energy_sword := preload(
+		"res://game/scenes/gameplay/flying_sword_projectile.tscn"
+	).instantiate() as FlyingSwordProjectile
+	energy_sword.initial_energy = 2.0
+	energy_sword.energy_cost_per_hit = 1.0
+	energy_sword.travel_speed = 600.0
+	game.add_child(energy_sword)
+	energy_sword.global_position = player.global_position
+	energy_sword.configure(Vector2.RIGHT, 1, 200.0)
+	await _wait_physics_frames(20)
+	_check(
+		sword_energy_target_a.current_health == 998
+		and sword_energy_target_b.current_health == 998
+		and not is_instance_valid(energy_sword),
+		"Flying Sword did not pierce until its configured energy was exhausted."
+	)
+	sword_energy_target_a.queue_free()
+	sword_energy_target_b.queue_free()
+	await _wait_process_frames(2)
+
+	var range_sword := preload(
+		"res://game/scenes/gameplay/flying_sword_projectile.tscn"
+	).instantiate() as FlyingSwordProjectile
+	range_sword.travel_speed = 600.0
+	game.add_child(range_sword)
+	range_sword.global_position = player.global_position
+	range_sword.configure(Vector2.LEFT, 1, 40.0)
+	await _wait_physics_frames(12)
+	_check(
+		not is_instance_valid(range_sword),
+		"Flying Sword survived beyond twice its resolved attack range."
+	)
+
+	player.set_movement_enabled(true)
+	_check(
+		player.collect_weapon(GOLDEN_BELL_DATA, 4)
+		and player.collect_weapon(GOLDEN_BELL_DATA, 3),
+		"Golden Bell pickups did not equip and add a second layer."
+	)
+	var golden_bell := player.get_node("GoldenBell") as GoldenBellController
+	var bell_target := preload(
+		"res://game/scenes/gameplay/enemy.tscn"
+	).instantiate() as EnemyController
+	bell_target.player = player
+	bell_target.max_health = 999
+	bell_target.cruise_speed = 1.0
+	bell_target.melee_attack_interval = 10.0
+	game.add_child(bell_target)
+	bell_target.global_position = player.global_position + Vector2(30.0, 0.0)
+	var bell_damage := player.get_current_weapon_damage()
+	var expected_bell_damage := maxi(
+		bell_damage,
+		ceili(
+			float(bell_target.max_health)
+				* golden_bell.ordinary_enemy_damage_ratio
+		)
+	)
+	await _wait_physics_frames(4)
+	var initial_knockback_speed := bell_target.get_knockback_velocity().length()
+	_check(
+		golden_bell.get_layer_count() == 2
+		and golden_bell.get_ready_layer_count() == 1
+		and golden_bell.get_flashing_layer_count() == 1
+		and golden_bell.get_layer_phase(0)
+			== GoldenBellController.LayerPhase.READY
+		and golden_bell.get_layer_phase(1)
+			== GoldenBellController.LayerPhase.FLASHING
+		and golden_bell.layer_width >= 2.5
+		and golden_bell.layer_spacing >= 4.0
+		and bell_target.current_health == 999 - expected_bell_damage
+		and initial_knockback_speed > 0.0,
+		"Golden Bell impact did not consume one layer, damage, and angle-knock the enemy."
+	)
+	var lifespan_before_bell_block := resources.current_lifespan
+	player.take_melee_damage(5.0, bell_target)
+	_check(
+		is_equal_approx(
+			resources.current_lifespan,
+			lifespan_before_bell_block
+		),
+		"Flashing Golden Bell layer did not protect the player."
+	)
+	await _wait_physics_frames(12)
+	_check(
+		bell_target.get_knockback_velocity().length()
+			< initial_knockback_speed,
+		"Knocked enemy did not gradually return toward steady movement."
+	)
+	await _wait_physics_frames(24)
+	_check(
+		golden_bell.get_flashing_layer_count() == 0
+		and golden_bell.get_recovering_layer_count() == 1,
+		"Consumed Golden Bell layer did not disappear after its 0.5-second flash."
+	)
+	await _wait_physics_frames(190)
+	_check(
+		golden_bell.get_ready_layer_count() == 2
+		and is_equal_approx(golden_bell.recovery_duration, 0.8),
+		"Golden Bell layer did not use its much faster recovery."
+	)
+	golden_bell.configure_weapon(true, 7, bell_damage)
+	golden_bell.configure_weapon(true, 4, bell_damage)
+	_check(
+		golden_bell.get_layer_count() == 4,
+		"Golden Bell visuals retained more layers than the equipped quantity."
+	)
+	golden_bell.configure_weapon(true, 2, bell_damage)
+	if is_instance_valid(bell_target):
+		bell_target.queue_free()
+	await _wait_process_frames(2)
+	var elite_bell_target := preload(
+		"res://game/scenes/gameplay/enemy.tscn"
+	).instantiate() as EnemyController
+	elite_bell_target.player = player
+	elite_bell_target.max_health = 100
+	elite_bell_target.cruise_speed = 1.0
+	elite_bell_target.melee_attack_interval = 10.0
+	game.add_child(elite_bell_target)
+	elite_bell_target.configure_elite(3.0, 1.2, 1.2)
+	elite_bell_target.global_position = (
+		player.global_position + Vector2(30.0, 0.0)
+	)
+	await _wait_physics_frames(4)
+	_check(
+		elite_bell_target.get_ordinary_health_equivalent() == 100
+		and elite_bell_target.current_health == 210,
+		"Golden Bell elite damage did not equal 90% of ordinary health."
+	)
+	elite_bell_target.queue_free()
+	await _wait_process_frames(2)
+	player.set_movement_enabled(false)
 
 	var fragment := preload(
 		"res://game/scenes/gameplay/cultivation_fragment.tscn"

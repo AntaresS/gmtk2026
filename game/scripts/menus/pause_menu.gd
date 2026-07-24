@@ -7,13 +7,36 @@ extends CanvasLayer
 )
 
 @onready var resume_button: Button = %ResumeButton
+@onready var debug_status: Label = %DebugStatus
+@onready var weapon_option: OptionButton = %WeaponOption
+@onready var fragment_option: OptionButton = %FragmentOption
+@onready var base_speed_spin: SpinBox = %BaseSpeedSpin
+@onready var lateral_speed_spin: SpinBox = %LateralSpeedSpin
+@onready var acceleration_spin: SpinBox = %AccelerationSpin
 
 var _pause_enabled: bool = true
+var _debug_player: PlayerController
+var _debug_resources: RunResources
+var _debug_weapons: Array[WeaponData] = [
+	preload("res://game/resources/great_strength_palm.tres"),
+	preload("res://game/resources/weapon/dao.tres"),
+	preload("res://game/resources/weapon/flying_sword.tres"),
+	preload("res://game/resources/weapon/qiankun_ring.tres"),
+	preload("res://game/resources/weapon/golden_bell.tres"),
+	preload("res://game/resources/weapon/thunder_hammer.tres"),
+	preload("res://game/resources/weapon/fantian_seal.tres"),
+]
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_pause_enabled = true
+	for weapon in _debug_weapons:
+		weapon_option.add_item(weapon.display_name)
+	for upgrade_type in UniversalUpgradeTypes.COUNT:
+		fragment_option.add_item(
+			UniversalUpgradeTypes.get_display_name(upgrade_type)
+		)
 	hide()
 
 
@@ -36,6 +59,7 @@ func pause_game() -> void:
 	show()
 	get_tree().paused = true
 	resume_button.grab_focus()
+	_refresh_debug_panel()
 
 
 func resume_game() -> void:
@@ -61,3 +85,105 @@ func _on_main_menu_pressed() -> void:
 	var error := get_tree().change_scene_to_file(main_menu_scene_path)
 	if error != OK:
 		push_error("Could not open main menu scene: %s" % error_string(error))
+
+
+## Supplies the pause-only debug panel with explicit mutation targets.
+func bind_debug_targets(
+	player: PlayerController,
+	resources: RunResources
+) -> void:
+	_debug_player = player
+	_debug_resources = resources
+	if is_instance_valid(_debug_player):
+		base_speed_spin.value = _debug_player.base_forward_speed
+		lateral_speed_spin.value = _debug_player.lateral_speed
+		acceleration_spin.value = _debug_player.forward_acceleration
+	_refresh_debug_panel()
+
+
+func _refresh_debug_panel() -> void:
+	if not is_instance_valid(_debug_player) or not is_instance_valid(_debug_resources):
+		debug_status.text = "等待游戏状态"
+		return
+	debug_status.text = (
+		"%s · 灵气 %d/%d · 寿元 %.1f\n"
+		+ "当前 %s ×%d · 伤害 %d\n碎片 %s"
+	) % [
+		_debug_resources.get_realm_display_text(),
+		_debug_resources.current_qi,
+		_debug_resources.get_current_qi_requirement(),
+		_debug_resources.current_lifespan,
+		_debug_player.get_weapon_name(),
+		_debug_player.get_current_delivery_count(),
+		_debug_player.get_current_weapon_damage(),
+		str(_debug_player.get_universal_upgrade_snapshot()),
+	]
+
+
+func _on_debug_add_qi_pressed() -> void:
+	_debug_resources.add_qi(_debug_resources.get_current_qi_requirement())
+	_refresh_debug_panel()
+
+
+func _on_debug_level_pressed() -> void:
+	_debug_resources.level_up()
+	_refresh_debug_panel()
+
+
+func _on_debug_lifespan_add_pressed() -> void:
+	_debug_resources.restore_lifespan(20.0)
+	_refresh_debug_panel()
+
+
+func _on_debug_lifespan_remove_pressed() -> void:
+	_debug_resources.apply_lifespan_damage(20.0)
+	_refresh_debug_panel()
+
+
+func _on_debug_weapon_add_pressed() -> void:
+	_debug_player.debug_adjust_weapon(
+		_debug_weapons[weapon_option.selected],
+		1
+	)
+	_refresh_debug_panel()
+
+
+func _on_debug_weapon_remove_pressed() -> void:
+	_debug_player.debug_adjust_weapon(
+		_debug_weapons[weapon_option.selected],
+		-1
+	)
+	_refresh_debug_panel()
+
+
+func _on_debug_fragment_add_pressed() -> void:
+	_debug_player.debug_adjust_universal_upgrade(
+		fragment_option.selected,
+		1
+	)
+	_refresh_debug_panel()
+
+
+func _on_debug_fragment_remove_pressed() -> void:
+	_debug_player.debug_adjust_universal_upgrade(
+		fragment_option.selected,
+		-1
+	)
+	_refresh_debug_panel()
+
+
+func _on_debug_damage_add_pressed() -> void:
+	_debug_player.debug_adjust_current_weapon_damage(1)
+	_refresh_debug_panel()
+
+
+func _on_debug_damage_remove_pressed() -> void:
+	_debug_player.debug_adjust_current_weapon_damage(-1)
+	_refresh_debug_panel()
+
+
+func _on_debug_apply_base_pressed() -> void:
+	_debug_player.base_forward_speed = float(base_speed_spin.value)
+	_debug_player.lateral_speed = float(lateral_speed_spin.value)
+	_debug_player.forward_acceleration = float(acceleration_spin.value)
+	_refresh_debug_panel()

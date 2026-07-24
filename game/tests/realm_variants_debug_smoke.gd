@@ -1,0 +1,219 @@
+extends SceneTree
+
+const PLAYER_SCENE := preload("res://game/scenes/gameplay/player.tscn")
+const ENEMY_SCENE := preload("res://game/scenes/gameplay/enemy.tscn")
+const ECHO_SCENE := preload("res://game/scenes/gameplay/player_echo.tscn")
+const SEAL_SCENE := preload(
+	"res://game/scenes/gameplay/fantian_seal_projectile.tscn"
+)
+
+var _failures: Array[String] = []
+
+
+func _initialize() -> void:
+	call_deferred("_run")
+
+
+func _check(condition: bool, message: String) -> void:
+	if condition:
+		return
+	_failures.append(message)
+	push_error("REALM VARIANT TEST: %s" % message)
+
+
+func _wait_physics_frames(count: int) -> void:
+	for _frame in count:
+		await physics_frame
+
+
+func _enemy(player: PlayerController, health: int = 20) -> EnemyController:
+	var enemy := ENEMY_SCENE.instantiate() as EnemyController
+	enemy.player = player
+	enemy.max_health = health
+	enemy.cruise_speed = 1.0
+	enemy.melee_attack_interval = 99.0
+	root.add_child(enemy)
+	return enemy
+
+
+func _run() -> void:
+	var resources := RunResources.new()
+	root.add_child(resources)
+	resources.set_process(false)
+	var player := PLAYER_SCENE.instantiate() as PlayerController
+	root.add_child(player)
+	player.global_position = Vector2(4000.0, 4000.0)
+	player.bind_cultivation(resources)
+	resources.cultivation_level_changed.connect(player.apply_cultivation_level)
+	player.set_movement_enabled(true)
+	_check(
+		player.character_sprite.sprite_frames.get_frame_count(&"flip") == 9,
+		"Qi Refining roll did not load all nine flip frames."
+	)
+	var received_damage := 0.0
+	player.melee_damage_received.connect(
+		func(amount: float) -> void: received_damage += amount
+	)
+	_check(player.start_qi_refining_roll(), "Qi Refining roll did not start.")
+	await _wait_physics_frames(2)
+	_check(
+		player.is_rolling()
+		and player.character_sprite.animation == &"flip",
+		"Roll state/animation mismatch (%s, %s)."
+			% [player.is_rolling(), player.character_sprite.animation]
+	)
+	player.take_melee_damage(50.0)
+	_check(
+		is_zero_approx(received_damage),
+		"Roll did not grant complete damage immunity."
+	)
+	var roll_target := _enemy(player, 50)
+	roll_target.global_position = player.global_position + Vector2(0.0, -30.0)
+	await _wait_physics_frames(10)
+	_check(
+		roll_target.current_health == 50,
+		"Player attacked while rolling."
+	)
+	await _wait_physics_frames(30)
+	_check(
+		not player.is_rolling()
+		and player.get_roll_cooldown_remaining() > 0.7
+		and not player.start_qi_refining_roll(),
+		"Roll did not enforce its 0.8-second post-roll cooldown."
+	)
+	roll_target.queue_free()
+
+	var spawner := EnemySpawner.new()
+	spawner.player = player
+	spawner.flying_spawn_chance = 1.0
+	spawner.ranged_flying_spawn_chance = 1.0
+	spawner.slow_autonomous_spawn_chance = 1.0
+	spawner.fast_autonomous_spawn_chance = 1.0
+	spawner.bomber_spawn_chance = 0.0
+	spawner.healer_spawn_chance = 0.0
+	spawner.elite_healer_spawn_chance = 0.0
+	root.add_child(spawner)
+	var before_unlock := _enemy(player)
+	spawner.set_cultivation_level(11)
+	spawner.call("_configure_enemy_variant", before_unlock, false)
+	var foundation_normal := _enemy(player)
+	spawner.set_cultivation_level(12)
+	spawner.call("_configure_enemy_variant", foundation_normal, false)
+	var early_elite := _enemy(player)
+	early_elite.configure_elite(2.0, 1.2, 1.2)
+	spawner.set_cultivation_level(13)
+	spawner.call("_configure_enemy_variant", early_elite, true)
+	var foundation_elite := _enemy(player)
+	foundation_elite.configure_elite(2.0, 1.2, 1.2)
+	spawner.set_cultivation_level(14)
+	spawner.call("_configure_enemy_variant", foundation_elite, true)
+	var golden_ranged := _enemy(player)
+	spawner.set_cultivation_level(19)
+	spawner.call("_configure_enemy_variant", golden_ranged, false)
+	var golden_mobile_elite := _enemy(player)
+	golden_mobile_elite.configure_elite(2.0, 1.2, 1.2)
+	spawner.set_cultivation_level(23)
+	spawner.call("_configure_enemy_variant", golden_mobile_elite, true)
+	var nascent_fast := _enemy(player)
+	spawner.set_cultivation_level(28)
+	spawner.call("_configure_enemy_variant", nascent_fast, false)
+	_check(
+		not before_unlock.is_flying
+		and foundation_normal.is_flying
+		and not foundation_normal.uses_ranged_attack
+		and not early_elite.is_flying
+		and foundation_elite.is_flying
+		and golden_ranged.uses_ranged_attack
+		and is_equal_approx(
+			golden_mobile_elite.autonomous_lateral_speed,
+			spawner.slow_autonomous_speed
+		)
+		and is_equal_approx(
+			nascent_fast.autonomous_lateral_speed,
+			spawner.fast_autonomous_speed
+		),
+		"Realm/layer enemy flight progression did not match its thresholds."
+	)
+
+	var bomber := _enemy(player, 100)
+	bomber.configure_archetype(EnemyController.EnemyArchetype.BOMBER)
+	var healer := _enemy(player, 30)
+	healer.configure_archetype(EnemyController.EnemyArchetype.HEALER)
+	var ally := _enemy(player, 30)
+	ally.take_melee_damage(10)
+	healer.global_position = ally.global_position
+	healer.call("_update_healing", healer.healing_interval)
+	var elite_healer := _enemy(player, 30)
+	elite_healer.configure_elite(2.0, 1.2, 1.2)
+	var normal_heal_radius := elite_healer.healing_radius
+	elite_healer.configure_archetype(EnemyController.EnemyArchetype.HEALER)
+	_check(
+		bomber.max_health == 38
+		and ally.current_health > 20
+		and elite_healer.healing_radius > normal_heal_radius,
+		"Bomber thin health or normal/elite healing behavior is wrong."
+	)
+
+	resources.demote_to_realm(2, 1)
+	await _wait_physics_frames(2)
+	_check(
+		player.activate_golden_core_echoes()
+		and player.get_active_echo_count() == 2,
+		"Golden Core Space ability did not create two echoes."
+	)
+	var echoes := get_nodes_in_group("player_echoes")
+	var first_echo := echoes[0] as PlayerEcho
+	_check(
+		first_echo.attack_damage
+			== maxi(roundi(player.get_current_weapon_damage() * 0.2), 1),
+		"Echo did not inherit twenty percent of player damage."
+	)
+	first_echo.take_enemy_damage(first_echo.max_health)
+	await _wait_physics_frames(2)
+	var cooldown_before_acceleration := player.get_echo_cooldown_remaining()
+	Input.action_press("speed_up")
+	player.activate_golden_core_echoes()
+	Input.action_release("speed_up")
+	_check(
+		player.get_active_echo_count() == 0
+		and player.get_echo_cooldown_remaining()
+			< cooldown_before_acceleration - 0.8,
+		"Accelerating Space press did not shorten echo recovery."
+	)
+
+	var tracking_target := _enemy(player, 100)
+	tracking_target.global_position = Vector2(2000.0, 2000.0)
+	var seal := SEAL_SCENE.instantiate() as FantianSealProjectile
+	root.add_child(seal)
+	seal.global_position = tracking_target.global_position
+	seal.configure(tracking_target, 18, 80.0)
+	await _wait_physics_frames(2)
+	tracking_target.global_position += Vector2(85.0, 30.0)
+	await _wait_physics_frames(2)
+	_check(
+		seal.global_position.is_equal_approx(tracking_target.global_position),
+		"Fantian Seal did not track the locked enemy's movement."
+	)
+
+	var change_error := change_scene_to_file(
+		"res://game/scenes/gameplay/game.tscn"
+	)
+	_check(change_error == OK, "Gameplay scene could not open for UI checks.")
+	await _wait_physics_frames(3)
+	var game := current_scene
+	var hud := game.get_node("GameplayHud") as GameplayHud
+	var pause := game.get_node("PauseMenu")
+	_check(
+		hud.cultivation_tracks_label.visible
+		and hud.cultivation_tracks_label.text.contains("每级")
+		and pause.get_node_or_null(
+			"Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"
+		) != null,
+		"Universal-fragment explanation or pause debug panel is missing."
+	)
+
+	if _failures.is_empty():
+		print("REALM VARIANT TEST: PASS")
+	else:
+		print("REALM VARIANT TEST: FAIL (%d failures)" % _failures.size())
+	quit()

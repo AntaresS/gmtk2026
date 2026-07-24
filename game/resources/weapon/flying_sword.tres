@@ -8,6 +8,7 @@ script = ExtResource("1_weapon_data")
 weapon_id = &"flying_sword"
 display_name = "飞剑"
 attack_kind = 2
+attack_domain = 1
 display_color = Color(0.47451, 0.87451, 1, 1)
 pickup_color = Color(0.466667, 0.85098, 1, 1)
 cultivation_type = 1

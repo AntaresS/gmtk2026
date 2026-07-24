@@ -93,10 +93,9 @@ static func resolve_global(
 		config.base_projectile_speed_bonus,
 		0.0
 	)
-	snapshot.delivery_count_bonus = maxi(
-		config.base_delivery_count_bonus,
-		0
-	)
+	# Weapon-copy delivery is owned by PlayerController's duplicate inventory.
+	# Cultivation and player-global stats cannot increase projectile quantity.
+	snapshot.delivery_count_bonus = 0
 	snapshot.aoe_radius_bonus = maxf(
 		config.base_aoe_radius_bonus,
 		0.0
@@ -114,7 +113,6 @@ static func resolve_global(
 		snapshot.critical_damage_multiplier += bonus.critical_damage_bonus
 		snapshot.attack_speed_bonus += bonus.attack_speed_bonus
 		snapshot.projectile_speed_bonus += bonus.projectile_speed_bonus
-		snapshot.delivery_count_bonus += bonus.delivery_count_bonus
 		snapshot.aoe_radius_bonus += bonus.aoe_radius_bonus
 		snapshot.targeting_range_bonus += bonus.targeting_range_bonus
 		snapshot.close_range_damage_reduction += (
@@ -132,10 +130,6 @@ static func resolve_global(
 	)
 	snapshot.projectile_speed_multiplier = (
 		1.0 + snapshot.projectile_speed_bonus
-	)
-	snapshot.delivery_count_bonus = maxi(
-		snapshot.delivery_count_bonus,
-		0
 	)
 	snapshot.close_range_damage_reduction = clampf(
 		snapshot.close_range_damage_reduction,
@@ -228,12 +222,7 @@ static func resolve_weapon(
 		else 1.0
 	)
 	snapshot.delivery_count = maxi(
-		weapon_data.base_delivery_count
-			+ (
-				global_stats.delivery_count_bonus
-				if global_stats != null
-				else 0
-			),
+		weapon_data.base_delivery_count,
 		1
 	)
 
@@ -294,13 +283,7 @@ static func _resolve_type_bonuses(
 		cultivation_type,
 		CultivationRewardResource.Stat.PROJECTILE_SPEED
 	)
-	bonuses.delivery_count_bonus = roundi(
-		_get_type_stat(
-			resources,
-			cultivation_type,
-			CultivationRewardResource.Stat.DELIVERY_COUNT
-		)
-	)
+	bonuses.delivery_count_bonus = 0
 	bonuses.aoe_radius_bonus = _get_type_stat(
 		resources,
 		cultivation_type,

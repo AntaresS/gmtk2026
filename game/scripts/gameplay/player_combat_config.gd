@@ -31,8 +31,8 @@ extends Resource
 ## Player-wide additive projectile-speed ratio before 气 progression. Projectile
 ## weapons opt into the resolved multiplier through their attack implementation.
 @export_range(0.0, 10.0, 0.01) var base_projectile_speed_bonus: float = 0.0
-## Player-wide additional delivery count before cultivation rewards. Flying
-## Sword interprets this as volley size; Universe Ring uses it as extra bounces.
+## Deprecated compatibility field. Weapon quantity now grows exclusively from
+## collecting duplicate weapon pickups and this value is intentionally ignored.
 @export_range(0, 100, 1) var base_delivery_count_bonus: int = 0
 
 @export_category("Area and Targeting")

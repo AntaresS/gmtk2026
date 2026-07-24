@@ -14,9 +14,13 @@ const DEFAULT_WEAPON_DATA: WeaponDataResource = preload(
 ## World velocity inherited from the defeated enemy. The drop keeps this
 ## velocity until it enters the player's attraction circle.
 @export var inherited_velocity: Vector2 = Vector2(0.0, -140.0)
-## Randomized attack damage rolled when this weapon drops. The player keeps
-## only the highest damage collected for each weapon type.
+## Randomized attack damage rolled when this weapon drops. Every duplicate adds
+## quantity, while only a stronger roll replaces that type's stored damage.
 @export_range(1, 100, 1) var weapon_damage: int = 2
+## Radius within which the player must remain to synchronize this elite drop.
+@export_range(24.0, 200.0, 1.0) var channel_radius: float = 72.0
+## Continuous synchronization time required before the weapon is collected.
+@export_range(0.2, 5.0, 0.1) var channel_duration: float = 1.0
 
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var description_label: Label = $DescriptionLabel
@@ -26,13 +30,12 @@ var _owner_player: PlayerController
 var _attraction_speed: float = 360.0
 var _collected: bool = false
 var _animation_phase: float = 0.0
+var _channel_elapsed: float = 0.0
+var _channeling: bool = false
 
 
 func _ready() -> void:
-	description_label.text = "%s  %d" % [
-		weapon_data.display_name if weapon_data != null else "无效武器",
-		weapon_damage,
-	]
+	_update_description()
 	queue_redraw()
 
 
@@ -54,6 +57,7 @@ func _process(delta: float) -> void:
 		and global_position.y > _owner_player.global_position.y + 900.0
 	):
 		queue_free()
+	_update_channel(delta)
 	queue_redraw()
 
 
@@ -61,6 +65,42 @@ func _draw() -> void:
 	if weapon_data == null:
 		return
 	var weapon_color := weapon_data.pickup_color
+	draw_circle(Vector2.ZERO, channel_radius, Color(weapon_color, 0.055))
+	draw_arc(
+		Vector2.ZERO,
+		channel_radius,
+		0.0,
+		TAU,
+		64,
+		Color(weapon_color, 0.72),
+		2.0,
+		true
+	)
+	if _channeling:
+		draw_arc(
+			Vector2.ZERO,
+			channel_radius - 5.0,
+			-PI * 0.5,
+			-PI * 0.5 + TAU * get_channel_progress(),
+			64,
+			Color.WHITE,
+			6.0,
+			true
+		)
+	if weapon_data.attack_kind == WeaponDataResource.AttackKind.GOLDEN_BELL:
+		draw_circle(Vector2.ZERO, 19.0, Color(weapon_color, 0.1))
+		for ring_index in 3:
+			draw_arc(
+				Vector2.ZERO,
+				8.0 + float(ring_index) * 2.5,
+				0.0,
+				TAU,
+				36,
+				Color(weapon_color, 0.95 - float(ring_index) * 0.18),
+				1.5,
+				true
+			)
+		return
 	if weapon_data.attack_kind == WeaponDataResource.AttackKind.QIANKUN_RING:
 		draw_circle(Vector2.ZERO, 19.0, Color(weapon_color, 0.14))
 		draw_arc(
@@ -82,6 +122,38 @@ func _draw() -> void:
 			Color("ffe9a8"),
 			2.0,
 			true
+		)
+		return
+	if weapon_data.attack_kind == WeaponDataResource.AttackKind.THUNDER_HAMMER:
+		draw_circle(Vector2.ZERO, 19.0, Color(weapon_color, 0.14))
+		draw_line(Vector2(-8.0, 13.0), Vector2(5.0, -5.0), Color("c7a47b"), 5.0)
+		draw_rect(
+			Rect2(Vector2(-2.0, -13.0), Vector2(20.0, 12.0)),
+			weapon_color,
+			true
+		)
+		draw_polyline(
+			PackedVector2Array([
+				Vector2(-15.0, -8.0),
+				Vector2(-8.0, -1.0),
+				Vector2(-13.0, 7.0),
+			]),
+			Color("d9f7ff"),
+			2.0
+		)
+		return
+	if weapon_data.attack_kind == WeaponDataResource.AttackKind.FANTIAN_SEAL:
+		draw_circle(Vector2.ZERO, 19.0, Color(weapon_color, 0.14))
+		draw_rect(
+			Rect2(Vector2(-12.0, -11.0), Vector2(24.0, 22.0)),
+			weapon_color,
+			true
+		)
+		draw_rect(
+			Rect2(Vector2(-12.0, -11.0), Vector2(24.0, 22.0)),
+			Color("ffd47a"),
+			false,
+			3.0
 		)
 		return
 	draw_circle(Vector2.ZERO, 19.0, Color(weapon_color, 0.14))
@@ -132,8 +204,37 @@ func get_weapon_id() -> StringName:
 func _on_player_body_entered(body: Node2D) -> void:
 	if _collected or body is not PlayerController:
 		return
+	_owner_player = body as PlayerController
+
+
+func _update_channel(delta: float) -> void:
+	if _collected or not is_instance_valid(_owner_player):
+		return
+	var inside := (
+		global_position.distance_to(_owner_player.global_position)
+		<= maxf(channel_radius, 1.0)
+	)
+	if not inside:
+		_channeling = false
+		_channel_elapsed = 0.0
+		_update_description()
+		return
+	_channeling = true
+	_channel_elapsed = minf(
+		_channel_elapsed + maxf(delta, 0.0),
+		maxf(channel_duration, 0.01)
+	)
+	_update_description()
+	if _channel_elapsed < maxf(channel_duration, 0.01):
+		return
+	_collect_weapon()
+
+
+func _collect_weapon() -> void:
+	if _collected or not is_instance_valid(_owner_player):
+		return
 	_collected = true
-	(body as PlayerController).collect_weapon(
+	_owner_player.collect_weapon(
 		weapon_data,
 		weapon_damage
 	)
@@ -147,3 +248,31 @@ func _on_player_body_entered(body: Node2D) -> void:
 	tween.tween_property(self, "scale", Vector2.ONE * 1.35, 0.18)
 	tween.tween_property(self, "modulate:a", 0.0, 0.18)
 	tween.chain().tween_callback(queue_free)
+
+
+func get_channel_progress() -> float:
+	return clampf(
+		_channel_elapsed / maxf(channel_duration, 0.01),
+		0.0,
+		1.0
+	)
+
+
+func _update_description() -> void:
+	if not is_instance_valid(description_label):
+		return
+	var weapon_name := (
+		weapon_data.display_name if weapon_data != null else "无效武器"
+	)
+	if _channeling:
+		description_label.text = "%s  %d\n同步 %.1f / %.1f秒" % [
+			weapon_name,
+			weapon_damage,
+			_channel_elapsed,
+			channel_duration,
+		]
+	else:
+		description_label.text = "%s  %d\n圈内同步1秒" % [
+			weapon_name,
+			weapon_damage,
+		]

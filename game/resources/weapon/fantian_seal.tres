@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://game/scripts/gameplay/weapon_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://game/scenes/gameplay/fantian_seal_projectile.tscn" id="2_projectile"]
+
+[resource]
+script = ExtResource("1_data")
+weapon_id = &"fantian_seal"
+display_name = "翻天印"
+attack_kind = 6
+attack_domain = 1
+display_color = Color(1, 0.48, 0.18, 1)
+pickup_color = Color(0.9, 0.32, 0.12, 1)
+minimum_damage = 18
+maximum_damage = 18
+attack_range = 462.0
+attack_interval = 2.25
+projectile_scene = ExtResource("2_projectile")
+projectile_sequence_interval = 0.5
+base_aoe_radius = 88.0

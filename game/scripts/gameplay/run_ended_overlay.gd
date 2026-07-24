@@ -24,6 +24,12 @@ func show_ascension() -> void:
 	_show_outcome("Ascension Complete")
 
 
+## Reveals the authored endpoint reached by attempting to break through beyond
+## Nascent Soul layer nine.
+func show_fatal_breakthrough() -> void:
+	_show_outcome("元婴九层 · 突破陨落")
+
+
 func _show_outcome(title: String) -> void:
 	title_label.text = title
 	restart_button.disabled = false

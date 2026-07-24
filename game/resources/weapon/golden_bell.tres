@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://game/scripts/gameplay/weapon_data.gd" id="1_weapon_data"]
+
+[resource]
+script = ExtResource("1_weapon_data")
+weapon_id = &"golden_bell"
+display_name = "金钟罩"
+attack_kind = 4
+display_color = Color(1, 0.78, 0.16, 1)
+pickup_color = Color(1, 0.72, 0.08, 1)
+cultivation_type = 0
+minimum_damage = 3
+maximum_damage = 3
+attack_range = 38.0
+attack_interval = 1.0

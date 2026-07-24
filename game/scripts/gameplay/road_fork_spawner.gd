@@ -27,6 +27,7 @@ var _forks_enabled: bool = true
 var _next_branch_side: int = -1
 var _next_is_trial_hell: bool = false
 var _route_center_x: float = 0.0
+var _road_half_width_resolver: Callable
 
 
 func _ready() -> void:
@@ -53,6 +54,11 @@ func set_road_half_width(value: float) -> void:
 	road_half_width = maxf(value, 64.0)
 
 
+## Supplies InfiniteWorld's deterministic world-Y width sampler.
+func set_road_half_width_resolver(resolver: Callable) -> void:
+	_road_half_width_resolver = resolver
+
+
 ## Moves later fork events to the active infinite route center.
 func set_route_center_x(value: float) -> void:
 	_route_center_x = value
@@ -77,20 +83,22 @@ func _spawn_fork() -> void:
 		return
 	road_fork.player = player
 	add_child(road_fork)
-	road_fork.set_road_half_width(road_half_width)
+	var half_visible_height := (
+		get_viewport_rect().size.y / maxf(camera.zoom.y, 0.01) * 0.5
+	)
+	var spawn_y := (
+		camera.global_position.y - half_visible_height - spawn_ahead_margin
+	)
+	road_fork.set_road_half_width(_get_road_half_width_at(spawn_y))
 	road_fork.configure_side(_next_branch_side)
 	road_fork.configure_trial_hell(_next_is_trial_hell)
 	_next_branch_side *= -1
 	_next_is_trial_hell = not _next_is_trial_hell
 	road_fork.branch_selected.connect(_on_branch_selected)
 	road_fork.route_committed.connect(_on_route_committed)
-
-	var half_visible_height := (
-		get_viewport_rect().size.y / maxf(camera.zoom.y, 0.01) * 0.5
-	)
 	road_fork.global_position = Vector2(
 		_route_center_x,
-		camera.global_position.y - half_visible_height - spawn_ahead_margin
+		spawn_y
 	)
 
 
@@ -104,3 +112,9 @@ func _on_route_committed(
 ) -> void:
 	_route_center_x = route_center_x
 	route_committed.emit(route_center_x, branch_name)
+
+
+func _get_road_half_width_at(world_y: float) -> float:
+	if _road_half_width_resolver.is_valid():
+		return maxf(float(_road_half_width_resolver.call(world_y)), 64.0)
+	return maxf(road_half_width, 64.0)

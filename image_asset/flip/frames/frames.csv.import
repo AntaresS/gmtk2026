@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://b1tavvjyuhngd"
+
+[deps]
+
+files=["res://image_asset/flip/frames/frames.width.translation", "res://image_asset/flip/frames/frames.height.translation", "res://image_asset/flip/frames/frames.center.translation", "res://image_asset/flip/frames/frames.bottom.translation", "res://image_asset/flip/frames/frames.source.translation", "res://image_asset/flip/frames/frames.source.translation", "res://image_asset/flip/frames/frames.source.translation", "res://image_asset/flip/frames/frames.source.translation", "res://image_asset/flip/frames/frames.shift.translation", "res://image_asset/flip/frames/frames.shift.translation"]
+
+source_file="res://image_asset/flip/frames/frames.csv"
+dest_files=["res://image_asset/flip/frames/frames.width.translation", "res://image_asset/flip/frames/frames.height.translation", "res://image_asset/flip/frames/frames.center.translation", "res://image_asset/flip/frames/frames.bottom.translation", "res://image_asset/flip/frames/frames.source.translation", "res://image_asset/flip/frames/frames.source.translation", "res://image_asset/flip/frames/frames.source.translation", "res://image_asset/flip/frames/frames.source.translation", "res://image_asset/flip/frames/frames.shift.translation", "res://image_asset/flip/frames/frames.shift.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

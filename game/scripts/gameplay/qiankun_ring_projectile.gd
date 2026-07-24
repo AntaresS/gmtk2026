@@ -10,10 +10,6 @@ signal enemy_hit(enemy: EnemyController)
 @export var return_speed: float = 920.0
 ## Maximum lifetime in seconds before a lost ring is safely removed.
 @export_range(1.0, 20.0, 0.5) var maximum_lifetime: float = 8.0
-## Damage multiplier applied once for every completed enemy bounce. A value of
-## 1.2 makes successive hits deal 100%, 120%, 144%, and so on.
-@export_range(1.0, 2.0, 0.05) var bounce_damage_multiplier: float = 1.2
-
 var _player: PlayerController
 var _target: EnemyController
 var _damage: int = 1
@@ -23,7 +19,6 @@ var _returning: bool = false
 var _finished: bool = false
 var _lifetime_remaining: float = 8.0
 var _last_hit_enemy_id: int = 0
-var _successful_hit_count: int = 0
 var _aoe_radius: float = 0.0
 var _projectile_speed_multiplier: float = 1.0
 var _is_critical: bool = false
@@ -155,19 +150,8 @@ func _hit_enemy(enemy: EnemyController) -> void:
 	if enemy_id == _last_hit_enemy_id:
 		return
 	_last_hit_enemy_id = enemy_id
-	var scaled_damage := maxi(
-		roundi(
-			float(_damage)
-				* pow(
-					maxf(bounce_damage_multiplier, 1.0),
-					float(_successful_hit_count)
-				)
-		),
-		1
-	)
-	_successful_hit_count += 1
-	enemy.take_melee_damage(scaled_damage, _is_critical)
-	_apply_aoe_damage(enemy, scaled_damage)
+	enemy.take_melee_damage(_damage, _is_critical)
+	_apply_aoe_damage(enemy, _damage)
 	enemy_hit.emit(enemy)
 	if _remaining_bounces <= 0:
 		_begin_return()

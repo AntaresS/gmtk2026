@@ -38,7 +38,9 @@ func _ready() -> void:
 		push_error("InfiniteWorld requires a WorldChunkConfig resource.")
 		set_physics_process(false)
 		return
-	player.road_half_width = chunk_config.road_half_width
+	player.road_half_width = get_road_half_width_at_world_y(
+		player.global_position.y
+	)
 	player.set_road_center_x(global_position.x)
 	_progression_enabled = true
 	_create_chunk_pool()
@@ -49,6 +51,9 @@ func _physics_process(_delta: float) -> void:
 		return
 
 	var player_local_y := to_local(player.global_position).y
+	player.road_half_width = chunk_config.get_road_half_width_at_world_y(
+		player_local_y
+	)
 	var chunk_height := _chunk_height()
 	var recycle_threshold := player_local_y + recycle_behind_distance
 	var recycle_steps := ceili(
@@ -114,6 +119,38 @@ func set_route_center_x(value: float) -> void:
 
 func get_route_center_x() -> float:
 	return global_position.x
+
+
+## Returns the active deterministic road half-width at a global Y coordinate.
+func get_road_half_width_at_world_y(world_y: float) -> float:
+	if chunk_config == null:
+		return 1.0
+	return chunk_config.get_road_half_width_at_world_y(
+		world_y - global_position.y
+	)
+
+
+func get_debug_snapshot() -> Dictionary:
+	var current_width := (
+		get_road_half_width_at_world_y(player.global_position.y)
+		if is_instance_valid(player)
+		else chunk_config.road_half_width
+	)
+	return {
+		"route_center_x": global_position.x,
+		"current_road_half_width": current_width,
+		"current_road_width_multiplier": (
+			current_width / maxf(chunk_config.road_half_width, 1.0)
+		),
+		"minimum_road_half_width": chunk_config.get_minimum_road_half_width(),
+		"maximum_road_half_width": chunk_config.get_maximum_road_half_width(),
+		"road_width_transition_chunk_span": (
+			chunk_config.road_width_transition_chunk_span
+		),
+		"active_chunks": get_active_chunk_count(),
+		"active_pickups": get_active_pickup_count(),
+		"trial_hell_active": _trial_hell_active,
+	}
 
 
 ## Applies or removes the Trial Hell palette across the entire pooled road.

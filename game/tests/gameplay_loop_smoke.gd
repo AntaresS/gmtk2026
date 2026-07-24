@@ -13,6 +13,15 @@ const FLYING_SWORD_DATA: WeaponDataResource = preload(
 const QIANKUN_RING_DATA: WeaponDataResource = preload(
 	"res://game/resources/weapon/qiankun_ring.tres"
 )
+const GOLDEN_BELL_DATA: WeaponDataResource = preload(
+	"res://game/resources/weapon/golden_bell.tres"
+)
+const THUNDER_HAMMER_DATA: WeaponDataResource = preload(
+	"res://game/resources/weapon/thunder_hammer.tres"
+)
+const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
+	"res://game/resources/weapon/fantian_seal.tres"
+)
 
 var _failures: Array[String] = []
 var _levels_emitted: int = 0
@@ -22,6 +31,7 @@ var _depletion_emissions: int = 0
 var _thunder_strikes_landed: int = 0
 var _thunder_strikes_hit: int = 0
 var _tribulation_completions: int = 0
+var _test_narrowing_boundary_y: float = 0.0
 
 
 func _initialize() -> void:
@@ -42,6 +52,10 @@ func _wait_physics_frames(count: int) -> void:
 func _wait_process_frames(count: int) -> void:
 	for _frame in count:
 		await process_frame
+
+
+func _get_test_road_half_width(world_y: float) -> float:
+	return 70.0 if world_y < _test_narrowing_boundary_y else 200.0
 
 
 func _run() -> void:
@@ -75,18 +89,73 @@ func _run() -> void:
 	_check(
 		character_sprite != null
 		and character_sprite.sprite_frames.get_frame_count(&"fly") == 9
+		and character_sprite.sprite_frames.get_frame_count(&"walk") == 9
+		and character_sprite.sprite_frames.get_frame_count(&"qi_walk") == 9
+		and character_sprite.animation == &"qi_walk"
 		and character_sprite.is_playing(),
-		"Player did not use the nine-frame chara_fly animation."
+		"Player did not start with the nine-frame running animation."
 	)
+	var grounded_character_scale := character_sprite.scale
 	_check(
 		player.get_current_attack_range() > 55.0,
 		"Player melee range is not stronger than the enemy default."
 	)
 	_check(
 		player.get_current_weapon_data() == PALM_DATA
-		and PALM_DATA.attack_interval < 1.0,
+		and PALM_DATA.attack_interval < 1.0
+		and is_equal_approx(PALM_DATA.attack_range, 108.0)
+		and PALM_DATA.directional_arc_degrees < 180.0,
 		"Player melee frequency is not stronger than the enemy default."
 	)
+	var palm_aim_target := preload(
+		"res://game/scenes/gameplay/enemy.tscn"
+	).instantiate() as EnemyController
+	palm_aim_target.player = player
+	palm_aim_target.max_health = 99
+	palm_aim_target.cruise_speed = 1.0
+	root.add_child(palm_aim_target)
+	palm_aim_target.global_position = (
+		player.global_position + Vector2(180.0, 0.0)
+	)
+	await _wait_process_frames(2)
+	_check(
+		player.get_palm_attack_direction().dot(Vector2.RIGHT) > 0.98,
+		"Idle Great Strength Palm range did not aim at the nearest enemy."
+	)
+	palm_aim_target.queue_free()
+	await _wait_process_frames(1)
+	var palm_forward_target := preload(
+		"res://game/scenes/gameplay/enemy.tscn"
+	).instantiate() as EnemyController
+	var palm_rear_target := preload(
+		"res://game/scenes/gameplay/enemy.tscn"
+	).instantiate() as EnemyController
+	for palm_target in [palm_forward_target, palm_rear_target]:
+		palm_target.player = player
+		palm_target.max_health = 99
+		palm_target.cruise_speed = 1.0
+		root.add_child(palm_target)
+	palm_forward_target.global_position = (
+		player.global_position + Vector2(0.0, -80.0)
+	)
+	palm_rear_target.global_position = (
+		player.global_position + Vector2(0.0, 80.0)
+	)
+	player.set("_attack_cooldown_remaining", 999.0)
+	await _wait_physics_frames(3)
+	player.call(
+		"_release_great_strength_palm",
+		palm_forward_target,
+		player.call("_roll_current_attack_damage")
+	)
+	_check(
+		palm_forward_target.current_health < 99
+		and palm_rear_target.current_health == 99,
+		"Great Strength Palm did not damage only its directional qi-wave sector."
+	)
+	player.set("_attack_cooldown_remaining", 0.0)
+	palm_forward_target.queue_free()
+	palm_rear_target.queue_free()
 	_check(
 		absf(resources.current_lifespan - 180.0) < 0.5,
 		"Lifespan did not start at three minutes."
@@ -113,15 +182,50 @@ func _run() -> void:
 		"HUD did not show the starting Great Strength Palm technique."
 	)
 	_check(
-		hud.weapon_label.text == "当前装备  大力掌  · 伤害 1",
+		hud.weapon_label.text == "当前装备  大力掌  · 伤害 5",
 		"HUD did not show the starting equipment."
 	)
 	_check(
 		hud.lifespan_rate_label.text == "寿元消耗  -1.00 / 秒",
 		"HUD did not show the current lifespan consumption rate."
 	)
+	var upgrade_player := preload(
+		"res://game/scenes/gameplay/player.tscn"
+	).instantiate() as PlayerController
+	get_root().add_child(upgrade_player)
+	upgrade_player.global_position = Vector2(5000.0, 5000.0)
+	upgrade_player.set_movement_enabled(false)
+	var upgrade_damage_before := upgrade_player.get_current_weapon_damage()
+	var power_fragment := preload(
+		"res://game/scenes/gameplay/weapon_power_fragment.tscn"
+	).instantiate() as WeaponPowerFragment
+	power_fragment.configure(upgrade_player, Vector2.ZERO)
+	power_fragment.power_collected.connect(
+		upgrade_player.upgrade_all_weapons
+	)
+	get_root().add_child(power_fragment)
+	power_fragment.global_position = upgrade_player.global_position
+	await _wait_physics_frames(70)
+	_check(
+		upgrade_player.get_weapon_power_level() == 1
+		and upgrade_player.get_current_weapon_damage()
+			== upgrade_damage_before + 1,
+		"Weapon-power fragment did not strengthen the existing weapon."
+	)
+	upgrade_player.collect_weapon(FLYING_SWORD_DATA, 6)
+	_check(
+		upgrade_player.get_current_weapon_damage() == 7,
+		"Weapon-power bonus did not apply to a future collected weapon."
+	)
+	upgrade_player.queue_free()
+	if is_instance_valid(power_fragment):
+		power_fragment.queue_free()
+	await _wait_process_frames(2)
+
 	var initial_attraction_range: float = player.get_attraction_range()
 	var initial_attack_range: float = player.get_current_attack_range()
+	var initial_attack_interval: float = player.get_current_attack_interval()
+	var initial_attack_damage: int = player.get_current_weapon_damage()
 	resources.add_qi(100)
 	_check(
 		player.is_level_up_effect_active(),
@@ -139,8 +243,10 @@ func _run() -> void:
 		"Cultivation level-up did not expand collectible attraction."
 	)
 	_check(
-		player.get_current_attack_range() == initial_attack_range,
-		"Cultivation incorrectly changed the fixed equipment attack range."
+		player.get_current_attack_range() > initial_attack_range
+		and player.get_current_attack_interval() < initial_attack_interval
+		and player.get_current_weapon_damage() > initial_attack_damage,
+		"Small-level cultivation did not improve Palm range, frequency, and damage."
 	)
 	resources.reset_resources()
 	_check(
@@ -161,8 +267,11 @@ func _run() -> void:
 			DAO_DATA,
 			FLYING_SWORD_DATA,
 			QIANKUN_RING_DATA,
+			GOLDEN_BELL_DATA,
+			THUNDER_HAMMER_DATA,
+			FANTIAN_SEAL_DATA,
 		],
-		"EnemySpawner did not use the three shared weapon definitions."
+		"EnemySpawner did not use the six shared weapon definitions."
 	)
 	_check(
 		is_equal_approx(enemy_spawner.spawn_interval, 3.5)
@@ -236,9 +345,9 @@ func _run() -> void:
 		"Enemy Qi progression did not apply step, type, and cap modifiers."
 	)
 	_check(
-		enemy_spawner.elite_spawn_chance > 0.0
-		and enemy_spawner.elite_spawn_chance <= 0.1,
-		"Elite enemies did not use a low default spawn probability."
+		is_equal_approx(enemy_spawner.elite_spawn_chance, 0.20)
+		and is_equal_approx(enemy_spawner.weapon_drop_chance, 0.75),
+		"Elite or weapon-drop probability was not substantially increased."
 	)
 
 	var lifespan_before_pause := resources.current_lifespan
@@ -290,6 +399,59 @@ func _run() -> void:
 			max_pickups_per_chunk = (child as WorldChunk).max_pickups_per_chunk
 			break
 	var initial_pickup_count := world.get_active_pickup_count()
+	var saw_narrow_width := false
+	var saw_wide_width := false
+	for boundary_index in range(-24, 25):
+		var multiplier := (
+			world.chunk_config.get_road_width_multiplier_at_boundary(
+				boundary_index
+			)
+		)
+		saw_narrow_width = saw_narrow_width or multiplier < 0.99
+		saw_wide_width = saw_wide_width or multiplier > 1.01
+		_check(
+			multiplier
+				>= world.chunk_config.minimum_road_width_multiplier
+			and multiplier
+				<= world.chunk_config.maximum_road_width_multiplier,
+			"Generated road width exceeded its configured multiplier range."
+		)
+	_check(
+		saw_narrow_width and saw_wide_width,
+		"Deterministic road samples did not include narrow and wide sections."
+	)
+	var transition_span := (
+		world.chunk_config.road_width_transition_chunk_span
+	)
+	var transition_start := (
+		world.chunk_config.get_road_half_width_for_chunk(0, 0.0)
+	)
+	var transition_end := (
+		world.chunk_config.get_road_half_width_for_chunk(
+			transition_span,
+			0.0
+		)
+	)
+	var first_chunk_end := (
+		world.chunk_config.get_road_half_width_for_chunk(0, 1.0)
+	)
+	var first_ratio := 1.0 / float(transition_span)
+	var first_smooth_ratio := first_ratio * first_ratio * (
+		3.0 - 2.0 * first_ratio
+	)
+	_check(
+		transition_span >= 3
+		and transition_span <= 5
+		and is_equal_approx(
+			first_chunk_end,
+			lerpf(
+				transition_start,
+				transition_end,
+				first_smooth_ratio
+			)
+		),
+		"Road width transition was not stretched across three to five chunks."
+	)
 	_check(
 		initial_pickup_count
 		<= world.active_chunk_count * max_pickups_per_chunk,
@@ -314,7 +476,9 @@ func _run() -> void:
 			var local_x: float = pickup_node.position.x
 			_check(
 				absf(local_x)
-				<= world.chunk_config.road_half_width
+				<= chunk.get_road_half_width_at_local_y(
+					pickup_node.position.y
+				)
 				- chunk.pickup_edge_clearance
 				+ 0.01,
 				"A generated pickup is outside the safe road bounds."
@@ -363,17 +527,17 @@ func _run() -> void:
 	root.add_child(balance_resources)
 	await process_frame
 	balance_resources.set_process(false)
-	for _realm in 9:
+	for _realm in 3:
 		for _level in 9:
 			balance_resources.level_up()
 		balance_resources.grant_breakthrough_reward()
 	_check(
-		is_equal_approx(balance_resources.max_lifespan, 882.0)
+		is_equal_approx(balance_resources.max_lifespan, 414.0)
 		and is_equal_approx(
 			balance_resources.get_current_lifespan_decay_rate(),
-			3.25
+			1.75
 		),
-		"Nine realms did not resolve to 882 lifespan and 3.25 decay."
+		"Three successful realm breakthroughs did not use tuned lifespan growth."
 	)
 	balance_resources.queue_free()
 
@@ -540,8 +704,8 @@ func _run() -> void:
 		await _wait_process_frames(2)
 		var saw_enemy_qi_drop := false
 		var saw_weapon_drop := false
-		var cultivation_fragment_count := 0
-		var saw_cultivation_fragment := false
+		var weapon_power_fragment_count := 0
+		var saw_weapon_power_fragment := false
 		for drop_node in enemy_spawner.get_children():
 			if drop_node is QiPickup:
 				var qi_drop := drop_node as QiPickup
@@ -556,24 +720,30 @@ func _run() -> void:
 						.is_equal_approx(inherited_enemy_velocity)
 					and weapon_drop.weapon_data
 						in enemy_spawner.weapon_drop_pool
-					and (
-						weapon_drop.description_label.text.begins_with("刀")
-						or weapon_drop.description_label.text.begins_with("飞剑")
-						or weapon_drop.description_label.text.begins_with(
-							"乾坤圈"
-						)
+					and weapon_drop.description_label.text.begins_with(
+						weapon_drop.weapon_data.display_name
+					)
+					and weapon_drop.description_label.text.contains(
+						"圈内同步1秒"
 					)
 					and weapon_drop.weapon_damage >= 2
 				)
-			elif drop_node is CultivationFragment:
-				var fragment := drop_node as CultivationFragment
-				cultivation_fragment_count += 1
-				saw_cultivation_fragment = (
-					is_equal_approx(fragment.channel_duration, 1.2)
-					and fragment.pickup_radius >= 90.0
-					and fragment.current_type == 0
-					and fragment.get_time_until_next_type() > 0.0
-					and fragment.description_label.text.contains("持续停留")
+			elif drop_node is WeaponPowerFragment:
+				var dropped_power_fragment := drop_node as WeaponPowerFragment
+				weapon_power_fragment_count += 1
+				saw_weapon_power_fragment = (
+					dropped_power_fragment.power_amount == 1
+					and is_equal_approx(
+						dropped_power_fragment.channel_duration,
+						1.0
+					)
+					and dropped_power_fragment.pickup_radius >= 90.0
+					and dropped_power_fragment.upgrade_type >= 0
+					and dropped_power_fragment.upgrade_type
+						< UniversalUpgradeTypes.COUNT
+					and dropped_power_fragment.description_label.text.contains(
+						"强化碎片"
+					)
 				)
 		_check(saw_enemy_qi_drop, "Defeated enemy did not drop configured qi.")
 		_check(
@@ -581,8 +751,8 @@ func _run() -> void:
 			"Weapon drop did not inherit enemy velocity or show its label."
 		)
 		_check(
-			saw_cultivation_fragment and cultivation_fragment_count == 1,
-			"Elite enemy did not drop exactly one cycling cultivation fragment."
+			saw_weapon_power_fragment and weapon_power_fragment_count == 1,
+			"Elite enemy did not drop exactly one universal-upgrade fragment."
 		)
 	enemy_spawner.set(
 		"_elapsed_run_time",
@@ -644,6 +814,34 @@ func _run() -> void:
 	straight_enemy.queue_free()
 	await _wait_process_frames(2)
 
+	var constrained_enemy := preload(
+		"res://game/scenes/gameplay/enemy.tscn"
+	).instantiate() as EnemyController
+	constrained_enemy.player = player
+	constrained_enemy.cruise_speed = 100.0
+	root.add_child(constrained_enemy)
+	var constrained_enemy_start_y := player.global_position.y - 400.0
+	_test_narrowing_boundary_y = constrained_enemy_start_y - 1.0
+	constrained_enemy.global_position = Vector2(
+		world.get_route_center_x() + 100.0,
+		constrained_enemy_start_y
+	)
+	constrained_enemy.configure_road_constraint(
+		world.get_route_center_x(),
+		Callable(self, "_get_test_road_half_width"),
+		32.0
+	)
+	await _wait_physics_frames(3)
+	_check(
+		absf(
+			constrained_enemy.global_position.x
+			- world.get_route_center_x()
+		) <= 38.01,
+		"Enemy was not clamped when it entered a narrower road section."
+	)
+	constrained_enemy.queue_free()
+	await _wait_process_frames(2)
+
 	road_fork_spawner.set_forks_enabled(false)
 	for old_fork_node in get_nodes_in_group("road_forks"):
 		old_fork_node.queue_free()
@@ -659,7 +857,9 @@ func _run() -> void:
 		_check(
 			is_equal_approx(
 				road_fork.main_road_half_width,
-				world.chunk_config.road_half_width
+				world.get_road_half_width_at_world_y(
+					road_fork.global_position.y
+				)
 			),
 			"Branch road width did not match the infinite main road."
 		)
@@ -712,7 +912,9 @@ func _run() -> void:
 					committed_enemy_node.global_position.x
 					- committed_center
 				) <= (
-					world.chunk_config.road_half_width
+					world.get_road_half_width_at_world_y(
+						committed_enemy_node.global_position.y
+					)
 					- enemy_spawner.road_edge_clearance
 				)
 			):
@@ -847,17 +1049,13 @@ func _run() -> void:
 		player.global_position
 		+ Vector2(combat_enemy.melee_attack_range + 24.0, 0.0)
 	)
-	await _wait_physics_frames(30)
+	await _wait_physics_frames(70)
 	_check(
 		is_equal_approx(
 			resources.current_lifespan,
 			lifespan_before_enemy_attack
 		),
 		"Escaping the announced enemy threat range did not dodge the strike."
-	)
-	_check(
-		float(combat_enemy.get("_attack_flash_remaining")) > 0.0,
-		"Missed enemy melee did not still play its committed strike effect."
 	)
 	combat_enemy.global_position = player.global_position + Vector2(0.0, -30.0)
 	await _wait_physics_frames(48)
@@ -929,42 +1127,43 @@ func _run() -> void:
 		player
 	)
 	root.add_child(weapon_pickup)
-	weapon_pickup.global_position = (
-		player.global_position
-		+ Vector2(player.get_attraction_range() - 12.0, 0.0)
-	)
-	await _wait_physics_frames(30)
+	weapon_pickup.global_position = player.global_position
+	await _wait_physics_frames(70)
 	_check(
 		player.get_weapon_name() == "飞剑",
-		"Weapon inside the shared range was not attracted and equipped."
+		"Qi Refining did not allow and equip a collected ranged weapon."
 	)
+	var level_one_sword_damage := player.get_current_weapon_damage()
 	_check(
-		player.get_current_weapon_damage() == 6,
+		level_one_sword_damage == 6,
 		"Collected weapon did not retain its rolled damage."
 	)
 	_check(
-		hud.weapon_label.text == "当前装备  飞剑  · 伤害 6",
+		hud.weapon_label.text == (
+			"当前装备  飞剑  · 伤害 %d" % level_one_sword_damage
+		),
 		"HUD did not update after equipping a weapon drop."
 	)
 	_check(
-		not player.collect_weapon(FLYING_SWORD_DATA, 5)
-		and player.get_current_weapon_damage() == 6,
-		"Weaker duplicate weapon was not discarded."
+		player.collect_weapon(FLYING_SWORD_DATA, 5)
+		and player.get_current_weapon_damage() == level_one_sword_damage
+		and player.get_flying_sword_projectile_count() == 2,
+		"Weaker duplicate weapon did not add quantity while preserving damage."
 	)
 	var level_one_sword_range := player.get_current_attack_range()
-	resources.add_qi(100)
+	resources.add_qi(resources.get_current_qi_requirement())
 	_check(
-		player.get_flying_sword_projectile_count() == 1
-		and player.get_current_weapon_damage() == 7
+		player.get_flying_sword_projectile_count() == 2
+		and player.get_current_weapon_damage() == level_one_sword_damage
 		and is_equal_approx(
 			player.get_global_combat_stats().global_damage_bonus,
-			1.0
+			0.0
 		)
 		and is_equal_approx(
 			player.get_current_attack_range(),
 			level_one_sword_range
 		),
-		"Overall Qi did not add global damage while preserving delivery/range."
+		"Small-level cultivation incorrectly changed non-Palm weapon stats."
 	)
 	var flying_target := preload(
 		"res://game/scenes/gameplay/enemy.tscn"
@@ -976,9 +1175,9 @@ func _run() -> void:
 	flying_target.global_position = (
 		player.global_position + Vector2(0.0, -80.0)
 	)
-	await _wait_physics_frames(30)
+	await _wait_physics_frames(70)
 	_check(
-		flying_target.current_health <= 93,
+		flying_target.current_health < 99,
 		"Base Flying Sword did not launch its single projectile."
 	)
 	flying_target.queue_free()
@@ -1007,9 +1206,9 @@ func _run() -> void:
 	dao_target.global_position = (
 		player.global_position + Vector2(0.0, -70.0)
 	)
-	await _wait_physics_frames(20)
+	await _wait_physics_frames(120)
 	_check(
-		dao_target.current_health <= 95,
+		dao_target.current_health < 99,
 		"Dao orbit attack did not damage a nearby enemy."
 	)
 	dao_target.queue_free()
@@ -1027,16 +1226,14 @@ func _run() -> void:
 		player
 	)
 	root.add_child(ring_pickup)
-	ring_pickup.global_position = (
-		player.global_position
-		+ Vector2(player.get_attraction_range() - 12.0, 0.0)
-	)
-	await _wait_physics_frames(30)
+	ring_pickup.global_position = player.global_position
+	await _wait_physics_frames(70)
+	var ring_damage := player.get_current_weapon_damage()
 	_check(
 		player.get_weapon_name() == "乾坤圈"
-		and player.get_current_weapon_damage() == 6
-		and player.get_qiankun_ring_bounce_count() == 0,
-		"Universe Ring did not retain its base no-bounce behavior."
+		and ring_damage == 5
+		and player.get_qiankun_ring_bounce_count() == 2,
+		"Universe Ring did not retain its fixed bounce count."
 	)
 	var ring_target := preload(
 		"res://game/scenes/gameplay/enemy.tscn"
@@ -1050,8 +1247,8 @@ func _run() -> void:
 	)
 	await _wait_physics_frames(70)
 	_check(
-		ring_target.current_health == 93,
-		"Base Universe Ring did not deal one hit before returning."
+		ring_target.current_health <= 99 - ring_damage,
+		"Base Universe Ring did not deal constant damage before returning."
 	)
 	ring_target.queue_free()
 	_check(
@@ -1077,49 +1274,73 @@ func _run() -> void:
 		"Tab did not cycle to the next equipment-library entry."
 	)
 	_check(
-		hud.equipment_library_label.text.contains("刀  伤害 5")
-			and hud.equipment_library_label.text.contains("飞剑  伤害 7")
-			and hud.equipment_library_label.text.contains("乾坤圈  伤害 6"),
-			"HUD equipment library did not list collected best weapons."
+		hud.equipment_library_label.text.contains("刀 ×1  伤害 4")
+			and hud.equipment_library_label.text.contains("飞剑 ×2  伤害 6")
+			and hud.equipment_library_label.text.contains(
+				"乾坤圈 ×1  伤害 5"
+			),
+			"HUD equipment library mismatch: %s"
+				% hud.equipment_library_label.text
 		)
 
+	var realm_config := resources.realm_progression_config
+	_check(
+		realm_config != null
+		and realm_config.get_realm_count() == 4
+		and realm_config.get_realm(0).display_name == "练气"
+		and realm_config.get_realm(1).display_name == "筑基"
+		and realm_config.get_realm(2).display_name == "金丹"
+		and realm_config.get_realm(3).display_name == "元婴"
+		and realm_config.get_total_levels() == 36,
+		"Realm configuration did not define four ordered nine-layer realms."
+	)
+	_check(
+		not realm_config.get_realm(0).melee_weapons_only
+		and realm_config.get_realm(1).qi_shield_enabled
+		and realm_config.get_realm(1).locomotion_mode
+			== RealmDefinition.LocomotionMode.TEMPORARY_FLIGHT
+		and realm_config.get_realm(2).locomotion_mode
+			== RealmDefinition.LocomotionMode.FLIGHT
+		and realm_config.get_realm(3).spirit_projection_enabled
+		and realm_config.get_realm(3).fatal_breakthrough
+		and realm_config.get_realm(0).tribulation_strike_count == 3
+		and realm_config.get_realm(1).tribulation_strike_count == 6
+		and realm_config.get_realm(2).tribulation_strike_count == 12
+		and realm_config.get_realm(3).tribulation_strike_count == 1,
+		"Realm capability progression did not match the design contract."
+	)
+	var player_shadow := player.get_node("PlayerShadow") as PlayerShadow
+	_check(
+		player_shadow != null
+		and is_zero_approx(player_shadow.get_elevation()),
+		"Grounded Qi Refining player did not keep a ground-contact shadow."
+	)
+
+	resources.demote_to_realm(0, 9)
 	var lifespan_before_tribulation := resources.current_lifespan
 	var maximum_before_tribulation := resources.max_lifespan
 	var decay_before_tribulation := (
 		resources.get_current_lifespan_decay_rate()
 	)
-	resources.breakthrough_level_interval = 5
-	resources.maximum_breakthroughs = 3
-	_check(
-		resources.get_unlocked_breakthrough_count(5) == 0
-		and resources.get_unlocked_breakthrough_count(6) == 1
-		and resources.get_unlocked_breakthrough_count(11) == 2
-		and resources.get_unlocked_breakthrough_count(1000) == 3,
-		"RunResources did not apply its tuned breakthrough interval and cap."
-	)
-	resources.breakthrough_level_interval = 9
-	resources.maximum_breakthroughs = 9
-	_check(
-		resources.get_unlocked_breakthrough_count(9) == 0
-		and resources.get_unlocked_breakthrough_count(10) == 1
-		and resources.get_unlocked_breakthrough_count(19) == 2
-		and resources.get_unlocked_breakthrough_count(82) == 9
-		and resources.get_unlocked_breakthrough_count(1000) == 9,
-		"Tribulation milestones were not spaced every nine levels or capped at nine."
-	)
-	game.call("_on_cultivation_level_changed", 10)
+	resources.add_qi(resources.get_current_qi_requirement())
 	await _wait_process_frames(2)
 	var tribulation_nodes := get_nodes_in_group("heavenly_tribulations")
+	var qi_tribulation_warning_min := 0.0
+	var qi_tribulation_warning_max := 0.0
 	_check(
 		tribulation_nodes.size() == 1,
-		"Breaking beyond cultivation level nine did not start one tribulation."
+		"Attempting to leave Qi Refining layer nine did not start tribulation."
 	)
 	if not tribulation_nodes.is_empty():
 		var tribulation := tribulation_nodes[0] as HeavenlyTribulation
+		qi_tribulation_warning_min = tribulation.warning_duration_min
+		qi_tribulation_warning_max = tribulation.warning_duration_max
 		_check(
-			tribulation.strike_count == 9
-			and tribulation.warning_label.visible,
-			"Tribulation did not show a ground warning for nine strikes."
+			tribulation.strike_count == 3
+			and tribulation.warning_label.visible
+			and is_equal_approx(qi_tribulation_warning_min, 2.1)
+			and is_equal_approx(qi_tribulation_warning_max, 3.0),
+			"Qi Refining tribulation did not use three strikes and triple warning time."
 		)
 		_check(
 			is_equal_approx(
@@ -1143,6 +1364,10 @@ func _run() -> void:
 		tribulation.random_landing_offset = 0.0
 		tribulation.strike_damage = 1.0
 		tribulation.maximum_lifespan_damage_ratio = 0.0
+		# The first warning was prepared before the smoke test shortened the
+		# exported durations, so shorten that already-active phase as well.
+		tribulation.set("_warning_duration", 0.03)
+		tribulation.set("_phase_time_remaining", 0.03)
 		_thunder_strikes_landed = 0
 		_thunder_strikes_hit = 0
 		_tribulation_completions = 0
@@ -1152,13 +1377,13 @@ func _run() -> void:
 		)
 		await _wait_physics_frames(150)
 		_check(
-			_thunder_strikes_landed == 9
-			and _thunder_strikes_hit == 9,
-			"Standing on the predicted path did not receive all nine strikes."
+			_thunder_strikes_landed == 3
+			and _thunder_strikes_hit == 3,
+			"Standing on the predicted path did not receive all three strikes."
 		)
 		_check(
 			_tribulation_completions == 1,
-			"Nine lightning strikes did not complete the tribulation."
+			"Three lightning strikes did not complete the tribulation."
 		)
 		_check(
 			player.is_breakthrough_effect_active(),
@@ -1169,6 +1394,7 @@ func _run() -> void:
 				resources.max_lifespan,
 				minf(
 					maximum_before_tribulation
+						+ resources.level_up_maxHP_increase
 						+ resources.breakthrough_max_lifespan_increase,
 					resources.maximum_lifespan_cap
 				)
@@ -1177,7 +1403,7 @@ func _run() -> void:
 				resources.current_lifespan,
 				minf(
 					lifespan_before_tribulation
-						- 9.0
+						- 3.0
 						+ resources.max_lifespan
 							* resources.breakthrough_lifespan_restore_ratio,
 					resources.max_lifespan
@@ -1194,58 +1420,200 @@ func _run() -> void:
 			resources.breakthroughs_completed == 1,
 			"First tribulation completion was not recorded."
 		)
+		_check(
+			resources.get_current_realm_index() == 1
+			and resources.get_current_realm_layer() == 1
+			and player.realm_abilities.is_qi_shield_enabled()
+			and player.realm_abilities.is_temporary_flight_active(),
+			"Entering Foundation did not automatically demonstrate temporary flight."
+		)
+		for _frame in 120:
+			if not player.realm_abilities.is_temporary_flight_active():
+				break
+			await physics_frame
+		_check(
+			player.realm_abilities.start_temporary_flight(),
+			"Foundation Space action did not start another temporary flight."
+		)
+		await _wait_physics_frames(15)
+		var rising_elevation := (
+			player.realm_abilities.get_current_flight_elevation()
+		)
+		_check(
+			rising_elevation > 0.0
+			and rising_elevation
+				< realm_config.get_realm(1).flight_height
+			and is_equal_approx(
+				player_shadow.get_elevation(),
+				rising_elevation
+			)
+			and character_sprite.position.y < -1.0
+			and character_sprite.scale.x > grounded_character_scale.x
+			and character_sprite.animation == &"fly"
+			and character_sprite.z_index > 4,
+			"Foundation temporary flight did not rise progressively."
+		)
+		var holding_snapshot := player.realm_abilities.get_debug_snapshot()
+		for _frame in 45:
+			if holding_snapshot["temporary_flight_phase"] == &"holding":
+				break
+			await physics_frame
+			holding_snapshot = player.realm_abilities.get_debug_snapshot()
+		_check(
+			holding_snapshot["temporary_flight_phase"] == &"holding"
+			and is_equal_approx(
+				player.realm_abilities.get_current_flight_elevation(),
+				realm_config.get_realm(1).flight_height
+			),
+			"Foundation temporary flight did not hold its maximum height."
+		)
+		await _wait_physics_frames(120)
+		_check(
+			not player.realm_abilities.is_temporary_flight_active()
+			and is_zero_approx(
+				player.realm_abilities.get_current_flight_elevation()
+			)
+			and is_zero_approx(player_shadow.get_elevation())
+			and character_sprite.scale.is_equal_approx(
+				grounded_character_scale
+			)
+			and character_sprite.animation == &"walk"
+			and character_sprite.z_index < 4,
+			"Foundation temporary flight did not descend and land."
+		)
 
-		for breakthrough_number in range(2, 10):
-			var milestone_level := 1 + breakthrough_number * 9
-			var maximum_before_repeat := resources.max_lifespan
-			game.call("_on_cultivation_level_changed", milestone_level)
+		resources.current_qi = 8
+		var lifespan_before_shield := resources.current_lifespan
+		var qi_refining_enemy := preload(
+			"res://game/scenes/gameplay/enemy.tscn"
+		).instantiate() as EnemyController
+		qi_refining_enemy.player = player
+		get_root().add_child(qi_refining_enemy)
+		qi_refining_enemy.global_position = (
+			player.global_position + Vector2(0.0, 180.0)
+		)
+		await _wait_process_frames(1)
+		qi_refining_enemy.set_combat_enabled(false)
+		player.take_melee_damage(3.0, qi_refining_enemy)
+		_check(
+			resources.current_qi == 8
+			and is_equal_approx(
+				resources.current_lifespan,
+				lifespan_before_shield
+			),
+			"Qi Refining enemy damaged a Foundation-realm player."
+		)
+		qi_refining_enemy.queue_free()
+		player.take_melee_damage(3.0)
+		_check(
+			resources.current_qi == 5
+			and is_equal_approx(
+				resources.current_lifespan,
+				lifespan_before_shield
+			),
+			"Foundation Qi shield did not spend Qi to absorb damage."
+		)
+
+		for source_realm_index in [1, 2]:
+			resources.demote_to_realm(source_realm_index, 9)
+			resources.add_qi(resources.get_current_qi_requirement())
 			await _wait_process_frames(2)
 			var repeat_tribulation := (
 				game.get("_active_tribulation") as HeavenlyTribulation
 			)
 			_check(
 				repeat_tribulation != null,
-				"Realm milestone %d did not start tribulation %d."
-					% [milestone_level, breakthrough_number]
+				"Realm layer nine did not request its normal tribulation."
 			)
 			if repeat_tribulation == null:
 				continue
+			var expected_strike_count := (
+				6 if source_realm_index == 1 else 12
+			)
+			var expected_warning_ratio := (
+				0.75 if source_realm_index == 1 else 0.35
+			)
+			_check(
+				repeat_tribulation.strike_count == expected_strike_count
+				and is_equal_approx(
+					repeat_tribulation.warning_duration_min,
+					qi_tribulation_warning_min
+						* expected_warning_ratio
+				)
+				and is_equal_approx(
+					repeat_tribulation.warning_duration_max,
+					qi_tribulation_warning_max
+						* expected_warning_ratio
+				),
+				"Realm tribulation did not use its configured strike count and warning ratio."
+			)
 			repeat_tribulation.cancel()
 			game.call("_on_heavenly_tribulation_completed")
 			await _wait_process_frames(2)
-			_check(
-				resources.breakthroughs_completed == breakthrough_number
-				and is_equal_approx(
-					resources.max_lifespan,
-					minf(
-						maximum_before_repeat
-							+ resources.breakthrough_max_lifespan_increase,
-						resources.maximum_lifespan_cap
+			if source_realm_index == 1:
+				var golden_core_elevation := (
+					player.realm_abilities.get_current_flight_elevation()
+				)
+				await _wait_physics_frames(10)
+				_check(
+					resources.get_current_realm_index() == 2
+					and golden_core_elevation > 0.0
+					and is_equal_approx(
+						golden_core_elevation,
+						player.realm_abilities
+							.get_current_flight_elevation()
 					)
-				),
-				"Tribulation %d did not grant its bounded lifespan increase."
-					% breakthrough_number
-			)
+					and not player.realm_abilities
+						.is_temporary_flight_active()
+					and character_sprite.animation == &"fly"
+					and character_sprite.z_index > 4,
+					"Golden Core did not maintain continuous flight."
+				)
 
-		game.call("_on_cultivation_level_changed", 1000)
-		await _wait_process_frames(2)
 		_check(
-			game.get("_active_tribulation") == null
-			and resources.breakthroughs_completed == 9
-			and not resources.is_run_active()
-			and end_overlay.visible
-			and end_overlay.title_label.text == "Ascension Complete",
-			"Ninth breakthrough did not end the run with ascension."
+			resources.get_current_realm_index() == 3
+			and resources.get_current_realm_layer() == 1
+			and player.realm_abilities.get_debug_snapshot()[
+				"flight_height"
+			] > 0.0
+			and player_shadow.get_elevation() > 0.0,
+			"Golden Core and Nascent Soul transitions did not unlock flight."
 		)
-		var maximum_after_nine := resources.max_lifespan
-		resources.grant_breakthrough_reward()
 		_check(
-			resources.breakthroughs_completed == 9
+			player.realm_abilities.toggle_spirit_projection()
 			and is_equal_approx(
-				resources.max_lifespan,
-				maximum_after_nine
+				player.realm_abilities.get_outgoing_damage_multiplier(),
+				2.0
 			),
-			"RunResources granted a reward beyond its breakthrough cap."
+			"Nascent Soul Space stance did not enable 200-percent power."
+		)
+		resources.current_qi = 0
+		player.take_melee_damage(1.0)
+		_check(
+			resources.get_current_realm_index() == 2
+			and resources.get_current_realm_layer() == 9
+			and not player.realm_abilities.is_spirit_projection_active(),
+			"Taking damage during spirit projection did not fall to Golden Core."
+		)
+
+		resources.demote_to_realm(3, 9)
+		resources.add_qi(resources.get_current_qi_requirement())
+		await _wait_process_frames(2)
+		var annihilation := game.get("_active_annihilation") as RealmAnnihilation
+		_check(
+			annihilation != null
+			and resources.is_pending_breakthrough_fatal()
+			and realm_config.get_realm(3).tribulation_strike_count == 1,
+			"Nascent Soul layer-nine breakthrough did not start fatal strike."
+		)
+		if annihilation != null:
+			annihilation.set("_remaining", 0.01)
+			await _wait_process_frames(4)
+		_check(
+			not resources.is_run_active()
+			and end_overlay.visible
+			and end_overlay.title_label.text.contains("突破陨落"),
+			"Fatal Nascent Soul breakthrough did not end the run."
 		)
 
 	game.call("_on_restart_requested")

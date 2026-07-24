@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://game/scripts/gameplay/weapon_data.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://game/scenes/gameplay/thunder_cloud_projectile.tscn" id="2_projectile"]
+
+[resource]
+script = ExtResource("1_data")
+weapon_id = &"thunder_hammer"
+display_name = "雷神之锤"
+attack_kind = 5
+attack_domain = 1
+display_color = Color(0.55, 0.78, 1, 1)
+pickup_color = Color(0.42, 0.72, 1, 1)
+minimum_damage = 2
+maximum_damage = 2
+attack_range = 260.0
+attack_interval = 2.2
+projectile_scene = ExtResource("2_projectile")
+projectile_sequence_interval = 0.22
+base_aoe_radius = 112.0

@@ -56,6 +56,16 @@ func _run() -> void:
 	var pause_menu := game.get_node("PauseMenu")
 	_check(player != null, "Gameplay has no PlayerController.")
 	_check(world != null, "Gameplay has no InfiniteWorld.")
+	var character_sprite := (
+		player.get_node("CharacterSprite") as AnimatedSprite2D
+	)
+	_check(
+		character_sprite.animation == &"qi_walk"
+		and character_sprite.sprite_frames.get_frame_count(&"qi_walk") == 9
+		and character_sprite.sprite_frames.get_frame_count(&"walk") == 9
+		and character_sprite.sprite_frames.get_frame_count(&"fly") == 9,
+		"Player did not load both realm running sets and the flying set."
+	)
 
 	var starting_y := player.global_position.y
 	await _wait_physics_frames(20)
@@ -67,6 +77,10 @@ func _run() -> void:
 	_check(
 		player.current_forward_speed > player.base_forward_speed + 40.0,
 		"Forward input did not smoothly raise travel speed."
+	)
+	_check(
+		character_sprite.speed_scale > 1.0,
+		"Accelerating did not speed up animation playback."
 	)
 	await _wait_physics_frames(40)
 	_check(
@@ -80,6 +94,10 @@ func _run() -> void:
 	_check(
 		player.current_forward_speed < player.base_forward_speed - 40.0,
 		"Backward input did not reduce forward travel speed."
+	)
+	_check(
+		character_sprite.speed_scale < 1.0,
+		"Slowing did not reduce animation playback speed."
 	)
 	_check(player.current_forward_speed > 0.0, "Player was allowed to reverse or stop.")
 

@@ -12,7 +12,7 @@ enum Phase {
 	GAP,
 }
 
-## Number of lightning strikes in each cultivation-realm breakthrough.
+## Default number of lightning strikes before realm-specific configuration.
 @export_range(1, 20, 1) var strike_count: int = 9
 ## Minimum ground-warning duration, in seconds. The exact duration is random
 ## for each strike and is also used to predict the player's landing position.
@@ -55,8 +55,22 @@ func _ready() -> void:
 	set_physics_process(false)
 
 
+## Applies one source realm's strike count and warning-time multiplier to this
+## scene instance without mutating the shared realm or scene resources.
+func configure_for_realm(realm: RealmDefinition) -> void:
+	if realm == null:
+		return
+	strike_count = maxi(realm.tribulation_strike_count, 1)
+	var warning_multiplier := maxf(
+		realm.tribulation_warning_duration_multiplier,
+		0.01
+	)
+	warning_duration_min *= warning_multiplier
+	warning_duration_max *= warning_multiplier
+
+
 ## Starts one complete strike sequence and snapshots the supplied maximum
-## lifespan so damage remains stable throughout all nine warnings and strikes.
+## lifespan so damage remains stable throughout the configured sequence.
 func start(
 	active_player: PlayerController,
 	maximum_lifespan: float = 0.0

@@ -1,137 +1,345 @@
-# Count Down foundation
+# Count Down：当前本地版本说明
 
-`assets/seasonal sample (summer).png` is a 256×256 sprite sheet on a 16×16
-grid. It arrived without a Godot `TileSet` or terrain metadata, so
-`summer_terrain_tileset.tres` configures an atlas source.
+这是一个使用 Godot 4.7 开发的俯视角修仙生存游戏原型。本文档以当前本地工作区中的代码、场景和资源配置为准，汇总了现阶段已经实现的玩法和近期更新。
 
-`default_world_chunk_config.tres` is the designer-facing source of truth for:
+## 当前玩法概览
 
-- Chunk dimensions, tile size, and road width
-- World seed and ground variation probability
-- TileSet selection and terrain-painting mode
-- Atlas source IDs and coordinates
+- 玩家持续向前推进，在动态宽窄变化的道路上战斗、修炼并延长寿命。
+- 修炼境界依次为练气、筑基、金丹、元婴，每个境界均有 9 个小层级。
+- 击杀敌人获得灵气；灵气充满后提升一个小层级并恢复寿命。
+- 练气 9 层、筑基 9 层、金丹 9 层之后需要渡劫才能进入下一境界。
+- 尝试突破元婴 9 层时会触发一道必中的即死天劫，作为当前流程终点。
+- 精英敌人会掉落武器和通用强化碎片。所有精英掉落物都需要玩家在拾取圈内持续同步 1 秒才能获得。
+- 原有“精气神碎片”玩法链路已经移除；旧兼容数据仍可能保留在代码或资源中，但不再作为当前掉落和成长机制使用。
 
-`world_chunk.tscn` uses an `@tool` preview that reacts to config changes.
-Atlas-only terrain is drawn directly on the editor canvas, independently of
-the runtime `TileMapLayer`. Terrain-painting mode uses an internal transient
-layer. In both cases, thousands of preview cells are not serialized into the
-scene. Editor-only cyan guides show the chunk bounds, origin, and forward
-direction and can be disabled from the chunk inspector.
+## 操作方式
 
-Open `world_chunk_preview.tscn` to inspect three adjacent chunks and the player
-together. The preview scene automatically repositions chunks when their
-configured dimensions change.
+| 按键 | 功能 |
+| --- | --- |
+| `W` / `S` | 加速 / 减速 |
+| `A` / `D` | 横向移动 |
+| `Space` | 根据当前境界触发翻滚、短暂驭空、虚影或灵体出窍 |
+| `Esc` | 暂停游戏并打开调试面板 |
+| `Tab` | 在包含分岔道路的场景中切换路线选择 |
 
-The source sheet is a mixed terrain/sample composition rather than a dedicated
-road autotile. The selected atlas coordinates therefore remain easy to change
-on the shared config resource. To use a future terrain set instead, assign it
-to `terrain_tileset`, enable `use_terrain_painting`, and set the terrain set,
-road terrain, and ground terrain IDs. If the assigned resource is invalid, the
-chunk falls back to its deterministic 16-pixel renderer rather than leaving
-holes.
+减速只改变移动速度，不会把寿命消耗降低到基础消耗以下。
 
-Pool size and recycle distance remain on `InfiniteWorld`; terrain and chunk
-shape come from its shared `chunk_config`. The world applies the configured road
-width to the player at startup so the visual and movement bounds stay aligned.
+## 修炼与寿命
 
-The minimal run loop is owned by separate gameplay systems:
+默认修炼参数集中在 `resources/run/default_run_config.tres` 和各境界资源中：
 
-- `RunResources` starts at 180 seconds, decays lifespan, tracks qi and
-  cultivation level, and restores lifespan on level-up. Passive decay scales
-  with actual forward speed: accelerating consumes it faster and slowing down
-  consumes it more slowly. Enemy melee damage uses the same lifespan resource.
-- Every pooled chunk tests a deterministic, bounded mix of scattered pickup
-  candidates and local clusters within the road margins.
-- `qi_profile.tres` defines the only qi pickup's value, appearance, and a
-  five-percent chance for each candidate position to create a real pickup.
-- Qi is collected immediately when the player's body touches it; there is no
-  timed absorption synchronization. A small `灵气` label follows each pickup.
-- `EnemySpawner` creates slower enemies ahead of the visible screen and
-  slightly faster pursuers behind it. Every enemy moves straight forward at
-  one constant assigned speed, never steers or accelerates toward the player,
-  and attacks only at close range. Enemies spawn within the current road and
-  are removed if route migration leaves them on a road the player did not take.
-  Every 20 unpaused seconds and every cultivation level above one add a full
-  difficulty step: newly spawned ordinary enemies gain two health and 0.75
-  damage, attack and spawn faster, and increase the simultaneous-enemy cap.
-  Each spawn has an eight-percent chance to become a gold-labeled elite with
-  triple health, 1.6-times melee range, and a 1.25-times larger body. Every
-  defeated elite drops one cycling `精 / 气 / 神` cultivation fragment.
-- Horizontal input is applied immediately with no release inertia. Forward
-  speed changes remain smoothed independently.
-- The player attacks automatically. The visible circle always represents only
-  the current equipment's live attack range. A separate invisible attraction
-  radius pulls qi and equipment and grows by 10 pixels per cultivation level.
-- Every enemy drops one 15-qi pickup and has a 35-percent chance to drop one
-  evenly selected `WeaponData` resource: `刀` with 2–5 damage, `飞剑` with
-  4–8 damage, or `乾坤圈` with 3–7 damage. The shared resources are the
-  designer-facing source of identity, damage bounds, range, cooldown,
-  cultivation type, delivery tuning, and projectile scenes. Weapon labels include randomized
-  damage, follow their drops, and retain the enemy's forward velocity until
-  attracted.
-- The player begins with `大力掌`. Only the current collected weapon is visible
-  beside the player; the strongest copy of each type is kept and new upgrades
-  auto-equip. Tab is captured before UI focus navigation and cycles the
-  equipment library shown on the HUD. The player uses the looping nine-frame
-  animation converted from `chara_fly.gif`; each cultivation increase adds a
-  brief cyan-and-gold expanding aura.
-- Elite cultivation fragments rotate deterministically through `精 → 气 → 神`.
-  Entering their 96-pixel circle locks the displayed type and automatically
-  channels while the player remains inside for 1.2 seconds, without stopping
-  movement or combat. Leaving the circle cancels progress, unlocks the type,
-  and resumes its prior cycle point. Each type tracks an independent level and
-  `0/3` fragment progress.
-- `cultivation_config.tres` owns the three repeating reward cycles, percentage
-  values, caps, cap-conversion damage, colors, and optional icons. Secondary
-  rewards resolve as player-global stats. Only the +10% additive damage per
-  level remains affinity-specific: 刀 uses 精, 飞剑 uses 气, and 乾坤圈 uses 神.
-  Untyped weapons such as 大力掌 remain neutral for that typed damage.
-- `player_combat_config.tres` is the source of truth for player-global base
-  combat stats, caps, and overall-level growth. Every overall cultivation level
-  after level one adds one configurable flat global damage point to all current
-  and future weapons before an affinity-specific damage multiplier is applied.
-- Dao attacks orbit the player every 0.5 seconds over a 94-pixel radius.
-  Player-wide AoE bonuses expand that primary damage circle. Flying swords
-  launch 2,200-pixel-per-second sword-light projectiles every 0.9 seconds over
-  a 240-pixel range. Delivery-count rewards add sequential swords to each
-  volley. Swept queries prevent tunneling between physics frames. Regardless of
-  weapon count, only one idle weapon accompanies the player.
-- Critical chance is rolled once per attack and its resolved critical-damage
-  multiplier is preserved across that attack's direct, volley, bounce, and AoE
-  deliveries. Every critical impact shows a gold burst and outlined `暴击!`
-  world-space damage number that remains readable after an immediate defeat.
-- The Universe Ring homes into an enemy and then returns to the moving player.
-  Delivery count adds enemy-to-enemy bounces before its return, while 神 area
-  and targeting rewards expand its impact and search radii. Player-global
-  projectile-speed bonuses affect its outbound, bounce, and return movement.
-  While the ring is away, its idle companion is hidden.
-- Advancing beyond cultivation level nine starts nine heavenly-lightning
-  strikes. Each shows a labeled ground warning near the player's predicted
-  position; its random offset remains inside a guaranteed-hit radius if the
-  player keeps the same movement. Surviving all nine doubles maximum lifespan,
-  immediately adds half of the new maximum to current lifespan, and displays
-  a success message plus a larger multi-ring, light-column breakthrough aura.
-- Periodic side roads appear ahead of the camera, alternating left and right.
-  Branch events also alternate between normal roads and `试炼地狱`. Every
-  branch is as wide as the current road and begins fully outside it. Trial Hell
-  is marked by a red-black road and warning label; after entry that palette
-  continues across the infinite route while enemies gain 50% health, 35%
-  damage, faster attacks, a 75% higher simultaneous cap, and roughly 82% more
-  frequent spawning. Entering a later normal branch clears those modifiers.
-  Every committed route recenters player and camera, migrates the pooled world
-  and spawners, and can recursively generate later branches.
-- The HUD shows current lifespan decay, technique, active equipment damage,
-  all three cultivation levels and fragment counts, fragment-channel progress
-  and cancellation, level reward messages, and the complete equipment library.
-  Its compact player-stat section shows live white global/final values plus
-  separately color-coded 精, 气, and 神 contributions.
-- `GameplayHud` listens to resource signals, while `game.gd` owns run-ended
-  movement, enemy shutdown, and scene transitions.
+- 初始寿命：180 秒。
+- 默认寿命上限：180 秒；全局硬上限：900 秒。
+- 基础寿命消耗：每秒 1 点。
+- 每次升级恢复 10 秒寿命，并令寿命上限增加 2 秒。
+- 每层基础需要 100 灵气，之后每层需求增加 25。
+- 每完成一次大境界突破：
+  - 寿命上限增加 60 秒；
+  - 恢复当前寿命上限的 50%；
+  - 每秒寿命消耗增加 0.25。
 
-Run the executable checks from the project root with:
+### 境界能力
 
-```sh
-godot --headless --path . --script res://game/tests/foundation_smoke.gd
-godot --headless --path . --script res://game/tests/gameplay_loop_smoke.gd
-godot --headless --path . --script res://game/tests/cultivation_smoke.gd
+| 境界 | 移动与空格能力 | 战斗能力 | 天劫 |
+| --- | --- | --- | --- |
+| 练气 1–9 | 地面跑步；空格翻滚 | 翻滚期间无敌且不能攻击；大力掌单方向攻击 | 3 道雷；预备时间为标准值 3 倍 |
+| 筑基 1–9 | 空格短暂跃起并驭空滑行，经历上升、悬停、下降和落地 | 获得灵气护盾；大力掌顺序攻击 2 个方向并轻微击飞 | 6 道雷；预备时间为练气雷劫的 0.75 倍 |
+| 金丹 1–9 | 持续御空飞行；空格召唤左右两个虚影 | 虚影分别继承玩家当前 20% 属性；大力掌顺序攻击 6 个方向并明显击飞 | 12 道雷；预备时间为练气雷劫的 0.35 倍 |
+| 元婴 1–9 | 持续御空；空格灵体出窍 | 灵体状态威力提升至 200%；受伤立即跌落到金丹 9 层；大力掌攻击 18 个方向并秒杀普通敌人 | 突破元婴 9 层时仅有 1 道必中的即死雷 |
+
+### 练气翻滚
+
+- 使用 `image_asset/flip/frames` 中的序列帧。
+- 翻滚持续约 0.6 秒，结束后冷却 0.8 秒。
+- 翻滚期间玩家无敌，所有武器攻击暂停，金钟罩也不会造成接触伤害。
+- 翻滚方向和移动速度独立于普通跑步状态。
+
+### 筑基短暂驭空
+
+- 按下空格后依次进入上升、最高高度维持、下降和落地阶段。
+- 首次突破到筑基时会自动完整跃起一次，用于提示玩家已经解锁驭空能力。
+- 飞行高度通过角色与地面阴影距离、角色缩放和渲染层级共同表现。
+
+### 金丹虚影
+
+- 按空格在玩家左右各生成一个虚影。
+- 每个虚影继承玩家当前 20% 最大生命、武器伤害、攻击范围和攻击频率。
+- 虚影死亡后进入 12 秒再生冷却；两侧虚影作为一组重新激活。
+- 冷却期间，在加速状态下按空格可令冷却缩短 1 秒。
+- HUD 会显示虚影存活状态、剩余冷却和加速生成提示。
+
+### 灵气护盾与元婴灵体
+
+- 筑基及以上境界获得灵气护盾，护盾按伤害量消耗灵气抵挡伤害。
+- 元婴灵体出窍时整体伤害增幅为 200%。
+- 灵体受伤会立即结束灵体状态并跌回金丹 9 层。
+
+## 玩家动画、阴影与渲染
+
+- 练气跑步动画来自 `image_asset/walk_0/frames`。
+- 筑基地面跑步动画来自 `image_asset/walk/sequence_frames`。
+- 飞行动画沿用原有角色动画，并会随加速和减速改变播放速度。
+- 玩家会根据地面、短暂驭空、持续飞行、翻滚、虚影和灵体状态切换对应表现。
+- 玩家拥有独立地面阴影；离地越高，角色和阴影的距离变化越明显。
+- 筑基、金丹和元婴的空中角色会逐级放大；当前基础缩放倍率分别约为 1.30、1.45、1.55。
+- 空中玩家使用高于地面怪物的渲染层级，不会再被练气期地面怪物遮挡。
+
+## 基础攻击：大力掌
+
+- 大力掌已经从玩家周围的圆形攻击改为朝向一个方向的气劲。
+- 未攻击时，攻击提示会持续瞄准最近的有效敌人。
+- 攻击提交后会使用目标位置和命中修正，避免面对移动敌人频繁空击。
+- 当前基础伤害为 5、基础范围为 108。
+- 玩家每提升一个小层级，大力掌都会获得小幅成长：
+  - 伤害约增加 0.5；
+  - 范围增加 2.5%；
+  - 攻击速度增加 2.5%。
+- 境界会改变单次攻击方向数和击退强度：
+  - 练气：1 个方向；
+  - 筑基：2 个方向，轻微击飞；
+  - 金丹：6 个方向，明显击飞；
+  - 元婴：18 个方向，强力击飞并秒杀普通敌人。
+
+## 武器系统
+
+武器数量不再因为升级等级自动增加。玩家必须拾取精英怪掉落的同类型武器，才会增加该武器的层数或单次发射数量。
+
+当前所有精英敌人均有 75% 概率额外掉落一个随机武器，武器池包含旋转刀、飞剑、乾坤圈、金钟罩、雷神之锤和翻天印。武器拾取需要在掉落圈内持续同步 1 秒，离开范围会重置进度。
+
+| 武器 | 基础伤害 | 基础范围 | 基础间隔 | 重复拾取效果 |
+| --- | ---: | ---: | ---: | --- |
+| 大力掌 | 5 | 108 | 随层级成长 | 单独按修炼层级成长 |
+| 旋转刀 | 9 | 94 | 0.50 秒 | 增加一圈旋转刀 |
+| 飞剑 | 8 | 240 | 0.90 秒 | 单次攻击顺序多发射一枚飞剑 |
+| 乾坤圈 | 5 | 210 | 0.90 秒 | 单次攻击顺序多发射一个乾坤圈 |
+| 金钟罩 | 动态计算 | 贴身范围 | 接触触发 | 增加一层护罩 |
+| 雷神之锤 | 每跳 2 | 260 | 2.20 秒 | 单次攻击顺序多生成一片雷云 |
+| 翻天印 | 精英固定 18 | 462 | 2.25 秒 | 单次攻击顺序多砸下一枚翻天印 |
+
+表中为当前默认资源值，后续可以直接通过武器资源修改，不需要改动控制器代码。
+
+### 旋转刀
+
+- 围绕玩家持续旋转。
+- 每次拾取同类武器增加一圈，维持原有多环表现。
+
+### 飞剑
+
+- 飞剑拥有 3 点初始能量。
+- 每命中一个不同敌人消耗 1 点能量，并可以继续穿透。
+- 能量越低，飞剑颜色越淡。
+- 能量耗尽，或飞行距离超过攻击范围的 2 倍时消失。
+- 使用扫掠碰撞检测，降低高速飞行时穿过敌人但未命中的概率。
+
+### 乾坤圈
+
+- 每次伤害固定为 5，不再随着弹射次数提高。
+- 基础弹射次数为 2 次。
+- 每拾取一个“增加伤害碎片”，乾坤圈额外增加 1 次弹射，而不是增加伤害。
+- 重复拾取乾坤圈会在同一轮攻击中顺序发射更多乾坤圈。
+- 范围碎片会同时影响命中范围和后续目标搜索范围。
+
+### 金钟罩
+
+- 金钟罩是紧贴玩家的多层金色发光圆环。
+- 护罩线宽已加粗为约 2.5，层间距约为 4；叠加厚度仍明显小于多圈旋转刀。
+- 接触敌人时造成伤害，并根据碰撞角度将敌人向外撞飞；敌人之后会逐渐恢复正常移动状态。
+- 普通敌人受到的初始伤害至少等于其最大生命值的 90%。
+- 对精英敌人的伤害基准，等同于同难度普通敌人最大生命值的 90%，不会按精英生命倍率放大。
+- 最外层可用护罩会最先消耗。
+- 被消耗的护罩会闪烁 0.5 秒；这段时间仍能保护玩家不受伤害，但不能造成伤害或击飞。
+- 闪烁结束后该层进入约 0.8 秒恢复，之后自动重新生成。
+
+### 雷神之锤
+
+- 向目标方向发射一片缓慢移动的雷云。
+- 雷云当前持续约 4 秒，每 0.4 秒对范围内敌人造成一次伤害。
+- 雷云基础范围约为 112，自身漂移速度约为 70，并会叠加玩家发射瞬间的移动速度。
+- 重复拾取后，单次攻击会按约 0.22 秒间隔顺序生成更多雷云。
+
+### 翻天印
+
+- 锁定敌人后抛出方块虚影，先快速升高，再向目标砸落。
+- 上升和下降期间会持续匹配锁定敌人的移动位置，不再只攻击最初的固定坐标。
+- 锁定和落点范围均按正方形计算。
+- 当前攻击范围为 462，落地区域边长依据约 88 的半边长计算。
+- 命中普通敌人时直接秒杀；精英及以上敌人受到固定 18 点伤害。
+- 命中会触发轻微震屏。
+- 当前上升时间约 0.65 秒、下降时间约 0.22 秒、视觉高度约 220。
+- 重复拾取后会以约 0.5 秒间隔顺序砸下更多翻天印。
+
+## 通用强化碎片
+
+精英敌人必定掉落一个随机通用强化碎片，仍需在掉落圈内同步 1 秒。碎片对全部适用武器生效，大力掌另有自身的层级成长规则。
+
+| 碎片 | 每层效果 |
+| --- | --- |
+| 攻速碎片 | 全局攻击速度提高 6% |
+| 伤害碎片 | 一般武器伤害增加 1；乾坤圈改为额外增加 1 次弹射 |
+| 移动碎片 | 横向速度增加 12，前后速度变化加速度增加 45 |
+| 范围碎片 | 全局伤害和索敌范围提高 6% |
+| 加减速碎片 | 加速目标速度增加 25，减速目标速度降低 18，并强化速度变化；最低速度不会低于 8 |
+
+HUD 侧边栏已经从旧精气神显示改为上述碎片系统，会显示持有数量和每层的具体数值效果。
+
+## 敌人系统
+
+### 基础生成与难度
+
+- 基础生成间隔约 3.5 秒。
+- 初始场上上限为 2，基础上限为 8。
+- 每 20 秒和每个修炼总层级都会提高一次敌人难度：
+  - 生命值增加；
+  - 攻击伤害增加；
+  - 攻击间隔缩短；
+  - 场上数量上限提高；
+  - 生成间隔缩短。
+- 当前精英生成概率为 20%。
+- 精英敌人默认拥有约 3 倍生命、1.6 倍攻击范围和 1.25 倍视觉尺寸。
+- 练气期原有地面怪物属于练气战斗层级，无法伤害筑基及以上的玩家。
+
+### 境界解锁的敌人
+
+| 玩家进度 | 新增敌人能力 |
+| --- | --- |
+| 筑基 3 | 概率出现带翅膀的飞行普通近战敌人 |
+| 筑基 5 | 概率出现带翅膀的飞行精英敌人 |
+| 金丹 1 | 出现可远程攻击的飞行普通敌人和精英敌人 |
+| 金丹 5 | 出现可慢速自主横移的飞行精英敌人 |
+| 元婴 1 | 出现可高速自主位移的飞行普通敌人和精英敌人 |
+
+当前基础概率配置：
+
+- 飞行变体概率约 38%。
+- 飞行敌人转为远程攻击的概率约 34%。
+- 金丹 5 后精英获得慢速自主位移的概率约 55%，自主速度约 80。
+- 元婴 1 后飞行敌人获得高速自主位移的概率约 72%，自主速度约 220。
+
+### 特殊敌人
+
+- 自爆怪：普通敌人变体，基础出现概率约 12%，生命值约为普通敌人的 38%；接近目标后自爆。
+- 治疗怪：普通变体概率约 10%，会周期性治疗周围敌人。
+- 精英治疗怪：精英变体概率约 16%，治疗光环范围约为普通治疗怪的 1.65 倍。
+- 飞行怪：拥有翅膀、独立空中高度和更高渲染表现。
+- 远程飞行怪：在攻击范围内蓄力并进行远程打击。
+- 自主位移怪：除了追踪目标之外，还会横向游走和主动变向。
+
+敌人现在也会把金丹虚影视为有效目标。
+
+### 道路约束与掉落
+
+- 所有敌人都会根据所在位置的实际道路宽度进行限制，不会再跑出道路。
+- 每个普通敌人提供基础 15 灵气，并随难度成长。
+- 精英灵气收益约为普通敌人的 1.5 倍。
+- 试炼路线和后方生成的敌人还有额外灵气倍率。
+- 每个精英敌人必掉一个通用强化碎片，并有 75% 概率掉落一个随机武器。
+
+## 道路、分岔与试炼
+
+- 主道路会随机保持原宽、逐渐收窄或逐渐扩宽。
+- 最窄宽度为基础宽度的 0.5 倍。
+- 最宽宽度为基础宽度的 2 倍。
+- 宽度变化现在会跨越约 4 个区块逐渐完成，相比早期变化节奏延长约 3–5 倍。
+- 玩家、敌人、背景和分岔路线都读取同一份实时道路宽度数据。
+- 路线分岔会提供不同玩法修正。
+- 当前“试炼·地狱”路线大致包含：
+  - 敌人数量倍率 1.75；
+  - 生成间隔倍率 0.55；
+  - 敌人生命倍率 1.50；
+  - 敌人伤害倍率 1.35；
+  - 敌人攻击间隔倍率 0.75。
+
+## HUD、暂停菜单与调试
+
+侧边 HUD 当前会显示：
+
+- 境界、小层级和灵气进度；
+- 当前寿命、寿命上限与危险提示；
+- 当前境界的空格能力说明；
+- 金丹虚影存活状态和再生冷却；
+- 武器持有数量；
+- 五类通用碎片数量及数值解释；
+- 武器或碎片同步拾取进度；
+- 路线与试炼提示。
+
+暂停菜单已经加入运行时调试面板，可直接：
+
+- 增加完整灵气条或提升修炼层级；
+- 增减当前寿命；
+- 增减六类武器数量；
+- 增减五类通用碎片；
+- 调整当前伤害；
+- 修改基础前进速度、横向速度和加速度。
+
+`Game`、`RunState`、`Player`、`InfiniteWorld` 和敌人管理器均提供调试快照或明确的调试修改接口，后续加入更完整的游戏内调试工具时不需要直接耦合内部节点。
+
+## 代码与配置结构
+
+核心逻辑被拆分为独立控制器和资源，避免把境界、武器、世界和 UI 数值写死在单一脚本中。
+
+- `scripts/state/run_state.gd`：寿命、灵气、层级、境界、碎片与调试状态。
+- `scripts/config/run_config.gd`：全局修炼和寿命配置。
+- `scripts/config/realm_config.gd`：每个境界的能力、飞行、护盾和天劫配置。
+- `scripts/config/weapon_data.gd`：武器公共参数和武器类型。
+- `scripts/player/player.gd`：玩家移动、受伤、动画和各境界空格能力协调。
+- `scripts/player/player_animation_controller.gd`：地面、飞行和翻滚动画切换。
+- `scripts/player/player_realm_ability_controller.gd`：翻滚、筑基驭空、金丹虚影和元婴灵体。
+- `scripts/player/player_weapon_controller.gd`：大力掌、旋转刀、飞剑、乾坤圈。
+- `scripts/player/player_golden_bell_controller.gd`：金钟罩层数、消耗、保护和恢复。
+- `scripts/player/player_thunder_hammer_controller.gd`：雷云生成、持续伤害和顺序发射。
+- `scripts/player/player_fantian_seal_controller.gd`：目标锁定、升降、追踪、方形伤害和震屏。
+- `scripts/world/infinite_world.gd`：道路区块、动态宽度、生成边界和路线约束。
+- `scripts/enemies/enemy_spawner.gd`：敌人生成、境界门槛、变体概率和难度成长。
+- `scripts/enemies/enemy.gd`：敌人战斗、飞行、远程、自爆、治疗和自主移动。
+- `scripts/ui/hud.gd`：主 HUD、碎片说明、能力状态和同步拾取显示。
+- `scripts/ui/pause_menu.gd`：暂停菜单和调试面板。
+
+主要默认资源：
+
+- `resources/run/default_run_config.tres`
+- `resources/realms/qi_refining.tres`
+- `resources/realms/foundation_establishment.tres`
+- `resources/realms/golden_core.tres`
+- `resources/realms/nascent_soul.tres`
+- `resources/world/default_world_chunk_config.tres`
+- `resources/weapons/palm.tres`
+- `resources/weapons/dao.tres`
+- `resources/weapons/sword.tres`
+- `resources/weapons/ring.tres`
+- `resources/weapons/golden_bell.tres`
+- `resources/weapons/thunder_hammer.tres`
+- `resources/weapons/fantian_seal.tres`
+
+所有可在 Inspector 中调整的导出字段，都应在对应脚本中保留紧邻的 `##` 文档注释。
+
+## 场景入口
+
+- 主菜单：`scenes/ui/main_menu.tscn`
+- 游戏入口：`scenes/game/game.tscn`
+- 世界：`scenes/world/infinite_world.tscn`
+- 玩家：`scenes/player/player.tscn`
+- 敌人：`scenes/enemies/enemy.tscn`
+
+## 自动化验证
+
+项目内现有五组无界面验证脚本：
+
+- `tests/foundation_smoke.gd`
+- `tests/gameplay_loop_smoke.gd`
+- `tests/cultivation_smoke.gd`
+- `tests/latest_weapon_design_smoke.gd`
+- `tests/realm_variants_debug_smoke.gd`
+
+在 `game` 目录中可以使用 Godot 4.7 逐项运行：
+
+```powershell
+godot --headless --path . --script res://tests/foundation_smoke.gd --log-file .godot/foundation-smoke.log
+godot --headless --path . --script res://tests/gameplay_loop_smoke.gd --log-file .godot/gameplay-loop-smoke.log
+godot --headless --path . --script res://tests/cultivation_smoke.gd --log-file .godot/cultivation-smoke.log
+godot --headless --path . --script res://tests/latest_weapon_design_smoke.gd --log-file .godot/latest-weapon-design-smoke.log
+godot --headless --path . --script res://tests/realm_variants_debug_smoke.gd --log-file .godot/realm-variants-debug-smoke.log
 ```
+
+Windows 下运行无界面测试时，应给每项测试设置独立日志文件和外部超时，避免多个 Godot 进程竞争同一个用户日志；如果测试超时，应先终止该次新启动的无界面进程再继续下一项，不要关闭正在使用的编辑器。
+
+Godot 可能输出系统根证书加载警告；只要测试打印对应的 `PASS` 且正常退出，该警告不代表游戏逻辑验证失败。

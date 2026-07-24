@@ -43,19 +43,12 @@ display_name = "飞行速度 +10%"
 amount = 0.1
 cap = 1.0
 
-[sub_resource type="Resource" id="RewardQiDelivery"]
-script = ExtResource("3_reward")
-stat = 5
-display_name = "御器次数 +1"
-amount = 1.0
-cap = 4.0
-
 [sub_resource type="Resource" id="TypeQi"]
 script = ExtResource("2_type")
 cultivation_type = 1
 display_name = "气"
 display_color = Color(0.22, 0.82, 1, 1)
-rewards = Array[ExtResource("3_reward")]([SubResource("RewardQiAttackSpeed"), SubResource("RewardQiProjectileSpeed"), SubResource("RewardQiDelivery")])
+rewards = Array[ExtResource("3_reward")]([SubResource("RewardQiAttackSpeed"), SubResource("RewardQiProjectileSpeed")])
 
 [sub_resource type="Resource" id="RewardShenAoe"]
 script = ExtResource("3_reward")
@@ -63,13 +56,6 @@ stat = 6
 display_name = "范围半径 +6%"
 amount = 0.06
 cap = 0.6
-
-[sub_resource type="Resource" id="RewardShenDelivery"]
-script = ExtResource("3_reward")
-stat = 5
-display_name = "御器次数 +1"
-amount = 1.0
-cap = 4.0
 
 [sub_resource type="Resource" id="RewardShenTargeting"]
 script = ExtResource("3_reward")
@@ -83,7 +69,7 @@ script = ExtResource("2_type")
 cultivation_type = 2
 display_name = "神"
 display_color = Color(0.78, 0.39, 1, 1)
-rewards = Array[ExtResource("3_reward")]([SubResource("RewardShenAoe"), SubResource("RewardShenDelivery"), SubResource("RewardShenTargeting")])
+rewards = Array[ExtResource("3_reward")]([SubResource("RewardShenAoe"), SubResource("RewardShenTargeting")])
 
 [resource]
 script = ExtResource("1_config")

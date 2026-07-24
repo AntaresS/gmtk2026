@@ -144,7 +144,14 @@ text = "寿元消耗  -1.00 / 秒"
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
-text = "练气 1"
+text = "练气 1层"
+
+[node name="RealmAbilityLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.66, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "地上修行"
 
 [node name="QiLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
 unique_name_in_owner = true
@@ -166,9 +173,20 @@ theme_override_colors/font_color = Color(0.94, 0.86, 1, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.75)
 theme_override_constants/outline_size = 2
 theme_override_font_sizes/font_size = 18
-text = "精 Lv.0  0/3
-气 Lv.0  0/3
-神 Lv.0  0/3"
+text = "通用碎片
+攻速 Lv.0：每级 +6%
+伤害 Lv.0：常规武器 +1 / 乾坤圈弹射 +1
+身法 Lv.0：横移 +12 / 纵向加速度 +45
+范围 Lv.0：每级全武器 +6%
+加减速 Lv.0：加速 +25 / 减速目标 -18（最低 8）"
+
+[node name="EchoStatusLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.48, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "金丹虚影：可召唤"
 
 [node name="TechniqueLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats"]
 unique_name_in_owner = true
@@ -203,10 +221,9 @@ bbcode_enabled = true
 text = "[b]角色属性[/b]
 基础  练气 Lv.1 · 全局伤害 +0.0 · 大力掌伤害 1
 总览  暴击 0% / 150% · 攻速 +0%
-投射  弹速 ×1.00 · 御器 +0 · 范围 +0% · 索敌 +0%
-[color=#ff7d40]精  暴击 +0% · 暴伤 +0% · 近减 +0%[/color]
-[color=#38d1ff]气  攻速 +0% · 弹速 +0% · 御器 +0[/color]
-[color=#c763ff]神  范围 +0% · 御器 +0 · 索敌 +0%[/color]"
+投射  弹速 ×1.00 · 当前武器 ×1 · 范围 +0% · 索敌 +0%
+碎片  攻速 0 · 伤害 0 · 身法 0 · 范围 0 · 加减速 0
+移动  横向 300 · 纵向加速度 360 · 减速目标 110"
 fit_content = true
 scroll_active = false
 
@@ -244,7 +261,7 @@ theme_override_colors/font_color = Color(0.92, 0.95, 1, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
 theme_override_constants/outline_size = 5
 theme_override_font_sizes/font_size = 22
-text = "精之碎片 · 引导中"
+text = "强化碎片 · 引导中"
 horizontal_alignment = 1
 
 [node name="ChannelProgress" type="ProgressBar" parent="HudRoot/ChannelFeedback"]

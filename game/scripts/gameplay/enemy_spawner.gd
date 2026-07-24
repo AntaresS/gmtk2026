@@ -2,13 +2,7 @@ class_name EnemySpawner
 extends Node2D
 
 signal qi_collected(amount: int)
-signal cultivation_fragment_collected(cultivation_type: int)
-signal cultivation_channel_changed(
-	cultivation_type: int,
-	progress: float,
-	active: bool,
-	cancelled: bool
-)
+signal universal_upgrade_collected(upgrade_type: int, amount: int)
 
 const WeaponDataResource = preload(
 	"res://game/scripts/gameplay/weapon_data.gd"
@@ -20,6 +14,15 @@ const FLYING_SWORD_DATA: WeaponDataResource = preload(
 const QIANKUN_RING_DATA: WeaponDataResource = preload(
 	"res://game/resources/weapon/qiankun_ring.tres"
 )
+const GOLDEN_BELL_DATA: WeaponDataResource = preload(
+	"res://game/resources/weapon/golden_bell.tres"
+)
+const THUNDER_HAMMER_DATA: WeaponDataResource = preload(
+	"res://game/resources/weapon/thunder_hammer.tres"
+)
+const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
+	"res://game/resources/weapon/fantian_seal.tres"
+)
 
 ## Enemy scene created beyond either camera edge. It must instantiate an
 ## EnemyController.
@@ -30,13 +33,13 @@ const QIANKUN_RING_DATA: WeaponDataResource = preload(
 @export var qi_pickup_scene: PackedScene = preload(
 	"res://game/scenes/gameplay/qi_pickup.tscn"
 )
-## Weapon pickup optionally created when an enemy is defeated.
+## Weapon pickup optionally created when an elite enemy is defeated.
 @export var weapon_pickup_scene: PackedScene = preload(
 	"res://game/scenes/gameplay/weapon_pickup.tscn"
 )
-## Cycling 精/气/神 fragment created once for every defeated elite enemy.
-@export var cultivation_fragment_scene: PackedScene = preload(
-	"res://game/scenes/gameplay/cultivation_fragment.tscn"
+## Random global-upgrade fragment created once for every defeated elite enemy.
+@export var weapon_power_fragment_scene: PackedScene = preload(
+	"res://game/scenes/gameplay/weapon_power_fragment.tscn"
 )
 ## Player reference injected into each spawned enemy.
 @export var player: PlayerController
@@ -82,13 +85,33 @@ const QIANKUN_RING_DATA: WeaponDataResource = preload(
 
 @export_category("Elite Enemies")
 ## Probability from zero to one that any new enemy becomes an elite variant.
-@export_range(0.0, 1.0, 0.01) var elite_spawn_chance: float = 0.08
+@export_range(0.0, 1.0, 0.01) var elite_spawn_chance: float = 0.20
 ## Health multiplier applied after elapsed-time difficulty scaling.
 @export_range(1.1, 10.0, 0.1) var elite_health_multiplier: float = 3.0
 ## Melee-range multiplier applied to elite enemies.
 @export_range(1.1, 4.0, 0.1) var elite_attack_range_multiplier: float = 1.6
 ## Visual and collision scale applied to elite enemy bodies.
 @export_range(1.0, 2.0, 0.05) var elite_visual_scale: float = 1.25
+
+@export_category("Enemy Variants")
+## Chance for an ordinary spawn to become a low-health self-destruct enemy.
+@export_range(0.0, 1.0, 0.01) var bomber_spawn_chance: float = 0.12
+## Chance for an ordinary spawn to heal nearby enemies periodically.
+@export_range(0.0, 1.0, 0.01) var healer_spawn_chance: float = 0.10
+## Chance for an elite spawn to become a healer with a larger aura.
+@export_range(0.0, 1.0, 0.01) var elite_healer_spawn_chance: float = 0.16
+## Flying-variant chance after its realm/layer threshold is unlocked.
+@export_range(0.0, 1.0, 0.01) var flying_spawn_chance: float = 0.38
+## Ranged flying-variant chance from Golden Core layer one onward.
+@export_range(0.0, 1.0, 0.01) var ranged_flying_spawn_chance: float = 0.34
+## Slow lateral speed granted to flying elites from Golden Core layer five.
+@export_range(0.0, 500.0, 5.0) var slow_autonomous_speed: float = 80.0
+## Fast lateral speed available to all flying enemies from Nascent Soul one.
+@export_range(0.0, 800.0, 5.0) var fast_autonomous_speed: float = 220.0
+## Chance that an eligible Golden Core elite receives slow autonomous movement.
+@export_range(0.0, 1.0, 0.01) var slow_autonomous_spawn_chance: float = 0.55
+## Chance that an eligible Nascent Soul spawn uses fast autonomous movement.
+@export_range(0.0, 1.0, 0.01) var fast_autonomous_spawn_chance: float = 0.72
 
 @export_category("Trial Hell")
 ## Multiplier applied to the simultaneous enemy cap on a Trial Hell route.
@@ -122,7 +145,7 @@ const QIANKUN_RING_DATA: WeaponDataResource = preload(
 ## enemy-type multipliers. The default adds one Qi every two steps after rounding.
 @export_range(0.0, 20.0, 0.05) var qi_drop_increase_per_difficulty_step: float = 0.5
 ## Qi multiplier for elite enemies. This deliberately compensates only part of
-## their triple health because elites also grant one cultivation fragment.
+## their triple health because elites also grant one universal fragment.
 @export_range(0.0, 5.0, 0.05) var elite_qi_drop_multiplier: float = 1.5
 ## Qi multiplier for enemies spawned while Trial Hell is active. It stacks with
 ## elite and rear-pursuer multipliers and rewards the route's added danger.
@@ -131,9 +154,9 @@ const QIANKUN_RING_DATA: WeaponDataResource = preload(
 @export_range(0.0, 5.0, 0.05) var rear_qi_drop_multiplier: float = 1.15
 ## Hard upper bound for one enemy's Qi reward after every modifier.
 @export_range(1, 5000, 1) var maximum_enemy_qi_drop: int = 200
-## Probability from zero to one that a defeated enemy also drops one definition
-## selected evenly from weapon_drop_pool.
-@export_range(0.0, 1.0, 0.05) var weapon_drop_chance: float = 0.35
+## Probability from zero to one that a defeated elite also drops one definition
+## selected evenly from weapon_drop_pool. Ordinary enemies never drop weapons.
+@export_range(0.0, 1.0, 0.05) var weapon_drop_chance: float = 0.75
 ## Designer-managed definitions eligible for enemy drops. Invalid or null
 ## entries are ignored; damage, identity, and combat tuning belong to each
 ## shared WeaponData resource rather than this spawner.
@@ -141,6 +164,9 @@ const QIANKUN_RING_DATA: WeaponDataResource = preload(
 	DAO_DATA,
 	FLYING_SWORD_DATA,
 	QIANKUN_RING_DATA,
+	GOLDEN_BELL_DATA,
+	THUNDER_HAMMER_DATA,
+	FANTIAN_SEAL_DATA,
 ]
 
 var road_half_width: float = 200.0
@@ -152,6 +178,7 @@ var _route_center_x: float = 0.0
 var _elapsed_run_time: float = 0.0
 var _cultivation_level: int = 1
 var _trial_hell_active: bool = false
+var _road_half_width_resolver: Callable
 
 
 func _ready() -> void:
@@ -192,10 +219,18 @@ func set_road_half_width(value: float) -> void:
 	road_half_width = maxf(value, road_edge_clearance + 1.0)
 
 
+## Supplies a world-Y to half-width resolver owned by InfiniteWorld. Keeping the
+## callable optional preserves isolated spawner scenes and tests.
+func set_road_half_width_resolver(resolver: Callable) -> void:
+	_road_half_width_resolver = resolver
+	_refresh_enemy_road_constraints()
+
+
 ## Moves future enemy spawn X positions to the active infinite route.
 func set_route_center_x(value: float) -> void:
 	_route_center_x = value
 	_remove_enemies_outside_active_route()
+	_refresh_enemy_road_constraints()
 
 
 ## Enables normal spawning or freezes all enemies when the run ends.
@@ -233,6 +268,20 @@ func set_trial_hell_active(active: bool) -> void:
 
 func is_trial_hell_active() -> bool:
 	return _trial_hell_active
+
+
+func get_debug_snapshot() -> Dictionary:
+	return {
+		"elapsed_run_time": _elapsed_run_time,
+		"cultivation_level": _cultivation_level,
+		"difficulty_step": get_difficulty_step(),
+		"active_enemies": get_active_enemy_count(),
+		"maximum_enemies": get_current_max_active_enemies(),
+		"forward_spawn_interval": get_current_spawn_interval(false),
+		"rear_spawn_interval": get_current_spawn_interval(true),
+		"trial_hell_active": _trial_hell_active,
+		"route_center_x": _route_center_x,
+	}
 
 
 func get_time_difficulty_step() -> int:
@@ -299,12 +348,14 @@ func _spawn_enemy(from_behind: bool = false) -> void:
 		return
 	enemy.player = player
 	_apply_current_difficulty(enemy)
-	if _rng.randf() <= clampf(elite_spawn_chance, 0.0, 1.0):
+	var elite := _rng.randf() <= clampf(elite_spawn_chance, 0.0, 1.0)
+	if elite:
 		enemy.configure_elite(
 			elite_health_multiplier,
 			elite_attack_range_multiplier,
 			elite_visual_scale
 		)
+	_configure_enemy_variant(enemy, elite)
 	var qi_reward := get_enemy_qi_drop_amount(
 		get_difficulty_step(),
 		enemy.is_elite_enemy(),
@@ -318,10 +369,6 @@ func _spawn_enemy(from_behind: bool = false) -> void:
 	var viewport_height := get_viewport_rect().size.y
 	var vertical_zoom := maxf(camera.zoom.y, 0.01)
 	var half_visible_height := viewport_height / vertical_zoom * 0.5
-	var usable_half_width := maxf(
-		road_half_width - road_edge_clearance,
-		1.0
-	)
 	var spawn_y := (
 		camera.global_position.y - half_visible_height - spawn_ahead_margin
 	)
@@ -330,12 +377,58 @@ func _spawn_enemy(from_behind: bool = false) -> void:
 			camera.global_position.y + half_visible_height + rear_spawn_margin
 		)
 		enemy.cruise_speed = maxf(rear_enemy_forward_speed, 1.0)
+	var usable_half_width := maxf(
+		_get_road_half_width_at(spawn_y) - road_edge_clearance,
+		1.0
+	)
 	enemy.global_position = Vector2(
 		_route_center_x
 			+ _rng.randf_range(-usable_half_width, usable_half_width),
 		spawn_y
 	)
+	enemy.configure_road_constraint(
+		_route_center_x,
+		Callable(self, "_get_road_half_width_at"),
+		road_edge_clearance
+	)
 	add_child(enemy)
+
+
+func _configure_enemy_variant(enemy: EnemyController, elite: bool) -> void:
+	if elite:
+		if _rng.randf() <= elite_healer_spawn_chance:
+			enemy.configure_archetype(EnemyController.EnemyArchetype.HEALER)
+	else:
+		var role_roll := _rng.randf()
+		if role_roll <= bomber_spawn_chance:
+			enemy.configure_archetype(EnemyController.EnemyArchetype.BOMBER)
+		elif role_roll <= bomber_spawn_chance + healer_spawn_chance:
+			enemy.configure_archetype(EnemyController.EnemyArchetype.HEALER)
+
+	if (
+		_cultivation_level >= 28
+		and _rng.randf() <= fast_autonomous_spawn_chance
+	):
+		enemy.configure_flying(3, true, fast_autonomous_speed)
+	elif (
+		elite
+		and _cultivation_level >= 23
+		and _rng.randf() <= slow_autonomous_spawn_chance
+	):
+		enemy.configure_flying(2, true, slow_autonomous_speed)
+	elif (
+		_cultivation_level >= 19
+		and _rng.randf() <= ranged_flying_spawn_chance
+	):
+		enemy.configure_flying(2, true, 0.0)
+	elif (
+		(
+			not elite and _cultivation_level >= 12
+			or elite and _cultivation_level >= 14
+		)
+		and _rng.randf() <= flying_spawn_chance
+	):
+		enemy.configure_flying(1, false, 0.0)
 
 
 func _apply_current_difficulty(enemy: EnemyController) -> void:
@@ -409,12 +502,12 @@ func _on_enemy_defeated(
 		is_instance_valid(defeated_enemy)
 		and defeated_enemy.is_elite_enemy()
 	):
-		_drop_cultivation_fragment(
+		_drop_weapon_power_fragment(
 			drop_position,
 			inherited_velocity
 		)
-	if _rng.randf() <= clampf(weapon_drop_chance, 0.0, 1.0):
-		_drop_weapon(drop_position, inherited_velocity)
+		if _rng.randf() <= clampf(weapon_drop_chance, 0.0, 1.0):
+			_drop_weapon(drop_position, inherited_velocity)
 
 
 func _drop_qi(drop_position: Vector2, qi_reward: int) -> void:
@@ -463,65 +556,72 @@ func _drop_weapon(
 	weapon_pickup.global_position = drop_position
 
 
-func _drop_cultivation_fragment(
+func _drop_weapon_power_fragment(
 	drop_position: Vector2,
 	inherited_velocity: Vector2
 ) -> void:
-	if cultivation_fragment_scene == null:
+	if weapon_power_fragment_scene == null:
 		return
 	var fragment := (
-		cultivation_fragment_scene.instantiate()
-		as CultivationFragment
+		weapon_power_fragment_scene.instantiate()
+		as WeaponPowerFragment
 	)
 	if fragment == null:
 		push_error(
-			"EnemySpawner cultivation_fragment_scene must instantiate "
-			+ "CultivationFragment."
+			"EnemySpawner weapon_power_fragment_scene must instantiate "
+			+ "WeaponPowerFragment."
 		)
 		return
-	fragment.configure(player, inherited_velocity)
+	fragment.configure(
+		player,
+		inherited_velocity,
+		_rng.randi_range(0, UniversalUpgradeTypes.COUNT - 1)
+	)
 	add_child(fragment)
 	fragment.global_position = drop_position
-	fragment.fragment_collected.connect(
-		_on_cultivation_fragment_collected
-	)
-	fragment.channel_changed.connect(
-		_on_cultivation_channel_changed
-	)
+	fragment.upgrade_collected.connect(_on_universal_upgrade_collected)
 
 
 func _on_dropped_qi_collected(amount: int) -> void:
 	qi_collected.emit(amount)
 
 
-func _on_cultivation_fragment_collected(cultivation_type: int) -> void:
-	cultivation_fragment_collected.emit(cultivation_type)
-
-
-func _on_cultivation_channel_changed(
-	cultivation_type: int,
-	progress: float,
-	active: bool,
-	cancelled: bool
+func _on_universal_upgrade_collected(
+	upgrade_type: int,
+	amount: int
 ) -> void:
-	cultivation_channel_changed.emit(
-		cultivation_type,
-		progress,
-		active,
-		cancelled
-	)
+	universal_upgrade_collected.emit(upgrade_type, amount)
 
 
 func _remove_enemies_outside_active_route() -> void:
-	var allowed_half_width := maxf(
-		road_half_width - road_edge_clearance,
-		1.0
-	)
 	for enemy_node in get_tree().get_nodes_in_group("enemies"):
 		if (
 			enemy_node is EnemyController
 			and absf(enemy_node.global_position.x - _route_center_x)
-				> allowed_half_width
+				> maxf(
+					_get_road_half_width_at(enemy_node.global_position.y)
+						- road_edge_clearance,
+					1.0
+				)
 		):
 			(enemy_node as EnemyController).set_combat_enabled(false)
 			enemy_node.queue_free()
+
+
+func _refresh_enemy_road_constraints() -> void:
+	for enemy_node in get_tree().get_nodes_in_group("enemies"):
+		if enemy_node is EnemyController:
+			(enemy_node as EnemyController).configure_road_constraint(
+				_route_center_x,
+				Callable(self, "_get_road_half_width_at"),
+				road_edge_clearance
+			)
+
+
+func _get_road_half_width_at(world_y: float) -> float:
+	if _road_half_width_resolver.is_valid():
+		return maxf(
+			float(_road_half_width_resolver.call(world_y)),
+			road_edge_clearance + 1.0
+		)
+	return maxf(road_half_width, road_edge_clearance + 1.0)

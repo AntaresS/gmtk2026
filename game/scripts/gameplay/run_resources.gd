@@ -19,12 +19,32 @@ signal cultivation_type_level_changed(
 	reward_name: String
 )
 signal cultivation_stats_changed(cultivation_type: int, level: int)
+signal realm_state_changed(
+	realm_index: int,
+	realm_name: String,
+	layer: int,
+	layer_count: int
+)
+signal breakthrough_requested(
+	from_realm_index: int,
+	to_realm_index: int,
+	fatal: bool
+)
+signal breakthrough_pending_changed(pending: bool, fatal: bool)
+signal realm_demoted(
+	from_realm_index: int,
+	to_realm_index: int,
+	to_layer: int
+)
 
 const CultivationTypesResource = preload(
 	"res://game/scripts/gameplay/cultivation_types.gd"
 )
 const DEFAULT_CULTIVATION_CONFIG: CultivationConfig = preload(
 	"res://game/resources/cultivation_config.tres"
+)
+const DEFAULT_REALM_PROGRESSION_CONFIG: RealmProgressionConfig = preload(
+	"res://game/resources/realm_progression_config.tres"
 )
 
 @export_category("Lifespan")
@@ -57,7 +77,7 @@ const DEFAULT_CULTIVATION_CONFIG: CultivationConfig = preload(
 @export_range(1, 100, 1) var breakthrough_level_interval: int = 9
 ## Maximum realm breakthroughs and bounded lifespan rewards available in one
 ## run. This is the shared cap used by both eligibility and reward granting.
-@export_range(1, 20, 1) var maximum_breakthroughs: int = 9
+@export_range(1, 20, 1) var maximum_breakthroughs: int = 3
 ## Permanent maximum-lifespan increase granted by a completed breakthrough.
 ## This additive reward avoids compounding previous realm rewards.
 @export_range(0.0, 1000.0, 1.0) var breakthrough_max_lifespan_increase: float = 60.0
@@ -72,6 +92,13 @@ const DEFAULT_CULTIVATION_CONFIG: CultivationConfig = preload(
 ## resource is read-only at runtime; fragment counts and levels remain run state.
 @export var cultivation_config: CultivationConfig = DEFAULT_CULTIVATION_CONFIG
 
+@export_category("Realm Progression")
+## Ordered realm definitions and capability unlocks. Runtime state stores only
+## the overall level and resolves realm/layer through this immutable resource.
+@export var realm_progression_config: RealmProgressionConfig = (
+	DEFAULT_REALM_PROGRESSION_CONFIG
+)
+
 var current_lifespan: float = 0.0
 var current_qi: int = 0
 var cultivation_level: int = 1
@@ -83,6 +110,9 @@ var _run_active: bool = false
 var _depletion_emitted: bool = false
 var _lifespan_decay_multiplier: float = 1.0
 var _initial_max_lifespan: float = 0.0
+var _breakthrough_pending: bool = false
+var _pending_breakthrough_fatal: bool = false
+var _pending_target_realm_index: int = -1
 
 
 func _ready() -> void:
@@ -163,6 +193,10 @@ func restore_lifespan(amount: float) -> void:
 ## lifespan, then restoring a configured portion of the new maximum. This
 ## resource records completion and enforces the shared realm and lifespan caps.
 func grant_breakthrough_reward() -> void:
+	_grant_breakthrough_reward_internal()
+
+
+func _grant_breakthrough_reward_internal() -> void:
 	if (
 		not _run_active
 		or breakthroughs_completed >= maxi(maximum_breakthroughs, 1)
@@ -196,12 +230,27 @@ func add_qi(amount: int) -> void:
 		return
 
 	current_qi += amount
-	var required := get_current_qi_requirement()
-	while current_qi >= required:
-		current_qi -= required
-		level_up()
-		required = get_current_qi_requirement()
-	qi_changed.emit(current_qi, required)
+	_resolve_qi_progression()
+	qi_changed.emit(current_qi, get_current_qi_requirement())
+
+
+## Converts accumulated Qi into ordinary layers until a realm boundary is
+## reached. Boundary Qi is consumed once and gameplay receives one explicit
+## breakthrough request; capabilities change only after successful completion.
+func _resolve_qi_progression() -> void:
+	while (
+		_run_active
+		and not _breakthrough_pending
+		and current_qi >= get_current_qi_requirement()
+	):
+		current_qi -= get_current_qi_requirement()
+		if (
+			realm_progression_config != null
+			and realm_progression_config.is_last_layer(cultivation_level)
+		):
+			_request_realm_breakthrough()
+			return
+		_advance_one_layer()
 
 
 ## Adds run-local fragments to one cultivation track. Every third fragment
@@ -282,6 +331,10 @@ func get_cultivation_stats(cultivation_type: int) -> Dictionary:
 ## Increases maximum lifespan within its run cap and restores the configured
 ## amount.
 func level_up() -> void:
+	_advance_one_layer()
+
+
+func _advance_one_layer() -> void:
 	cultivation_level += 1
 	max_lifespan = minf(
 		max_lifespan + maxf(level_up_maxHP_increase, 0.0),
@@ -294,6 +347,7 @@ func level_up() -> void:
 		cultivation_level,
 		maxf(level_up_lifespan_restore, 0.0)
 	)
+	_emit_realm_state()
 
 ## Restores this component to one clean run and publishes a complete initial
 ## snapshot for newly connected presentation or gameplay systems.
@@ -305,6 +359,9 @@ func reset_resources() -> void:
 	current_qi = 0
 	cultivation_level = 1
 	breakthroughs_completed = 0
+	_breakthrough_pending = false
+	_pending_breakthrough_fatal = false
+	_pending_target_realm_index = -1
 	cultivation_fragments = [0, 0, 0]
 	cultivation_levels = [0, 0, 0]
 	_run_active = current_lifespan > 0.0
@@ -313,6 +370,7 @@ func reset_resources() -> void:
 	lifespan_decay_rate_changed.emit(get_current_lifespan_decay_rate())
 	qi_changed.emit(current_qi, get_current_qi_requirement())
 	cultivation_level_changed.emit(cultivation_level)
+	_emit_realm_state()
 	for cultivation_type in CultivationTypesResource.ORDER:
 		cultivation_fragment_progress_changed.emit(
 			cultivation_type,
@@ -330,6 +388,200 @@ func is_run_active() -> bool:
 ## Game uses this for a successful ninth-realm ascension.
 func complete_run() -> void:
 	_run_active = false
+
+
+## Completes a non-fatal realm transition after HeavenlyTribulation reports
+## survival. The first layer of the new realm and its capabilities become
+## active atomically with the breakthrough reward.
+func complete_pending_breakthrough() -> bool:
+	if (
+		not _run_active
+		or not _breakthrough_pending
+		or _pending_breakthrough_fatal
+		or realm_progression_config == null
+	):
+		return false
+	var target_realm_index := _pending_target_realm_index
+	_breakthrough_pending = false
+	_pending_breakthrough_fatal = false
+	_pending_target_realm_index = -1
+	cultivation_level = realm_progression_config.get_overall_level(
+		target_realm_index,
+		1
+	)
+	max_lifespan = minf(
+		max_lifespan + maxf(level_up_maxHP_increase, 0.0),
+		maxf(maximum_lifespan_cap, 0.0)
+	)
+	_grant_breakthrough_reward_internal()
+	cultivation_level_changed.emit(cultivation_level)
+	_emit_realm_state()
+	breakthrough_pending_changed.emit(false, false)
+	_resolve_qi_progression()
+	qi_changed.emit(current_qi, get_current_qi_requirement())
+	return true
+
+
+func has_pending_realm_breakthrough() -> bool:
+	return _breakthrough_pending
+
+
+func is_pending_breakthrough_fatal() -> bool:
+	return _breakthrough_pending and _pending_breakthrough_fatal
+
+
+## Instantly ends the active run. Fatal breakthrough attacks use this direct
+## resource operation so Qi shields and ordinary damage modifiers cannot
+## accidentally negate the authored instant death.
+func force_deplete() -> void:
+	if not _run_active:
+		return
+	current_lifespan = 0.0
+	_run_active = false
+	lifespan_changed.emit(0.0, _get_maximum_lifespan())
+	if not _depletion_emitted:
+		_depletion_emitted = true
+		lifespan_depleted.emit()
+
+
+## Uses integer Qi to absorb floating-point damage and returns a neutral result
+## object suitable for player presentation and future debug panels.
+func absorb_damage_with_qi(
+	damage: float,
+	damage_per_qi: float
+) -> Dictionary:
+	var safe_damage := maxf(damage, 0.0)
+	var efficiency := maxf(damage_per_qi, 0.01)
+	if not _run_active or safe_damage <= 0.0 or current_qi <= 0:
+		return {
+			"blocked_damage": 0.0,
+			"qi_spent": 0,
+			"remaining_damage": safe_damage,
+		}
+	var blocked_damage := minf(
+		safe_damage,
+		float(current_qi) * efficiency
+	)
+	var qi_spent := mini(
+		ceili(blocked_damage / efficiency),
+		current_qi
+	)
+	current_qi -= qi_spent
+	qi_changed.emit(current_qi, get_current_qi_requirement())
+	return {
+		"blocked_damage": blocked_damage,
+		"qi_spent": qi_spent,
+		"remaining_damage": maxf(safe_damage - blocked_damage, 0.0),
+	}
+
+
+## Drops the overall cultivation state to a configured realm/layer without
+## rolling back run-local lifespan rewards or independent 精/气/神 progress.
+func demote_to_realm(realm_index: int, layer: int) -> void:
+	if not _run_active or realm_progression_config == null:
+		return
+	var from_realm_index := get_current_realm_index()
+	var target_realm_index := clampi(
+		realm_index,
+		0,
+		maxi(realm_progression_config.get_realm_count() - 1, 0)
+	)
+	cultivation_level = realm_progression_config.get_overall_level(
+		target_realm_index,
+		layer
+	)
+	current_qi = 0
+	_breakthrough_pending = false
+	_pending_breakthrough_fatal = false
+	_pending_target_realm_index = -1
+	cultivation_level_changed.emit(cultivation_level)
+	_emit_realm_state()
+	qi_changed.emit(current_qi, get_current_qi_requirement())
+	breakthrough_pending_changed.emit(false, false)
+	realm_demoted.emit(
+		from_realm_index,
+		target_realm_index,
+		get_current_realm_layer()
+	)
+
+
+func get_current_realm_index() -> int:
+	if realm_progression_config == null:
+		return 0
+	return realm_progression_config.get_realm_index_for_level(
+		cultivation_level
+	)
+
+
+func get_current_realm_layer() -> int:
+	if realm_progression_config == null:
+		return cultivation_level
+	return realm_progression_config.get_layer_for_level(cultivation_level)
+
+
+func get_current_realm_definition() -> RealmDefinition:
+	if realm_progression_config == null:
+		return null
+	return realm_progression_config.get_realm(get_current_realm_index())
+
+
+func get_realm_display_text() -> String:
+	var realm := get_current_realm_definition()
+	if realm == null:
+		return "境界 %d" % cultivation_level
+	return "%s %d层" % [realm.display_name, get_current_realm_layer()]
+
+
+func get_debug_snapshot() -> Dictionary:
+	var realm_snapshot := (
+		realm_progression_config.get_debug_snapshot(cultivation_level)
+		if realm_progression_config != null
+		else {}
+	)
+	realm_snapshot.merge({
+		"current_qi": current_qi,
+		"required_qi": get_current_qi_requirement(),
+		"current_lifespan": current_lifespan,
+		"maximum_lifespan": max_lifespan,
+		"lifespan_decay_rate": get_current_lifespan_decay_rate(),
+		"breakthroughs_completed": breakthroughs_completed,
+		"breakthrough_pending": _breakthrough_pending,
+		"fatal_breakthrough_pending": _pending_breakthrough_fatal,
+	}, true)
+	return realm_snapshot
+
+
+func _request_realm_breakthrough() -> void:
+	var from_realm_index := get_current_realm_index()
+	var current_realm := get_current_realm_definition()
+	var has_next := realm_progression_config.has_next_realm(cultivation_level)
+	_breakthrough_pending = true
+	_pending_breakthrough_fatal = (
+		not has_next
+		or (current_realm != null and current_realm.fatal_breakthrough)
+	)
+	_pending_target_realm_index = (
+		from_realm_index + 1 if has_next else from_realm_index
+	)
+	breakthrough_pending_changed.emit(
+		true,
+		_pending_breakthrough_fatal
+	)
+	breakthrough_requested.emit(
+		from_realm_index,
+		_pending_target_realm_index,
+		_pending_breakthrough_fatal
+	)
+
+
+func _emit_realm_state() -> void:
+	var realm := get_current_realm_definition()
+	realm_state_changed.emit(
+		get_current_realm_index(),
+		realm.display_name if realm != null else "境界",
+		get_current_realm_layer(),
+		maxi(realm.layer_count, 1) if realm != null else 1
+	)
 
 
 ## Returns how many realm breakthroughs have unlocked at a cultivation level,

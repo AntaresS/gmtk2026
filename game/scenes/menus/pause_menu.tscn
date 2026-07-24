@@ -54,5 +54,156 @@ custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 text = "Main Menu"
 
+[node name="DebugPanel" type="PanelContainer" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -450.0
+offset_top = -340.0
+offset_right = -24.0
+offset_bottom = 340.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="DebugScroll" type="ScrollContainer" parent="Overlay/DebugPanel"]
+layout_mode = 2
+
+[node name="DebugMargin" type="MarginContainer" parent="Overlay/DebugPanel/DebugScroll"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 14
+
+[node name="DebugControls" type="VBoxContainer" parent="Overlay/DebugPanel/DebugScroll/DebugMargin"]
+custom_minimum_size = Vector2(375, 0)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="DebugTitle" type="Label" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "运行中调试面板"
+
+[node name="DebugStatus" type="Label" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "等待游戏状态"
+autowrap_mode = 2
+
+[node name="ProgressButtons" type="HBoxContainer" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+layout_mode = 2
+
+[node name="AddQi" type="Button" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/ProgressButtons"]
+layout_mode = 2
+text = "+一管灵气"
+
+[node name="LevelUp" type="Button" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/ProgressButtons"]
+layout_mode = 2
+text = "+小境界"
+
+[node name="LifespanButtons" type="HBoxContainer" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+layout_mode = 2
+
+[node name="AddLifespan" type="Button" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/LifespanButtons"]
+layout_mode = 2
+text = "寿元 +20"
+
+[node name="RemoveLifespan" type="Button" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/LifespanButtons"]
+layout_mode = 2
+text = "寿元 -20"
+
+[node name="WeaponLabel" type="Label" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+layout_mode = 2
+text = "武器数量"
+
+[node name="WeaponOption" type="OptionButton" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="WeaponButtons" type="HBoxContainer" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+layout_mode = 2
+
+[node name="AddWeapon" type="Button" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/WeaponButtons"]
+layout_mode = 2
+text = "+武器"
+
+[node name="RemoveWeapon" type="Button" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/WeaponButtons"]
+layout_mode = 2
+text = "-武器"
+
+[node name="AddDamage" type="Button" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/WeaponButtons"]
+layout_mode = 2
+text = "当前伤害 +1"
+
+[node name="RemoveDamage" type="Button" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/WeaponButtons"]
+layout_mode = 2
+text = "当前伤害 -1"
+
+[node name="FragmentLabel" type="Label" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+layout_mode = 2
+text = "通用碎片等级"
+
+[node name="FragmentOption" type="OptionButton" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="FragmentButtons" type="HBoxContainer" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+layout_mode = 2
+
+[node name="AddFragment" type="Button" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/FragmentButtons"]
+layout_mode = 2
+text = "+碎片"
+
+[node name="RemoveFragment" type="Button" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/FragmentButtons"]
+layout_mode = 2
+text = "-碎片"
+
+[node name="BaseStatsLabel" type="Label" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+layout_mode = 2
+text = "玩家基础数值"
+
+[node name="BaseSpeedSpin" type="SpinBox" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1.0
+max_value = 1200.0
+value = 260.0
+prefix = "前进速度 "
+
+[node name="LateralSpeedSpin" type="SpinBox" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1.0
+max_value = 1200.0
+value = 300.0
+prefix = "横向速度 "
+
+[node name="AccelerationSpin" type="SpinBox" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1.0
+max_value = 2000.0
+value = 360.0
+prefix = "纵向加速度 "
+
+[node name="ApplyBaseStats" type="Button" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+layout_mode = 2
+text = "应用基础数值"
+
 [connection signal="pressed" from="Overlay/CenterContainer/Menu/ResumeButton" to="." method="_on_resume_pressed"]
 [connection signal="pressed" from="Overlay/CenterContainer/Menu/MainMenuButton" to="." method="_on_main_menu_pressed"]
+[connection signal="pressed" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/ProgressButtons/AddQi" to="." method="_on_debug_add_qi_pressed"]
+[connection signal="pressed" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/ProgressButtons/LevelUp" to="." method="_on_debug_level_pressed"]
+[connection signal="pressed" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/LifespanButtons/AddLifespan" to="." method="_on_debug_lifespan_add_pressed"]
+[connection signal="pressed" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/LifespanButtons/RemoveLifespan" to="." method="_on_debug_lifespan_remove_pressed"]
+[connection signal="pressed" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/WeaponButtons/AddWeapon" to="." method="_on_debug_weapon_add_pressed"]
+[connection signal="pressed" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/WeaponButtons/RemoveWeapon" to="." method="_on_debug_weapon_remove_pressed"]
+[connection signal="pressed" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/WeaponButtons/AddDamage" to="." method="_on_debug_damage_add_pressed"]
+[connection signal="pressed" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/WeaponButtons/RemoveDamage" to="." method="_on_debug_damage_remove_pressed"]
+[connection signal="pressed" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/FragmentButtons/AddFragment" to="." method="_on_debug_fragment_add_pressed"]
+[connection signal="pressed" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/FragmentButtons/RemoveFragment" to="." method="_on_debug_fragment_remove_pressed"]
+[connection signal="pressed" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/ApplyBaseStats" to="." method="_on_debug_apply_base_pressed"]

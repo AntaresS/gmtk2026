@@ -4,4 +4,5 @@
 
 [resource]
 script = ExtResource("1_config")
+global_damage_bonus_per_overall_level = 0.0
 base_critical_chance = 0.05

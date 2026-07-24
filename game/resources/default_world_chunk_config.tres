@@ -6,6 +6,11 @@
 [resource]
 script = ExtResource("1_script")
 road_half_width = 200.0
+vary_road_width = true
+minimum_road_width_multiplier = 0.5
+maximum_road_width_multiplier = 2.0
+normal_width_boundary_chance = 0.35
+road_width_transition_chunk_span = 4
 terrain_tileset = ExtResource("2_tileset")
 road_atlas_coordinates = Vector2i(4, 1)
 ground_atlas_coordinates = Vector2i(0, 1)
