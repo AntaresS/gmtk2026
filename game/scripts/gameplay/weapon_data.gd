@@ -53,6 +53,26 @@ var cultivation_type: int = -1
 ## Minimum seconds between automatic attacks while a valid target is present.
 @export_range(0.05, 5.0, 0.01) var attack_interval: float = 0.7
 
+@export_category("Great Strength Palm")
+## Outward impulse speed applied by Great Strength Palm from Foundation onward.
+## Zero disables Palm knockback for definitions that do not use this technique.
+@export_range(0.0, 1000.0, 10.0) var palm_knockback_speed: float = 0.0
+## Speed removed from Palm knockback per second. Higher recovery preserves the
+## initial impact while shortening displacement away from the player.
+@export_range(10.0, 5000.0, 10.0) var palm_knockback_recovery: float = 920.0
+## Pre-hit health ratio above which Golden Core and later Palm hits receive the
+## high-health damage multiplier. A value of 0.75 means strictly above 75%.
+@export_range(0.0, 1.0, 0.01) var palm_high_health_threshold_ratio: float = 0.75
+## Final numeric Palm damage multiplier against targets above the configured
+## high-health threshold. This multiplies resolved critical and realm damage.
+@export_range(1.0, 5.0, 0.05) var palm_high_health_damage_multiplier: float = 1.0
+## Pre-hit health ratio below which Nascent Soul ordinary enemies become
+## eligible for Palm's execute roll. A value of 0.50 means strictly below 50%.
+@export_range(0.0, 1.0, 0.01) var palm_execute_health_threshold_ratio: float = 0.5
+## Per-hit Nascent Soul execute probability for eligible non-elite ordinary
+## enemies. The roll occurs at most once for each enemy in one Palm cast.
+@export_range(0.0, 1.0, 0.01) var palm_execute_chance: float = 0.0
+
 @export_category("Delivery")
 ## Optional projectile scene used by projectile-based attack kinds.
 @export var projectile_scene: PackedScene

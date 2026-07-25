@@ -8,6 +8,7 @@ extends CanvasLayer
 
 @onready var resume_button: Button = %ResumeButton
 @onready var debug_status: Label = %DebugStatus
+@onready var palm_geometry_check: CheckButton = %PalmGeometryCheck
 @onready var weapon_option: OptionButton = %WeaponOption
 @onready var fragment_option: OptionButton = %FragmentOption
 @onready var base_speed_spin: SpinBox = %BaseSpeedSpin
@@ -98,6 +99,9 @@ func bind_debug_targets(
 		base_speed_spin.value = _debug_player.base_forward_speed
 		lateral_speed_spin.value = _debug_player.lateral_speed
 		acceleration_spin.value = _debug_player.forward_acceleration
+		palm_geometry_check.button_pressed = (
+			_debug_player.is_palm_debug_geometry_visible()
+		)
 	_refresh_debug_panel()
 
 
@@ -138,6 +142,12 @@ func _on_debug_lifespan_add_pressed() -> void:
 func _on_debug_lifespan_remove_pressed() -> void:
 	_debug_resources.apply_lifespan_damage(20.0)
 	_refresh_debug_panel()
+
+
+func _on_palm_geometry_toggled(enabled: bool) -> void:
+	if not is_instance_valid(_debug_player):
+		return
+	_debug_player.debug_set_palm_geometry_visible(enabled)
 
 
 func _on_debug_weapon_add_pressed() -> void:

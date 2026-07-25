@@ -232,6 +232,10 @@ func _run() -> void:
 	var game := current_scene
 	var hud := game.get_node("GameplayHud") as GameplayHud
 	var pause := game.get_node("PauseMenu")
+	var game_player := game.get_node("Player") as PlayerController
+	var palm_geometry_check := pause.get_node(
+		"Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/PalmGeometryCheck"
+	) as CheckButton
 	_check(
 		hud.cultivation_tracks_label.visible
 		and hud.cultivation_tracks_label.text.contains("每级")
@@ -239,6 +243,11 @@ func _run() -> void:
 			"Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"
 		) != null,
 		"Universal-fragment explanation or pause debug panel is missing."
+	)
+	palm_geometry_check.button_pressed = true
+	_check(
+		game_player.is_palm_debug_geometry_visible(),
+		"Pause debug panel did not enable exact Palm combat geometry."
 	)
 
 	if _failures.is_empty():

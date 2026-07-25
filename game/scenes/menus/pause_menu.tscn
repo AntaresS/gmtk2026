@@ -94,6 +94,11 @@ layout_mode = 2
 text = "等待游戏状态"
 autowrap_mode = 2
 
+[node name="PalmGeometryCheck" type="CheckButton" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "显示大力掌精确范围"
+
 [node name="ProgressButtons" type="HBoxContainer" parent="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"]
 layout_mode = 2
 
@@ -196,6 +201,7 @@ text = "应用基础数值"
 
 [connection signal="pressed" from="Overlay/CenterContainer/Menu/ResumeButton" to="." method="_on_resume_pressed"]
 [connection signal="pressed" from="Overlay/CenterContainer/Menu/MainMenuButton" to="." method="_on_main_menu_pressed"]
+[connection signal="toggled" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/PalmGeometryCheck" to="." method="_on_palm_geometry_toggled"]
 [connection signal="pressed" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/ProgressButtons/AddQi" to="." method="_on_debug_add_qi_pressed"]
 [connection signal="pressed" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/ProgressButtons/LevelUp" to="." method="_on_debug_level_pressed"]
 [connection signal="pressed" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/LifespanButtons/AddLifespan" to="." method="_on_debug_lifespan_add_pressed"]

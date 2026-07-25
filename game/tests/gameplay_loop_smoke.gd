@@ -148,6 +148,7 @@ func _run() -> void:
 		palm_forward_target,
 		player.call("_roll_current_attack_damage")
 	)
+	await _wait_physics_frames(10)
 	_check(
 		palm_forward_target.current_health < 99
 		and palm_rear_target.current_health == 99,

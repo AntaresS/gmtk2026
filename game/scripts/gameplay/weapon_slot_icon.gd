@@ -4,7 +4,9 @@ extends Control
 const WeaponDataResource = preload(
 	"res://game/scripts/gameplay/weapon_data.gd"
 )
-const SLOT_SIZE := Vector2(92.0, 92.0)
+const SLOT_SIZE := Vector2(108.0, 104.0)
+const ICON_CENTER := Vector2(54.0, 50.0)
+const FOOTER_RECT := Rect2(Vector2(4.0, 77.0), Vector2(100.0, 23.0))
 const POWER_UP_DURATION: float = 0.72
 
 var weapon_data: WeaponDataResource
@@ -72,6 +74,11 @@ func get_weapon_id() -> StringName:
 
 func get_quantity() -> int:
 	return quantity
+
+
+## Returns the exact owned weapon level shown in the slot's count badge.
+func get_quantity_text() -> String:
+	return "Lv.%d" % quantity
 
 
 func _process(delta: float) -> void:
@@ -150,11 +157,10 @@ func _draw() -> void:
 		return
 
 	_draw_weapon_icon(weapon_data.attack_kind, weapon_color)
-	_draw_weapon_name()
-	_draw_quantity()
+	_draw_weapon_footer(weapon_color)
 	if locked:
 		draw_rect(bounds, Color(0.12, 0.02, 0.03, 0.62), true)
-		_draw_centered_text("境界锁定", 51.0, 14, Color("ff8b83"))
+		_draw_centered_text("境界锁定", 55.0, 14, Color("ff8b83"))
 	if selected:
 		_draw_centered_text("当前", 17.0, 13, Color("7dffd8"))
 	elif new_unselected:
@@ -190,43 +196,54 @@ func _draw_hotkey() -> void:
 
 
 func _draw_placeholder() -> void:
-	var placeholder := Rect2(Vector2(25.0, 23.0), Vector2(42.0, 42.0))
+	var placeholder := Rect2(
+		ICON_CENTER - Vector2.ONE * 21.0,
+		Vector2.ONE * 42.0
+	)
 	draw_rect(placeholder, Color(0.22, 0.27, 0.34, 0.24), true)
 	draw_rect(placeholder, Color(0.44, 0.52, 0.62, 0.48), false, 2.0)
-	_draw_centered_text("?", 54.0, 25, Color(0.5, 0.58, 0.68, 0.68))
-	_draw_centered_text("空", 82.0, 13, Color(0.48, 0.55, 0.64, 0.78))
+	_draw_centered_text("?", 59.0, 25, Color(0.5, 0.58, 0.68, 0.68))
+	draw_rect(FOOTER_RECT, Color(0.035, 0.05, 0.072, 0.88), true)
+	_draw_centered_text("空", 95.0, 13, Color(0.48, 0.55, 0.64, 0.78))
 
 
-func _draw_weapon_name() -> void:
-	_draw_centered_text(
-		weapon_data.display_name,
-		83.0,
-		13,
-		Color(0.94, 0.97, 1.0)
+func _draw_weapon_footer(weapon_color: Color) -> void:
+	draw_rect(FOOTER_RECT, Color(0.025, 0.04, 0.06, 0.98), true)
+	draw_line(
+		FOOTER_RECT.position,
+		FOOTER_RECT.position + Vector2(FOOTER_RECT.size.x, 0.0),
+		Color(weapon_color, 0.72),
+		2.0
 	)
-
-
-func _draw_quantity() -> void:
-	var badge_center := Vector2(76.0, 61.0)
-	draw_circle(badge_center, 13.0, Color(0.04, 0.055, 0.08, 0.96))
-	draw_arc(
-		badge_center,
-		13.0,
-		0.0,
-		TAU,
-		28,
-		Color("ffd35a"),
-		2.0,
-		true
+	var divider_x := 64.0
+	draw_line(
+		Vector2(divider_x, FOOTER_RECT.position.y + 3.0),
+		Vector2(divider_x, FOOTER_RECT.end.y - 3.0),
+		Color(0.34, 0.42, 0.52, 0.78),
+		1.0
 	)
 	var font := ThemeDB.fallback_font
 	draw_string(
 		font,
-		Vector2(63.0, 66.0),
-		"×%d" % quantity,
+		Vector2(6.0, 95.0),
+		weapon_data.display_name,
 		HORIZONTAL_ALIGNMENT_CENTER,
-		26.0,
-		13,
+		56.0,
+		12,
+		Color(0.94, 0.97, 1.0)
+	)
+	var font_size := 13
+	if quantity >= 100:
+		font_size = 11
+	if quantity >= 1000:
+		font_size = 9
+	draw_string(
+		font,
+		Vector2(66.0, 95.0),
+		get_quantity_text(),
+		HORIZONTAL_ALIGNMENT_CENTER,
+		36.0,
+		font_size,
 		Color("fff1b0")
 	)
 
@@ -249,7 +266,7 @@ func _draw_centered_text(
 
 
 func _draw_weapon_icon(attack_kind: int, weapon_color: Color) -> void:
-	var center := Vector2(46.0, 47.0)
+	var center := ICON_CENTER
 	if attack_kind == WeaponDataResource.AttackKind.GREAT_STRENGTH_PALM:
 		draw_circle(center, 20.0, Color(weapon_color, 0.12))
 		for ray_index in 6:

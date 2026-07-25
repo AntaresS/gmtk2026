@@ -49,10 +49,12 @@ func _run() -> void:
 	_check(
 		palm.visible
 		and palm.texture == PALM_TEXTURE
-		and player.get_palm_visual_state() == 2
+		and player.get_palm_visual_state() == 3
+		and player.get_visible_palm_sprite_count() == 1
+		and not player.is_palm_debug_geometry_visible()
 		and absf(palm.scale.x - 0.035) < 0.001
 		and absf(palm.position.length() - 68.0) < 1.0,
-		"Equipping Great Strength Palm did not summon its idle sprite."
+		"Equipping Great Strength Palm did not show its floating aim indicator."
 	)
 
 	var enemy := ENEMY_SCENE.instantiate() as EnemyController
@@ -73,49 +75,60 @@ func _run() -> void:
 	var finger_direction := Vector2.UP.rotated(palm.rotation).normalized()
 	_check(
 		player.get_palm_warning_strength() > 0.65
+		and palm.visible
 		and palm.position.length() < 42.0
-		and palm.scale.x < 0.065
+		and palm.scale.x < 0.035
 		and palm.modulate.r > 1.15
 		and warning_outline.a > 0.65
 		and palm.position.normalized().dot(Vector2.RIGHT) > 0.95
 		and finger_direction.dot(Vector2.RIGHT) > 0.98,
-		"Approaching the Palm range did not trigger its aimed charge pose."
+		"Floating Palm did not aim and charge toward the nearest enemy."
+	)
+	player.debug_set_palm_geometry_visible(true)
+	_check(
+		player.is_palm_debug_geometry_visible(),
+		"Palm debug geometry could not be enabled."
 	)
 
 	enemy.global_position = Vector2(
 		player.get_current_attack_range() - 12.0,
 		0.0
 	)
+	var idle_launch_position := palm.position
 	player.call(
 		"_release_great_strength_palm",
 		enemy,
 		AttackDamageResultResource.new(5, false)
 	)
 	_check(
-		player.get_palm_visual_state() == 3
+		player.get_palm_visual_state() == 1
+		and palm.visible
+		and player.get_visible_palm_sprite_count() == 1
+		and palm.position.distance_to(idle_launch_position) < 0.1
 		and enemy.current_health == 99,
-		"Great Strength Palm did not begin a strike at an in-range enemy."
+		"Great Strength Palm did not launch from its floating aim position."
 	)
 	await _wait_seconds(0.15)
-	var impact_sprite_position: Vector2 = player.get(
-		"_palm_visual_start_position"
-	)
 	var impact_palm_center := player.to_global(
-		impact_sprite_position
+		palm.position
 		+ Vector2.DOWN.rotated(PI * 0.5)
 			* PALM_CENTER_OFFSET_PIXELS
 			* 0.105
 	)
+	var dissolve_material := palm.material as ShaderMaterial
 	_check(
-		player.get_palm_visual_state() == 4
+		player.get_palm_visual_state() == 2
 		and enemy.current_health == 94
+		and dissolve_material != null
+		and dissolve_material.shader.resource_path
+			== "res://game/shaders/enemy_dissolve.gdshader"
 		and impact_palm_center.distance_to(enemy.global_position) < 2.5,
-		"Great Strength Palm did not land palm-first and begin returning."
+		"Great Strength Palm did not land, deal one synchronized hit, and dissolve."
 	)
-	await _wait_seconds(0.22)
+	await _wait_seconds(0.16)
 	_check(
-		player.get_palm_visual_state() == 2,
-		"Great Strength Palm did not return immediately after its hit."
+		player.get_palm_visual_state() == 3 and palm.visible,
+		"Great Strength Palm did not rematerialize as the idle aim indicator."
 	)
 
 	enemy.queue_free()
@@ -143,9 +156,9 @@ func _run() -> void:
 		"Great Strength Palm did not defeat the weak target."
 	)
 	_check(
-		player.get_palm_visual_state() == 4
-		or player.get_palm_visual_state() == 2,
-		"Great Strength Palm did not return after defeating its target."
+		player.get_palm_visual_state() == 2
+		or player.get_palm_visual_state() == 3,
+		"Great Strength Palm did not dissolve after defeating its target."
 	)
 
 	if is_instance_valid(weak_enemy):

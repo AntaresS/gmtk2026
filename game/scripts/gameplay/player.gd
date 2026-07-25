@@ -73,12 +73,17 @@ const FANTIAN_SEAL_TEXTURE: Texture2D = preload(
 const OUTLINE_SHADER: Shader = preload(
 	"res://game/shaders/enemy_outline.gdshader"
 )
+const DISSOLVE_SHADER: Shader = preload(
+	"res://game/shaders/enemy_dissolve.gdshader"
+)
+const DEFAULT_PALM_EXECUTE_VFX_SCENE: PackedScene = preload(
+	"res://game/scenes/gameplay/palm_execute_vfx.tscn"
+)
 enum PalmVisualState {
 	HIDDEN,
-	SUMMONING,
-	IDLE,
 	STRIKING,
-	RETURNING,
+	DISSOLVING,
+	IDLE,
 }
 enum FantianSealVisualState {
 	HIDDEN,
@@ -89,16 +94,16 @@ enum FantianSealVisualState {
 	SHADOW_SHRINK,
 }
 
-const PALM_NORMAL_SCALE: float = 0.035
+const PALM_LAUNCH_SCALE: float = 0.035
 const PALM_CHARGED_SCALE: float = 0.025
 const PALM_STRIKE_SCALE: float = 0.105
 const PALM_CENTER_OFFSET_PIXELS: float = 88.0
 const PALM_IDLE_RADIUS: float = 68.0
 const PALM_CHARGED_RADIUS: float = 24.0
 const PALM_WARNING_MARGIN: float = 74.0
-const PALM_SUMMON_DURATION: float = 0.24
 const PALM_STRIKE_DURATION: float = 0.13
-const PALM_RETURN_DURATION: float = 0.18
+const PALM_DISSOLVE_DURATION: float = 0.14
+const PALM_COVERAGE_FLASH_DURATION: float = 0.22
 const PALM_OUTLINE_TEXTURE_WIDTH: float = 20.0
 const PALM_GLOW_COLOR: Color = Color("d9ffff")
 const FLYING_SWORD_SCALE: float = 0.032
@@ -249,8 +254,11 @@ const DAO_MAX_ATTACK_TRAIL_COUNT: int = 24
 @export_range(0.0, 0.2, 0.005) var palm_range_ratio_per_level: float = 0.025
 ## Additive attack-speed ratio added to Great Strength Palm per small level.
 @export_range(0.0, 0.2, 0.005) var palm_speed_ratio_per_level: float = 0.025
-## Delay between realm-unlocked directional palm waves.
-@export_range(0.01, 0.5, 0.01) var palm_sequence_interval: float = 0.06
+## World-space burst shown when an eligible ordinary enemy is executed by
+## Nascent Soul Palm. The spawned scene owns and cleans up its presentation.
+@export var palm_execute_vfx_scene: PackedScene = (
+	DEFAULT_PALM_EXECUTE_VFX_SCENE
+)
 
 @export_category("Collectible Attraction")
 ## Invisible starting radius, in world pixels, that attracts qi and equipment.
@@ -291,6 +299,7 @@ const DAO_MAX_ATTACK_TRAIL_COUNT: int = 24
 @onready var dao_weapon_layer: Node2D = $DaoWeapons
 @onready var flying_sword_layer: Node2D = $FlyingSwordWeapons
 @onready var palm_weapon: Sprite2D = $PalmWeapon
+@onready var palm_echo_layer: Node2D = $PalmEchoes
 @onready var fantian_seal_weapon: Sprite2D = $FantianSealWeapon
 @onready var damage_taken_label: Label = $DamageTakenLabel
 @onready var realm_abilities: RealmAbilityController = $RealmAbilities
@@ -317,13 +326,19 @@ var _palm_visual_state: int = PalmVisualState.HIDDEN
 var _palm_visual_equipped: bool = false
 var _palm_visual_elapsed: float = 0.0
 var _palm_visual_target: EnemyController
-var _palm_visual_impact_global_position: Vector2 = Vector2.ZERO
-var _palm_visual_start_position: Vector2 = Vector2.ZERO
-var _palm_visual_start_scale: float = PALM_NORMAL_SCALE
+var _palm_attack_sprites: Array[Sprite2D] = []
+var _palm_visual_directions: Array[Vector2] = []
+var _palm_visual_start_positions: Array[Vector2] = []
+var _palm_visual_start_scales: Array[float] = []
+var _palm_visual_impact_positions: Array[Vector2] = []
 var _palm_warning_strength: float = 0.0
 var _palm_glow_material: ShaderMaterial
+var _palm_dissolve_material: ShaderMaterial
 var _palm_visual_pending_damage: int = 0
 var _palm_visual_pending_critical: bool = false
+var _palm_cast_direction: Vector2 = Vector2.UP
+var _palm_cast_targets: Array[EnemyController] = []
+var _palm_debug_geometry_visible: bool = false
 var _flying_sword_visual_sprites: Array[Sprite2D] = []
 var _flying_sword_visual_visibility: Array[float] = []
 var _flying_sword_visual_filled: Array[bool] = []
@@ -387,15 +402,6 @@ var _qiankun_ring_sequence_damage: int = 1
 var _qiankun_ring_sequence_is_critical: bool = false
 var _qiankun_ring_sequence_timer: float = 0.0
 var _active_qiankun_rings: int = 0
-var _pending_palm_waves: int = 0
-var _palm_sequence_total: int = 0
-var _palm_sequence_launched: int = 0
-var _palm_sequence_damage: int = 1
-var _palm_sequence_is_critical: bool = false
-var _palm_sequence_timer: float = 0.0
-var _palm_sequence_base_direction: Vector2 = Vector2.UP
-var _palm_sequence_primary: EnemyController
-var _palm_sequence_hit_ids: Dictionary = {}
 var _pending_special_projectiles: int = 0
 var _special_sequence_kind: int = -1
 var _special_sequence_launched: int = 0
@@ -556,7 +562,7 @@ func _draw() -> void:
 	if (
 		attack_kind == WeaponDataResource.AttackKind.GREAT_STRENGTH_PALM
 	):
-		pass
+		_draw_palm_coverage(attack_range)
 	elif (
 		attack_kind != WeaponDataResource.AttackKind.GOLDEN_BELL
 		and attack_kind != WeaponDataResource.AttackKind.DAO
@@ -595,41 +601,136 @@ func _draw() -> void:
 
 	_draw_dao_trails()
 	_draw_weapon_companions()
-	if _attack_flash_remaining > 0.0 and not _palm_visual_equipped:
-		var palm_angle := _palm_attack_direction.angle()
-		var half_arc := deg_to_rad(
-			_get_current_weapon_data().directional_arc_degrees * 0.5
-		)
-		draw_arc(
-			Vector2.ZERO,
-			attack_range,
-			palm_angle - half_arc,
-			palm_angle + half_arc,
-			28,
-			Color(0.55, 1.0, 0.86, 0.98),
-			8.0,
-			true
-		)
-		for wave_index in 3:
-			var wave_distance := (
-				attack_range * (0.45 + float(wave_index) * 0.2)
-			)
-			draw_arc(
-				Vector2.ZERO,
-				wave_distance,
-				palm_angle - half_arc,
-				palm_angle + half_arc,
-				20,
-				Color(0.72, 1.0, 0.9, 0.7 - float(wave_index) * 0.15),
-				4.0,
-				true
-			)
 	if _damage_flash_remaining > 0.0:
 		_draw_damage_feedback()
 	if _level_up_effect_remaining > 0.0:
 		_draw_level_up_effect()
 	if _breakthrough_effect_remaining > 0.0:
 		_draw_breakthrough_effect()
+
+
+func _draw_palm_coverage(attack_range: float) -> void:
+	if not _palm_debug_geometry_visible:
+		return
+	_draw_palm_geometry(
+		attack_range,
+		_palm_attack_direction,
+		Color(0.3, 0.95, 1.0, 0.13),
+		Color(0.58, 1.0, 1.0, 0.32),
+		2.5
+	)
+	if _attack_flash_remaining > 0.0:
+		var flash_progress := 1.0 - clampf(
+			_attack_flash_remaining / PALM_COVERAGE_FLASH_DURATION,
+			0.0,
+			1.0
+		)
+		var pulse_range := attack_range * ease(flash_progress, -1.5)
+		_draw_palm_geometry(
+			pulse_range,
+			_palm_cast_direction,
+			Color(0.42, 0.98, 1.0, (1.0 - flash_progress) * 0.16),
+			Color(0.72, 1.0, 1.0, 1.0 - flash_progress),
+			lerpf(7.0, 2.0, flash_progress)
+		)
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(-42.0, -attack_range - 8.0),
+		"Palm %.0f px" % attack_range,
+		HORIZONTAL_ALIGNMENT_CENTER,
+		84.0,
+		14,
+		Color(0.72, 1.0, 1.0, 0.96)
+	)
+
+
+func _draw_palm_geometry(
+	attack_range: float,
+	direction: Vector2,
+	fill_color: Color,
+	edge_color: Color,
+	edge_width: float
+) -> void:
+	if attack_range <= 0.0:
+		return
+	if _is_palm_full_circle():
+		draw_circle(Vector2.ZERO, attack_range, fill_color)
+		draw_arc(
+			Vector2.ZERO,
+			attack_range,
+			0.0,
+			TAU,
+			80,
+			edge_color,
+			edge_width,
+			true
+		)
+		return
+	var direction_count := _get_palm_direction_count()
+	for direction_index in direction_count:
+		var sector_direction := direction.rotated(
+			TAU * float(direction_index) / float(direction_count)
+		)
+		_draw_palm_sector(
+			attack_range,
+			sector_direction,
+			fill_color,
+			edge_color,
+			edge_width
+		)
+
+
+func _draw_palm_sector(
+	attack_range: float,
+	direction: Vector2,
+	fill_color: Color,
+	edge_color: Color,
+	edge_width: float
+) -> void:
+	var half_arc := deg_to_rad(
+		_get_current_weapon_data().directional_arc_degrees * 0.5
+	)
+	var center_angle := direction.angle()
+	var points := PackedVector2Array([Vector2.ZERO])
+	var segment_count := 28
+	for segment_index in segment_count + 1:
+		var segment_ratio := (
+			float(segment_index) / float(segment_count)
+		)
+		points.append(
+			Vector2.from_angle(
+				lerpf(
+					center_angle - half_arc,
+					center_angle + half_arc,
+					segment_ratio
+				)
+			) * attack_range
+		)
+	draw_colored_polygon(points, fill_color)
+	draw_arc(
+		Vector2.ZERO,
+		attack_range,
+		center_angle - half_arc,
+		center_angle + half_arc,
+		segment_count,
+		edge_color,
+		edge_width,
+		true
+	)
+	draw_line(
+		Vector2.ZERO,
+		Vector2.from_angle(center_angle - half_arc) * attack_range,
+		edge_color,
+		edge_width,
+		true
+	)
+	draw_line(
+		Vector2.ZERO,
+		Vector2.from_angle(center_angle + half_arc) * attack_range,
+		edge_color,
+		edge_width,
+		true
+	)
 
 
 func _draw_fantian_seal_switch_shadow(attack_range: float) -> void:
@@ -779,7 +880,7 @@ func set_movement_enabled(enabled: bool) -> void:
 	if not _movement_enabled:
 		velocity = Vector2.ZERO
 		_cancel_flying_sword_sequence()
-		_cancel_palm_sequence()
+		_cancel_palm_cast()
 		_cancel_qiankun_ring_sequence()
 		_cancel_special_projectile_sequence()
 
@@ -1169,10 +1270,16 @@ func get_current_weapon_data() -> WeaponDataResource:
 	return _get_current_weapon_data()
 
 
-## Every collected Dao level occupies one persistent concentric orbit while an
-## enemy is inside attack range.
+## Dao levels occupy persistent concentric combat orbits up to the weapon's
+## configured range-level cap. Later duplicate levels strengthen damage
+## without creating overlapping blades beyond the outermost path.
 func get_dao_orbit_count() -> int:
-	return get_current_delivery_count()
+	if not _is_dao_equipped():
+		return 0
+	return mini(
+		get_current_delivery_count(),
+		maxi(_get_current_weapon_data().attack_range_level_cap, 1)
+	)
 
 
 ## Returns the displayed Dao distance from sprite center to blade tip in pixels.
@@ -1180,18 +1287,32 @@ func get_dao_weapon_tip_length() -> float:
 	return DAO_WEAPON_TIP_OFFSET_PIXELS * DAO_WEAPON_SCALE
 
 
-## Returns the blade-center radius for one Dao path. The authored blade tip,
-## rather than a synthetic circle, reaches the matching attack boundary.
+## Returns the blade-center radius for one Dao path. Authored concentric
+## boundaries are scaled to the final resolved attack range so universal range
+## fragments, cultivation bonuses, collision, and the outer blade tip agree.
 func get_dao_orbit_radius(orbit_index: int) -> float:
 	var weapon_data := _get_current_weapon_data()
+	var orbit_count := maxi(get_dao_orbit_count(), 1)
 	var capped_level := mini(
 		maxi(orbit_index + 1, 1),
-		maxi(weapon_data.attack_range_level_cap, 1)
+		orbit_count
+	)
+	var authored_ring_boundary := (
+		maxf(weapon_data.attack_range, 0.0)
+		+ float(capped_level - 1)
+			* maxf(weapon_data.attack_range_increase_per_level, 0.0)
+	)
+	var authored_outer_boundary := (
+		maxf(weapon_data.attack_range, 0.0)
+		+ float(orbit_count - 1)
+			* maxf(weapon_data.attack_range_increase_per_level, 0.0)
 	)
 	return maxf(
-		weapon_data.attack_range
-			+ float(capped_level - 1)
-				* maxf(weapon_data.attack_range_increase_per_level, 0.0)
+		authored_ring_boundary
+			* (
+				maxf(get_current_attack_range(), 0.0)
+				/ maxf(authored_outer_boundary, 1.0)
+			)
 			- get_dao_weapon_tip_length(),
 		28.0
 	)
@@ -1382,7 +1503,7 @@ func start_qi_refining_roll() -> bool:
 		character_sprite.play(roll_animation)
 		character_sprite.speed_scale = 1.0
 	_cancel_flying_sword_sequence()
-	_cancel_palm_sequence()
+	_cancel_palm_cast()
 	_cancel_qiankun_ring_sequence()
 	_cancel_special_projectile_sequence()
 	roll_state_changed.emit(true, get_roll_cooldown_remaining())
@@ -1622,11 +1743,6 @@ func _update_weapon_attack(delta: float) -> void:
 		if _flying_sword_sequence_timer <= 0.0:
 			_launch_next_flying_sword()
 		return
-	if _pending_palm_waves > 0:
-		_palm_sequence_timer -= delta
-		if _palm_sequence_timer <= 0.0:
-			_launch_next_palm_wave()
-		return
 	if _pending_qiankun_rings > 0:
 		_qiankun_ring_sequence_timer -= delta
 		if _qiankun_ring_sequence_timer <= 0.0:
@@ -1676,7 +1792,7 @@ func _update_weapon_attack(delta: float) -> void:
 	):
 		_begin_special_projectile_sequence(attack_kind, attack_damage)
 	else:
-		_begin_palm_sequence(targets[0], attack_damage)
+		_begin_palm_cast(targets[0], attack_damage)
 
 	_attack_cooldown_remaining = get_current_attack_interval()
 	queue_redraw()
@@ -1733,102 +1849,139 @@ func _release_great_strength_palm(
 	primary_target: EnemyController,
 	attack_damage: AttackDamageResultResource
 ) -> void:
-	_palm_sequence_hit_ids.clear()
-	_palm_attack_direction = global_position.direction_to(
-		primary_target.global_position
-	).normalized()
-	_release_palm_wave(
-		_palm_attack_direction,
-		primary_target,
-		attack_damage
-	)
+	_begin_palm_cast(primary_target, attack_damage)
 
 
-func _begin_palm_sequence(
+func _begin_palm_cast(
 	primary_target: EnemyController,
 	attack_damage: AttackDamageResultResource
 ) -> void:
-	_palm_sequence_total = _get_palm_direction_count()
-	_pending_palm_waves = _palm_sequence_total
-	_palm_sequence_launched = 0
-	_palm_sequence_damage = maxi(attack_damage.damage, 1)
-	_palm_sequence_is_critical = attack_damage.is_critical
-	_palm_sequence_base_direction = global_position.direction_to(
-		primary_target.global_position
-	).normalized()
-	_palm_sequence_primary = primary_target
-	_palm_sequence_hit_ids.clear()
-	_launch_next_palm_wave()
-
-
-func _launch_next_palm_wave() -> void:
-	if _pending_palm_waves <= 0:
+	if not is_instance_valid(primary_target):
 		return
-	var direction := _palm_sequence_base_direction.rotated(
-		TAU
-			* float(_palm_sequence_launched)
-			/ float(maxi(_palm_sequence_total, 1))
+	_palm_cast_direction = global_position.direction_to(
+		primary_target.global_position
+	).normalized()
+	if _palm_cast_direction.is_zero_approx():
+		_palm_cast_direction = Vector2.UP
+	_palm_attack_direction = _palm_cast_direction
+	_palm_cast_targets = _collect_palm_cast_targets(
+		_palm_cast_direction,
+		primary_target
 	)
-	var damage := AttackDamageResultResource.new(
-		_palm_sequence_damage,
-		_palm_sequence_is_critical
-	)
-	_release_palm_wave(
-		direction,
-		_palm_sequence_primary if _palm_sequence_launched == 0 else null,
-		damage
-	)
-	_palm_sequence_launched += 1
-	_pending_palm_waves -= 1
-	_palm_sequence_timer = maxf(palm_sequence_interval, 0.01)
+	if _palm_visual_equipped:
+		_begin_palm_visual_strike(primary_target, attack_damage)
+	else:
+		_resolve_palm_cast(attack_damage)
 
 
-func _release_palm_wave(
+func _collect_palm_cast_targets(
 	direction: Vector2,
-	primary_target: EnemyController,
-	attack_damage: AttackDamageResultResource
-) -> void:
-	_palm_attack_direction = direction.normalized()
-	var minimum_dot := cos(
-		deg_to_rad(
-			_get_current_weapon_data().directional_arc_degrees * 0.5
-		)
-	)
-	var attack_range_squared := pow(get_current_attack_range(), 2.0)
-	if is_instance_valid(primary_target) and primary_target.is_combat_active():
-		if _palm_visual_equipped:
-			_begin_palm_visual_strike(primary_target, attack_damage)
-		else:
-			_apply_palm_hit(primary_target, attack_damage)
+	primary_target: EnemyController = null
+) -> Array[EnemyController]:
+	var targets: Array[EnemyController] = []
+	var target_ids: Dictionary = {}
+	if (
+		is_instance_valid(primary_target)
+		and primary_target.is_combat_active()
+		and _is_enemy_in_palm_coverage(primary_target, direction)
+	):
+		targets.append(primary_target)
+		target_ids[primary_target.get_instance_id()] = true
 	for enemy_node in get_tree().get_nodes_in_group("enemies"):
 		if enemy_node is not EnemyController:
 			continue
 		var enemy := enemy_node as EnemyController
 		if (
 			not enemy.is_combat_active()
-			or _palm_sequence_hit_ids.has(enemy.get_instance_id())
+			or target_ids.has(enemy.get_instance_id())
 		):
 			continue
-		var offset := enemy.global_position - global_position
-		if (
-			offset.length_squared() <= attack_range_squared
-			and _palm_attack_direction.dot(offset.normalized()) >= minimum_dot
-		):
-			_apply_palm_hit(enemy, attack_damage)
-	_attack_flash_remaining = 0.2
+		if _is_enemy_in_palm_coverage(enemy, direction):
+			targets.append(enemy)
+			target_ids[enemy.get_instance_id()] = true
+	return targets
 
 
-func _apply_palm_hit(
+func _is_enemy_in_palm_coverage(
 	enemy: EnemyController,
+	direction: Vector2
+) -> bool:
+	return _is_offset_in_palm_coverage(
+		enemy.global_position - global_position,
+		direction,
+		_get_enemy_target_radius(enemy)
+	)
+
+
+func _get_enemy_target_radius(enemy: EnemyController) -> float:
+	var collision_shape := enemy.get_node_or_null(
+		"CollisionShape2D"
+	) as CollisionShape2D
+	if collision_shape == null or collision_shape.shape == null:
+		return 0.0
+	var scale_multiplier := maxf(
+		absf(collision_shape.global_scale.x),
+		absf(collision_shape.global_scale.y)
+	)
+	if collision_shape.shape is CircleShape2D:
+		return (
+			(collision_shape.shape as CircleShape2D).radius
+			* scale_multiplier
+		)
+	if collision_shape.shape is RectangleShape2D:
+		return (
+			(collision_shape.shape as RectangleShape2D).size.length()
+			* 0.5
+			* scale_multiplier
+		)
+	return 0.0
+
+
+func _is_offset_in_palm_coverage(
+	offset: Vector2,
+	direction: Vector2,
+	target_radius: float = 0.0
+) -> bool:
+	var safe_target_radius := maxf(target_radius, 0.0)
+	var target_distance := offset.length()
+	if target_distance > get_current_attack_range() + safe_target_radius:
+		return false
+	if _is_palm_full_circle():
+		return true
+	if target_distance <= safe_target_radius:
+		return true
+	var half_arc := deg_to_rad(
+		_get_current_weapon_data().directional_arc_degrees * 0.5
+	)
+	half_arc += asin(
+		clampf(
+			safe_target_radius / maxf(target_distance, 0.001),
+			0.0,
+			1.0
+		)
+	)
+	var minimum_dot := cos(minf(half_arc, PI))
+	var offset_direction := offset.normalized()
+	var safe_direction := direction.normalized()
+	for direction_index in _get_palm_direction_count():
+		var sector_direction := safe_direction.rotated(
+			TAU
+				* float(direction_index)
+				/ float(_get_palm_direction_count())
+		)
+		if sector_direction.dot(offset_direction) >= minimum_dot:
+			return true
+	return false
+
+
+func _resolve_palm_cast(
 	attack_damage: AttackDamageResultResource
 ) -> void:
-	if not is_instance_valid(enemy) or not enemy.is_combat_active():
-		return
-	var enemy_id := enemy.get_instance_id()
-	if _palm_sequence_hit_ids.has(enemy_id):
-		return
-	_palm_sequence_hit_ids[enemy_id] = true
-	_apply_palm_damage(enemy, attack_damage)
+	for enemy in _palm_cast_targets:
+		if is_instance_valid(enemy) and enemy.is_combat_active():
+			_apply_palm_damage(enemy, attack_damage)
+	_palm_cast_targets.clear()
+	_attack_flash_remaining = PALM_COVERAGE_FLASH_DURATION
 
 
 func _apply_palm_damage(
@@ -1838,37 +1991,61 @@ func _apply_palm_damage(
 	if not is_instance_valid(enemy) or not enemy.is_combat_active():
 		return
 	var realm_index := _get_current_realm_index()
-	var knockback_speed := 0.0
-	if realm_index == 1:
-		knockback_speed = 110.0
-	elif realm_index == 2:
-		knockback_speed = 320.0
-	elif realm_index >= 3:
-		knockback_speed = 480.0
-	if knockback_speed > 0.0:
+	var weapon_data := _get_current_weapon_data()
+	if realm_index >= 1 and weapon_data.palm_knockback_speed > 0.0:
 		enemy.apply_knockback(
 			global_position.direction_to(enemy.global_position),
-			knockback_speed
+			weapon_data.palm_knockback_speed,
+			weapon_data.palm_knockback_recovery
 		)
-	if realm_index >= 3 and not enemy.is_elite_enemy():
+	var health_ratio := (
+		float(enemy.current_health) / float(maxi(enemy.max_health, 1))
+	)
+	if (
+		realm_index >= 3
+		and not enemy.is_elite_enemy()
+		and health_ratio < weapon_data.palm_execute_health_threshold_ratio
+		and randf() < weapon_data.palm_execute_chance
+	):
+		_spawn_palm_execute_vfx(enemy)
 		enemy.take_melee_damage(maxi(enemy.current_health, 1))
-	else:
-		enemy.take_melee_damage(
-			attack_damage.damage,
-			attack_damage.is_critical
+		return
+	var resolved_damage := attack_damage.damage
+	if (
+		realm_index >= 2
+		and health_ratio > weapon_data.palm_high_health_threshold_ratio
+	):
+		resolved_damage = maxi(
+			roundi(
+				float(resolved_damage)
+					* weapon_data.palm_high_health_damage_multiplier
+			),
+			1
 		)
+	enemy.take_melee_damage(
+		resolved_damage,
+		attack_damage.is_critical
+	)
+
+
+func _spawn_palm_execute_vfx(enemy: EnemyController) -> void:
+	if palm_execute_vfx_scene == null or enemy.get_parent() == null:
+		return
+	var execute_vfx := palm_execute_vfx_scene.instantiate() as Node2D
+	if execute_vfx == null:
+		return
+	enemy.get_parent().add_child(execute_vfx)
+	execute_vfx.global_position = enemy.global_position
+	if execute_vfx.has_method("play"):
+		execute_vfx.call("play")
 
 
 func _get_palm_direction_count() -> int:
-	match _get_current_realm_index():
-		1:
-			return 2
-		2:
-			return 6
-		3:
-			return 18
-		_:
-			return 1
+	return 2 if _get_current_realm_index() == 1 else 1
+
+
+func _is_palm_full_circle() -> bool:
+	return _get_current_realm_index() >= 2
 
 
 func _get_current_realm_index() -> int:
@@ -1879,12 +2056,13 @@ func _get_current_realm_index() -> int:
 	)
 
 
-func _cancel_palm_sequence() -> void:
-	_pending_palm_waves = 0
-	_palm_sequence_total = 0
-	_palm_sequence_launched = 0
-	_palm_sequence_primary = null
-	_palm_sequence_hit_ids.clear()
+func _cancel_palm_cast() -> void:
+	_palm_cast_targets.clear()
+	_palm_visual_pending_damage = 0
+	_palm_visual_pending_critical = false
+	_palm_visual_target = null
+	if is_instance_valid(palm_weapon):
+		_show_palm_idle()
 
 
 func _begin_qiankun_ring_sequence(
@@ -2614,8 +2792,16 @@ func _refresh_palm_visual_equipment() -> void:
 			&"outline_width",
 			PALM_OUTLINE_TEXTURE_WIDTH
 		)
+	if _palm_dissolve_material == null:
+		_palm_dissolve_material = ShaderMaterial.new()
+		_palm_dissolve_material.shader = DISSOLVE_SHADER
+		_palm_dissolve_material.set_shader_parameter(
+			&"edge_color",
+			Color("78f7ff")
+		)
 	palm_weapon.texture = PALM_WEAPON_TEXTURE
-	palm_weapon.material = _palm_glow_material
+	if _palm_attack_sprites.is_empty():
+		_palm_attack_sprites.append(palm_weapon)
 	if not _is_palm_equipped():
 		_palm_visual_equipped = false
 		_palm_visual_state = PalmVisualState.HIDDEN
@@ -2624,22 +2810,77 @@ func _refresh_palm_visual_equipment() -> void:
 		_palm_warning_strength = 0.0
 		_palm_visual_pending_damage = 0
 		_palm_visual_pending_critical = false
-		palm_weapon.hide()
-		return
-	if _palm_visual_equipped:
+		for attack_sprite in _palm_attack_sprites:
+			attack_sprite.hide()
 		return
 	_palm_visual_equipped = true
-	_palm_visual_state = PalmVisualState.SUMMONING
 	_palm_visual_elapsed = 0.0
 	_palm_visual_target = null
-	_palm_visual_start_position = (
-		Vector2.from_angle(_companion_phase - PI * 0.5) * 12.0
-	)
-	palm_weapon.position = _palm_visual_start_position
+	_show_palm_idle()
+
+
+func _show_palm_idle() -> void:
+	if not _palm_visual_equipped or not _is_palm_equipped():
+		_palm_visual_state = PalmVisualState.HIDDEN
+		for attack_sprite in _palm_attack_sprites:
+			attack_sprite.hide()
+		return
+	_hide_palm_attack_echoes()
+	_palm_visual_state = PalmVisualState.IDLE
+	palm_weapon.material = _palm_glow_material
+	palm_weapon.position = _get_palm_idle_position()
 	palm_weapon.rotation = _get_palm_rotation(_palm_attack_direction)
-	palm_weapon.scale = Vector2.ONE * PALM_NORMAL_SCALE * 0.32
-	_set_palm_glow(0.0, 0.0)
+	palm_weapon.scale = Vector2.ONE * _get_palm_idle_scale()
+	_set_palm_glow(_palm_warning_strength)
 	palm_weapon.show()
+
+
+func _ensure_palm_attack_sprite_count(required_count: int) -> void:
+	if _palm_attack_sprites.is_empty():
+		_palm_attack_sprites.append(palm_weapon)
+	while _palm_attack_sprites.size() < maxi(required_count, 1):
+		var echo_sprite := Sprite2D.new()
+		echo_sprite.texture = PALM_WEAPON_TEXTURE
+		echo_sprite.material = _palm_glow_material
+		echo_sprite.hide()
+		palm_echo_layer.add_child(echo_sprite)
+		_palm_attack_sprites.append(echo_sprite)
+	for sprite_index in range(
+		maxi(required_count, 1),
+		_palm_attack_sprites.size()
+	):
+		_palm_attack_sprites[sprite_index].hide()
+
+
+func _hide_palm_attack_echoes() -> void:
+	for sprite_index in range(1, _palm_attack_sprites.size()):
+		var echo_sprite := _palm_attack_sprites[sprite_index]
+		echo_sprite.material = _palm_glow_material
+		echo_sprite.hide()
+
+
+func _get_palm_visual_direction_count() -> int:
+	match _get_current_realm_index():
+		1:
+			return 2
+		2:
+			return 6
+		3:
+			return 8
+		_:
+			return 1
+
+
+func _get_palm_visual_directions() -> Array[Vector2]:
+	var directions: Array[Vector2] = []
+	var direction_count := _get_palm_visual_direction_count()
+	for direction_index in direction_count:
+		directions.append(
+			_palm_cast_direction.rotated(
+				TAU * float(direction_index) / float(direction_count)
+			)
+		)
+	return directions
 
 
 func _get_palm_rotation(direction: Vector2) -> float:
@@ -2666,7 +2907,7 @@ func _get_palm_idle_position() -> Vector2:
 
 func _get_palm_idle_scale() -> float:
 	return lerpf(
-		PALM_NORMAL_SCALE,
+		PALM_LAUNCH_SCALE,
 		PALM_CHARGED_SCALE,
 		_palm_warning_strength
 	)
@@ -2692,6 +2933,22 @@ func _set_palm_glow(strength: float, alpha: float = 1.0) -> void:
 		)
 
 
+func _set_palm_attack_glow(strength: float, alpha: float = 1.0) -> void:
+	_set_palm_glow(strength, alpha)
+	var safe_strength := clampf(strength, 0.0, 1.0)
+	var safe_alpha := clampf(alpha, 0.0, 1.0)
+	var brightness := lerpf(1.0, 1.42, safe_strength)
+	for sprite_index in range(1, _palm_attack_sprites.size()):
+		var attack_sprite := _palm_attack_sprites[sprite_index]
+		if attack_sprite.visible:
+			attack_sprite.modulate = Color(
+				brightness,
+				brightness,
+				brightness,
+				safe_alpha
+			)
+
+
 func _get_palm_impact_position(
 	impact_global_position: Vector2,
 	direction: Vector2,
@@ -2713,23 +2970,68 @@ func _begin_palm_visual_strike(
 	if not _palm_visual_equipped or not is_instance_valid(target):
 		return
 	_palm_visual_target = target
-	_palm_sequence_hit_ids[target.get_instance_id()] = true
 	_palm_visual_pending_damage = maxi(attack_damage.damage, 1)
 	_palm_visual_pending_critical = attack_damage.is_critical
-	_palm_visual_impact_global_position = target.global_position
-	_palm_visual_start_position = palm_weapon.position
-	_palm_visual_start_scale = palm_weapon.scale.x
+	_palm_visual_directions = _get_palm_visual_directions()
+	_ensure_palm_attack_sprite_count(_palm_visual_directions.size())
+	_palm_visual_start_positions.clear()
+	_palm_visual_start_scales.clear()
+	_palm_visual_impact_positions.clear()
 	_palm_visual_elapsed = 0.0
 	_palm_visual_state = PalmVisualState.STRIKING
-	palm_weapon.show()
+	for sprite_index in _palm_visual_directions.size():
+		var attack_sprite := _palm_attack_sprites[sprite_index]
+		var attack_direction := _palm_visual_directions[sprite_index]
+		var start_position := (
+			palm_weapon.position
+			if sprite_index == 0
+			else attack_direction * PALM_CHARGED_RADIUS
+		)
+		var start_scale := (
+			palm_weapon.scale.x
+			if sprite_index == 0
+			else PALM_CHARGED_SCALE
+		)
+		var impact_global_position := (
+			target.global_position
+			if sprite_index == 0
+			else global_position
+				+ attack_direction * get_current_attack_range()
+		)
+		_palm_visual_start_positions.append(start_position)
+		_palm_visual_start_scales.append(start_scale)
+		_palm_visual_impact_positions.append(
+			_get_palm_impact_position(
+				impact_global_position,
+				attack_direction,
+				PALM_STRIKE_SCALE
+			)
+		)
+		attack_sprite.material = _palm_glow_material
+		attack_sprite.position = start_position
+		attack_sprite.rotation = _get_palm_rotation(attack_direction)
+		attack_sprite.scale = Vector2.ONE * start_scale
+		attack_sprite.show()
+	_set_palm_attack_glow(1.0)
 
 
-func _begin_palm_visual_return() -> void:
-	_palm_visual_start_position = palm_weapon.position
-	_palm_visual_start_scale = palm_weapon.scale.x
+func _begin_palm_visual_dissolve() -> void:
+	_resolve_palm_cast(
+		AttackDamageResultResource.new(
+			_palm_visual_pending_damage,
+			_palm_visual_pending_critical
+		)
+	)
+	_palm_visual_pending_damage = 0
+	_palm_visual_pending_critical = false
 	_palm_visual_elapsed = 0.0
-	_palm_visual_state = PalmVisualState.RETURNING
+	_palm_visual_state = PalmVisualState.DISSOLVING
 	_palm_visual_target = null
+	for sprite_index in _palm_visual_directions.size():
+		var attack_sprite := _palm_attack_sprites[sprite_index]
+		attack_sprite.material = _palm_dissolve_material
+		attack_sprite.modulate = Color.WHITE
+	_palm_dissolve_material.set_shader_parameter(&"dissolve_amount", 0.0)
 
 
 func _update_palm_warning() -> void:
@@ -2754,49 +3056,25 @@ func _update_palm_weapon_visual(delta: float) -> void:
 	if not _palm_visual_equipped or not _is_palm_equipped():
 		return
 	_update_palm_warning()
+	if _palm_visual_state == PalmVisualState.HIDDEN:
+		palm_weapon.hide()
+		return
 	_palm_visual_elapsed += delta
-	var aim_direction := _palm_attack_direction
-	if is_instance_valid(_palm_aim_target):
-		aim_direction = global_position.direction_to(
-			_palm_aim_target.global_position
-		).normalized()
 	match _palm_visual_state:
-		PalmVisualState.SUMMONING:
-			var progress := clampf(
-				_palm_visual_elapsed / PALM_SUMMON_DURATION,
-				0.0,
-				1.0
-			)
-			var eased := progress * progress * (3.0 - 2.0 * progress)
-			palm_weapon.position = _palm_visual_start_position.lerp(
-				_get_palm_idle_position(),
-				eased
-			)
-			var summon_scale := lerpf(
-				PALM_NORMAL_SCALE * 0.32,
-				_get_palm_idle_scale(),
-				eased
-			)
-			palm_weapon.scale = Vector2.ONE * summon_scale
-			palm_weapon.rotation = lerp_angle(
-				palm_weapon.rotation,
-				_get_palm_rotation(aim_direction),
-				1.0 - exp(-18.0 * delta)
-			)
-			_set_palm_glow(_palm_warning_strength, eased)
-			if progress >= 1.0:
-				_palm_visual_state = PalmVisualState.IDLE
-				_palm_visual_elapsed = 0.0
 		PalmVisualState.IDLE:
+			var aim_direction := _palm_attack_direction
+			if is_instance_valid(_palm_aim_target):
+				aim_direction = global_position.direction_to(
+					_palm_aim_target.global_position
+				).normalized()
 			var follow_weight := 1.0 - exp(-14.0 * delta)
 			palm_weapon.position = palm_weapon.position.lerp(
 				_get_palm_idle_position(),
 				follow_weight
 			)
-			var target_scale := _get_palm_idle_scale()
 			var next_scale := lerpf(
 				palm_weapon.scale.x,
-				target_scale,
+				_get_palm_idle_scale(),
 				follow_weight
 			)
 			palm_weapon.scale = Vector2.ONE * next_scale
@@ -2806,105 +3084,88 @@ func _update_palm_weapon_visual(delta: float) -> void:
 				1.0 - exp(-20.0 * delta)
 			)
 			_set_palm_glow(_palm_warning_strength)
+			palm_weapon.show()
 		PalmVisualState.STRIKING:
-			if (
-				is_instance_valid(_palm_visual_target)
-				and _palm_visual_target.is_combat_active()
-			):
-				_palm_visual_impact_global_position = (
-					_palm_visual_target.global_position
-				)
-			var strike_direction := global_position.direction_to(
-				_palm_visual_impact_global_position
-			).normalized()
-			if strike_direction.is_zero_approx():
-				strike_direction = aim_direction
 			var strike_progress := clampf(
 				_palm_visual_elapsed / PALM_STRIKE_DURATION,
 				0.0,
 				1.0
 			)
 			var strike_eased := 1.0 - pow(1.0 - strike_progress, 3.0)
-			var impact_position := _get_palm_impact_position(
-				_palm_visual_impact_global_position,
-				strike_direction,
-				PALM_STRIKE_SCALE
-			)
-			palm_weapon.position = _palm_visual_start_position.lerp(
-				impact_position,
-				strike_eased
-			)
-			var strike_scale := lerpf(
-				_palm_visual_start_scale,
-				PALM_STRIKE_SCALE,
-				strike_eased
-			)
-			strike_scale *= 1.0 + sin(strike_progress * PI) * 0.12
-			palm_weapon.scale = Vector2.ONE * strike_scale
-			palm_weapon.rotation = _get_palm_rotation(strike_direction)
-			_set_palm_glow(
-				lerpf(_palm_warning_strength, 0.0, strike_eased)
-			)
+			for sprite_index in _palm_visual_directions.size():
+				var attack_sprite := _palm_attack_sprites[sprite_index]
+				var strike_scale := lerpf(
+					_palm_visual_start_scales[sprite_index],
+					PALM_STRIKE_SCALE,
+					strike_eased
+				)
+				strike_scale *= (
+					1.0 + sin(strike_progress * PI) * 0.12
+				)
+				attack_sprite.position = (
+					_palm_visual_start_positions[sprite_index].lerp(
+						_palm_visual_impact_positions[sprite_index],
+						strike_eased
+					)
+				)
+				attack_sprite.scale = Vector2.ONE * strike_scale
+				attack_sprite.rotation = _get_palm_rotation(
+					_palm_visual_directions[sprite_index]
+				)
+			_set_palm_attack_glow(lerpf(1.0, 0.25, strike_eased))
 			if strike_progress >= 1.0:
-				if (
-					is_instance_valid(_palm_visual_target)
-					and _palm_visual_target.is_combat_active()
-				):
-					if _palm_visual_pending_damage > 0:
-						_apply_palm_damage(
-							_palm_visual_target,
-							AttackDamageResultResource.new(
-								_palm_visual_pending_damage,
-								_palm_visual_pending_critical
-							)
-						)
-					_palm_visual_pending_damage = 0
-					_palm_visual_pending_critical = false
-					_begin_palm_visual_return()
-				else:
-					_palm_visual_pending_damage = 0
-					_palm_visual_pending_critical = false
-					_begin_palm_visual_return()
-		PalmVisualState.RETURNING:
-			var return_progress := clampf(
-				_palm_visual_elapsed / PALM_RETURN_DURATION,
+				_begin_palm_visual_dissolve()
+		PalmVisualState.DISSOLVING:
+			var dissolve_progress := clampf(
+				_palm_visual_elapsed / PALM_DISSOLVE_DURATION,
 				0.0,
 				1.0
 			)
-			var return_eased := (
-				return_progress
-				* return_progress
-				* (3.0 - 2.0 * return_progress)
+			_palm_dissolve_material.set_shader_parameter(
+				&"dissolve_amount",
+				dissolve_progress
 			)
-			palm_weapon.position = _palm_visual_start_position.lerp(
-				_get_palm_idle_position(),
-				return_eased
-			)
-			var return_scale := lerpf(
-				_palm_visual_start_scale,
-				_get_palm_idle_scale(),
-				return_eased
-			)
-			palm_weapon.scale = Vector2.ONE * return_scale
-			palm_weapon.rotation = lerp_angle(
-				palm_weapon.rotation,
-				_get_palm_rotation(aim_direction),
-				1.0 - exp(-22.0 * delta)
-			)
-			_set_palm_glow(
-				_palm_warning_strength * return_eased
-			)
-			if return_progress >= 1.0:
-				_palm_visual_state = PalmVisualState.IDLE
+			for sprite_index in _palm_visual_directions.size():
+				_palm_attack_sprites[sprite_index].scale = (
+					Vector2.ONE
+					* lerpf(
+						PALM_STRIKE_SCALE,
+						PALM_STRIKE_SCALE * 1.12,
+						dissolve_progress
+					)
+				)
+			if dissolve_progress >= 1.0:
 				_palm_visual_elapsed = 0.0
+				_show_palm_idle()
 
 
 func get_palm_visual_state() -> int:
 	return _palm_visual_state
 
 
+## Returns every currently visible Palm sprite. Idle presentation reports one;
+## Foundation and later casts report their synchronized visual echo count.
+func get_visible_palm_sprite_count() -> int:
+	var visible_count := 0
+	for attack_sprite in _palm_attack_sprites:
+		if is_instance_valid(attack_sprite) and attack_sprite.visible:
+			visible_count += 1
+	return visible_count
+
+
 func get_palm_warning_strength() -> float:
 	return _palm_warning_strength
+
+
+## Enables the exact Great Strength Palm combat geometry used by the pause
+## debug panel. The setting persists after gameplay resumes.
+func debug_set_palm_geometry_visible(visible: bool) -> void:
+	_palm_debug_geometry_visible = visible
+	queue_redraw()
+
+
+func is_palm_debug_geometry_visible() -> bool:
+	return _palm_debug_geometry_visible
 
 
 func _is_flying_sword_equipped() -> bool:
@@ -3846,14 +4107,19 @@ func _rebuild_combat_stats() -> void:
 	else:
 		var equipment := _get_current_equipment()
 		_current_weapon_combat_stats = _resolve_equipment_combat_stats(equipment)
-		_current_weapon_combat_stats.delivery_count = maxi(
-			(
-				(equipment["data"] as WeaponDataResource).base_delivery_count
+		var weapon_data := equipment["data"] as WeaponDataResource
+		var delivery_count := maxi(
+			weapon_data.base_delivery_count
 				+ int(equipment.get("quantity", 1))
-				- 1
-			),
+				- 1,
 			1
 		)
+		if weapon_data.attack_kind == WeaponDataResource.AttackKind.DAO:
+			delivery_count = mini(
+				delivery_count,
+				maxi(weapon_data.attack_range_level_cap, 1)
+			)
+		_current_weapon_combat_stats.delivery_count = delivery_count
 		var attack_speed_level := _universal_upgrade_levels[
 			UniversalUpgradeTypes.UpgradeType.ATTACK_SPEED
 		]
@@ -4047,7 +4313,7 @@ func get_debug_snapshot() -> Dictionary:
 
 func _on_current_equipment_changed() -> void:
 	_cancel_flying_sword_sequence()
-	_cancel_palm_sequence()
+	_cancel_palm_cast()
 	_cancel_qiankun_ring_sequence()
 	_cancel_special_projectile_sequence()
 	_rebuild_combat_stats()

@@ -15,6 +15,7 @@ const THUNDER_HAMMER_DATA := preload(
 const FANTIAN_SEAL_DATA := preload(
 	"res://game/resources/weapon/fantian_seal.tres"
 )
+const PALM_DATA := preload("res://game/resources/great_strength_palm.tres")
 
 var _failures: Array[String] = []
 
@@ -138,8 +139,19 @@ func _run() -> void:
 		float(dao_level_one_damage)
 			* (1.0 + DAO_DATA.damage_ratio_per_level_above_range_cap)
 	)
+	var dao_inventory_snapshot := dao_player.get_equipment_inventory_snapshot()
+	var dao_owned_count := 0
+	for equipment_snapshot in dao_inventory_snapshot:
+		if (
+			(equipment_snapshot["data"] as WeaponData).weapon_id
+			== DAO_DATA.weapon_id
+		):
+			dao_owned_count = int(equipment_snapshot["quantity"])
+			break
 	_check(
-		dao_player.get_current_delivery_count() == 11
+		dao_player.get_current_delivery_count() == 10
+		and dao_player.get_dao_orbit_count() == 10
+		and dao_owned_count == 11
 		and is_equal_approx(
 			dao_player.get_current_attack_range(),
 			dao_level_ten_range
@@ -149,7 +161,41 @@ func _run() -> void:
 			dao_player.get_dao_orbit_radius(9)
 		)
 		and dao_player.get_current_weapon_damage() == dao_level_eleven_damage,
-		"Dao Lv.11 expanded past its cap or missed its +10% damage conversion."
+		"Post-cap Dao created an eleventh blade, expanded its base range, or missed its +10% damage conversion."
+	)
+	dao_player.apply_universal_upgrade(
+		UniversalUpgradeTypes.UpgradeType.DAMAGE_RANGE
+	)
+	var dao_fragment_range := (
+		dao_level_ten_range
+		* (1.0 + dao_player.range_bonus_per_fragment)
+	)
+	var dao_inner_fragment_boundary := (
+		DAO_DATA.attack_range
+		* dao_fragment_range
+		/ dao_level_ten_range
+	)
+	_check(
+		dao_player.get_current_delivery_count() == 10
+		and is_equal_approx(
+			dao_player.get_current_attack_range(),
+			dao_fragment_range
+		)
+		and is_equal_approx(
+			(dao_player.attack_shape.shape as CircleShape2D).radius,
+			dao_fragment_range
+		)
+		and is_equal_approx(
+			dao_player.get_dao_orbit_radius(9)
+				+ dao_player.get_dao_weapon_tip_length(),
+			dao_fragment_range
+		)
+		and is_equal_approx(
+			dao_player.get_dao_orbit_radius(0)
+				+ dao_player.get_dao_weapon_tip_length(),
+			dao_inner_fragment_boundary
+		),
+		"Range fragment did not expand Dao collision and all capped orbit paths together."
 	)
 	dao_player.queue_free()
 	var ring_player := PLAYER_SCENE.instantiate() as PlayerController
@@ -189,56 +235,269 @@ func _run() -> void:
 
 	resources.demote_to_realm(0, 1)
 	_check(
-		int(player.call("_get_palm_direction_count")) == 1,
+		int(player.call("_get_palm_direction_count")) == 1
+		and not bool(player.call("_is_palm_full_circle")),
 		"Qi Refining Palm did not keep one direction."
 	)
+	var palm_edge_target := _make_enemy(
+		player,
+		player.global_position
+			+ Vector2(player.get_current_attack_range() + 19.0, 0.0),
+		99
+	)
+	var palm_outside_target := _make_enemy(
+		player,
+		player.global_position
+			+ Vector2(player.get_current_attack_range() + 21.0, 0.0),
+		99
+	)
+	palm_edge_target.set_physics_process(false)
+	palm_outside_target.set_physics_process(false)
+	player.call(
+		"_release_great_strength_palm",
+		palm_edge_target,
+		AttackDamageResult.new(5, false)
+	)
+	await _wait_physics_frames(10)
+	_check(
+		palm_edge_target.current_health == 94
+		and palm_outside_target.current_health == 99,
+		"Palm did not honor the enemy collider at its outer range boundary."
+	)
+	await _wait_physics_frames(10)
+	palm_edge_target.queue_free()
+	palm_outside_target.queue_free()
 	resources.demote_to_realm(1, 1)
 	_check(
-		int(player.call("_get_palm_direction_count")) == 2,
-		"Foundation Palm did not use two sequential directions."
+		int(player.call("_get_palm_direction_count")) == 2
+		and not bool(player.call("_is_palm_full_circle")),
+		"Foundation Palm did not use two opposite directional sectors."
 	)
+	var foundation_visual_target := _make_enemy(
+		player,
+		player.global_position + Vector2(50.0, 0.0)
+	)
+	player.call(
+		"_release_great_strength_palm",
+		foundation_visual_target,
+		AttackDamageResult.new(2, false)
+	)
+	_check(
+		player.get_visible_palm_sprite_count() == 2,
+		"Foundation Palm did not launch two opposite visual palms."
+	)
+	await _wait_physics_frames(20)
+	foundation_visual_target.queue_free()
 	var foundation_target := _make_enemy(
 		player,
 		player.global_position + Vector2(50.0, 0.0)
 	)
-	player.set("_palm_sequence_hit_ids", {})
 	player.call(
-		"_apply_palm_hit",
+		"_apply_palm_damage",
 		foundation_target,
 		AttackDamageResult.new(2, false)
 	)
 	_check(
-		foundation_target.get_knockback_velocity().length() > 0.0,
-		"Foundation Palm did not apply its light knockback."
+		is_equal_approx(
+			foundation_target.get_knockback_velocity().length(),
+			320.0
+		)
+		and is_equal_approx(
+			float(foundation_target.get("_knockback_recovery")),
+			1800.0
+		),
+		"Foundation Palm did not apply its tuned 320 knockback."
 	)
 	foundation_target.queue_free()
 	resources.demote_to_realm(2, 1)
 	_check(
-		int(player.call("_get_palm_direction_count")) == 6,
-		"Golden Core Palm did not use six sequential directions."
+		int(player.call("_get_palm_direction_count")) == 1
+		and bool(player.call("_is_palm_full_circle"))
+		and bool(
+			player.call(
+				"_is_offset_in_palm_coverage",
+				Vector2(0.0, player.get_current_attack_range() - 1.0),
+				Vector2.UP
+			)
+		),
+		"Golden Core Palm did not resolve as one full-circle cast."
 	)
-	resources.demote_to_realm(3, 1)
-	_check(
-		int(player.call("_get_palm_direction_count")) == 18,
-		"Nascent Soul Palm did not use eighteen sequential directions."
-	)
-	var nascent_target := _make_enemy(
+	var golden_high_target := _make_enemy(
 		player,
 		player.global_position + Vector2(50.0, 0.0),
-		500
+		100
 	)
-	player.set("_palm_sequence_hit_ids", {})
 	player.call(
-		"_apply_palm_hit",
+		"_apply_palm_damage",
+		golden_high_target,
+		AttackDamageResult.new(20, false)
+	)
+	_check(
+		golden_high_target.current_health == 70
+		and is_equal_approx(
+			golden_high_target.get_knockback_velocity().length(),
+			320.0
+		),
+		"Golden Core Palm did not apply +50% opener damage and retained knockback."
+	)
+	var golden_threshold_target := _make_enemy(
+		player,
+		player.global_position + Vector2(50.0, 0.0),
+		100
+	)
+	golden_threshold_target.take_melee_damage(25)
+	player.call(
+		"_apply_palm_damage",
+		golden_threshold_target,
+		AttackDamageResult.new(20, false)
+	)
+	_check(
+		golden_threshold_target.current_health == 55,
+		"Golden Core Palm applied its opener at exactly 75% health."
+	)
+	golden_high_target.queue_free()
+	golden_threshold_target.queue_free()
+	var golden_front_target := _make_enemy(
+		player,
+		player.global_position + Vector2(50.0, 0.0),
+		100
+	)
+	var golden_rear_target := _make_enemy(
+		player,
+		player.global_position + Vector2(-50.0, 0.0),
+		100
+	)
+	golden_front_target.set_physics_process(false)
+	golden_rear_target.set_physics_process(false)
+	player.call(
+		"_release_great_strength_palm",
+		golden_front_target,
+		AttackDamageResult.new(20, false)
+	)
+	_check(
+		golden_front_target.current_health == 100
+		and golden_rear_target.current_health == 100,
+		"Golden Core Palm applied area damage before the hand impact."
+	)
+	_check(
+		player.get_visible_palm_sprite_count() == 6,
+		"Golden Core Palm did not launch six radial visual echoes."
+	)
+	await _wait_physics_frames(10)
+	_check(
+		golden_front_target.current_health == 70
+		and golden_rear_target.current_health == 70,
+		"Golden Core Palm did not hit each full-circle target exactly once."
+	)
+	golden_front_target.queue_free()
+	golden_rear_target.queue_free()
+	resources.demote_to_realm(3, 1)
+	_check(
+		int(player.call("_get_palm_direction_count")) == 1
+		and bool(player.call("_is_palm_full_circle")),
+		"Nascent Soul Palm did not preserve one full-circle cast."
+	)
+	var nascent_visual_target := _make_enemy(
+		player,
+		player.global_position + Vector2(50.0, 0.0),
+		100
+	)
+	nascent_visual_target.set_physics_process(false)
+	player.call(
+		"_release_great_strength_palm",
+		nascent_visual_target,
+		AttackDamageResult.new(1, false)
+	)
+	_check(
+		player.get_visible_palm_sprite_count() == 8,
+		"Nascent Soul Palm did not launch eight radial visual echoes."
+	)
+	await _wait_physics_frames(20)
+	nascent_visual_target.queue_free()
+	var execute_resources := RunResources.new()
+	root.add_child(execute_resources)
+	execute_resources.set_process(false)
+	var execute_player := PLAYER_SCENE.instantiate() as PlayerController
+	var execute_palm := PALM_DATA.duplicate(true) as WeaponData
+	execute_palm.palm_execute_chance = 1.0
+	execute_player.starting_weapon_data = execute_palm
+	root.add_child(execute_player)
+	execute_player.global_position = Vector2(8000.0, 8000.0)
+	execute_player.set_movement_enabled(false)
+	execute_player.bind_cultivation(execute_resources)
+	execute_resources.demote_to_realm(3, 1)
+	var nascent_target := _make_enemy(
+		execute_player,
+		execute_player.global_position + Vector2(50.0, 0.0),
+		100
+	)
+	nascent_target.take_melee_damage(51)
+	execute_player.call(
+		"_apply_palm_damage",
 		nascent_target,
 		AttackDamageResult.new(1, false)
 	)
-	await _wait_physics_frames(2)
 	_check(
-		not is_instance_valid(nascent_target)
-			or not nascent_target.is_combat_active(),
-		"Nascent Soul Palm did not instantly defeat an ordinary enemy."
+		not nascent_target.is_combat_active()
+		and not get_nodes_in_group("palm_execute_vfx").is_empty(),
+		"Nascent Soul Palm did not execute an eligible ordinary target below 50%."
 	)
+	var threshold_target := _make_enemy(
+		execute_player,
+		execute_player.global_position + Vector2(50.0, 0.0),
+		100
+	)
+	threshold_target.take_melee_damage(50)
+	execute_player.call(
+		"_apply_palm_damage",
+		threshold_target,
+		AttackDamageResult.new(10, false)
+	)
+	_check(
+		threshold_target.is_combat_active()
+		and threshold_target.current_health == 40,
+		"Nascent Soul Palm executed an ordinary target at exactly 50% health."
+	)
+	var palm_elite_target := _make_enemy(
+		execute_player,
+		execute_player.global_position + Vector2(50.0, 0.0),
+		100
+	)
+	palm_elite_target.configure_elite(2.0, 1.2, 1.2)
+	palm_elite_target.take_melee_damage(101)
+	execute_player.call(
+		"_apply_palm_damage",
+		palm_elite_target,
+		AttackDamageResult.new(1, false)
+	)
+	_check(
+		palm_elite_target.is_combat_active()
+		and palm_elite_target.current_health == 98,
+		"Nascent Soul Palm executed an elite target."
+	)
+	var nascent_high_target := _make_enemy(
+		execute_player,
+		execute_player.global_position + Vector2(50.0, 0.0),
+		100
+	)
+	execute_player.call(
+		"_apply_palm_damage",
+		nascent_high_target,
+		AttackDamageResult.new(20, false)
+	)
+	_check(
+		nascent_high_target.current_health == 70
+		and is_equal_approx(
+			nascent_high_target.get_knockback_velocity().length(),
+			320.0
+		),
+		"Nascent Soul did not retain Golden opener damage and 320 knockback."
+	)
+	threshold_target.queue_free()
+	palm_elite_target.queue_free()
+	nascent_high_target.queue_free()
+	execute_player.queue_free()
+	execute_resources.queue_free()
 
 	var pickup := WEAPON_PICKUP_SCENE.instantiate() as WeaponPickup
 	pickup.configure(FLYING_SWORD_DATA, 6, Vector2.ZERO, player)

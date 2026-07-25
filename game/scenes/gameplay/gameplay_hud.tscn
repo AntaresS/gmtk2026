@@ -255,10 +255,10 @@ layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_left = 420.0
-offset_top = -448.0
-offset_right = 730.0
-offset_bottom = -334.0
+offset_left = 421.0
+offset_top = -470.0
+offset_right = 731.0
+offset_bottom = -356.0
 grow_vertical = 0
 mouse_filter = 2
 
@@ -332,10 +332,10 @@ layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_left = 420.0
-offset_top = -326.0
-offset_right = 730.0
-offset_bottom = -24.0
+offset_left = 422.0
+offset_top = -348.0
+offset_right = 776.0
+offset_bottom = -6.0
 grow_vertical = 0
 mouse_filter = 2
 
@@ -356,7 +356,7 @@ theme_override_constants/separation = 9
 
 [node name="PalmWeaponSlot" type="Control" parent="HudRoot/WeaponSlotsLayout/SlotsMargin/SlotsColumn/PalmRow" unique_id=898986389]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(92, 92)
+custom_minimum_size = Vector2(108, 104)
 layout_mode = 2
 mouse_filter = 2
 script = ExtResource("2_weapon_slot")
@@ -387,42 +387,42 @@ columns = 3
 
 [node name="WeaponSlot1" type="Control" parent="HudRoot/WeaponSlotsLayout/SlotsMargin/SlotsColumn/WeaponGrid" unique_id=2138918018]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(92, 92)
+custom_minimum_size = Vector2(108, 104)
 layout_mode = 2
 mouse_filter = 2
 script = ExtResource("2_weapon_slot")
 
 [node name="WeaponSlot2" type="Control" parent="HudRoot/WeaponSlotsLayout/SlotsMargin/SlotsColumn/WeaponGrid" unique_id=2017115106]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(92, 92)
+custom_minimum_size = Vector2(108, 104)
 layout_mode = 2
 mouse_filter = 2
 script = ExtResource("2_weapon_slot")
 
 [node name="WeaponSlot3" type="Control" parent="HudRoot/WeaponSlotsLayout/SlotsMargin/SlotsColumn/WeaponGrid" unique_id=1857823013]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(92, 92)
+custom_minimum_size = Vector2(108, 104)
 layout_mode = 2
 mouse_filter = 2
 script = ExtResource("2_weapon_slot")
 
 [node name="WeaponSlot4" type="Control" parent="HudRoot/WeaponSlotsLayout/SlotsMargin/SlotsColumn/WeaponGrid" unique_id=1879067643]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(92, 92)
+custom_minimum_size = Vector2(108, 104)
 layout_mode = 2
 mouse_filter = 2
 script = ExtResource("2_weapon_slot")
 
 [node name="WeaponSlot5" type="Control" parent="HudRoot/WeaponSlotsLayout/SlotsMargin/SlotsColumn/WeaponGrid" unique_id=2103036315]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(92, 92)
+custom_minimum_size = Vector2(108, 104)
 layout_mode = 2
 mouse_filter = 2
 script = ExtResource("2_weapon_slot")
 
 [node name="WeaponSlot6" type="Control" parent="HudRoot/WeaponSlotsLayout/SlotsMargin/SlotsColumn/WeaponGrid" unique_id=1139140689]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(92, 92)
+custom_minimum_size = Vector2(108, 104)
 layout_mode = 2
 mouse_filter = 2
 script = ExtResource("2_weapon_slot")

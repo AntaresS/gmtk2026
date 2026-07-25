@@ -108,13 +108,24 @@ func _run() -> void:
 		and first_slot.is_power_up_effect_active(),
 		"Duplicate pickup did not update count and play power-up feedback."
 	)
+	for _copy in 9:
+		player.collect_weapon(DAO_DATA, DAO_DATA.minimum_damage)
+	await _wait_process_frames(1)
+	_check(
+		first_slot.get_quantity() == 11
+		and first_slot.get_quantity_text() == "Lv.11"
+		and first_slot.custom_minimum_size == Vector2(108.0, 104.0),
+		"Post-cap Dao ownership or the unobstructed slot layout was incorrect."
+	)
 
 	await _send_key(49)
 	_check(
 		player.get_current_weapon_data() == DAO_DATA
+		and player.get_current_delivery_count() == 10
+		and player.get_dao_orbit_count() == 10
 		and first_slot.selected
 		and not first_slot.is_new_weapon_flashing(),
-		"Key 1 did not select slot 1 and clear its first-selection flash."
+		"Key 1 did not select the ten-blade-capped Dao or clear its first-selection flash."
 	)
 
 	var remaining_weapons: Array[WeaponDataResource] = [

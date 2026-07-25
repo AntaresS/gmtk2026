@@ -166,7 +166,7 @@ func _run() -> void:
 	var stress_visibility: Array[float] = player.get(
 		"_dao_weapon_visibility"
 	)
-	var all_stress_blades_deployed := stress_visibility.size() == 100
+	var all_stress_blades_deployed := stress_visibility.size() == 10
 	for visibility in stress_visibility:
 		all_stress_blades_deployed = (
 			all_stress_blades_deployed
@@ -174,8 +174,9 @@ func _run() -> void:
 		)
 	_check(
 		all_stress_blades_deployed
-		and player.get_visible_dao_weapon_count() == 100,
-		"Maximum Dao count did not finish its bounded deployment."
+		and player.get_dao_orbit_count() == 10
+		and player.get_visible_dao_weapon_count() == 10,
+		"Post-cap Dao levels did not remain at ten deployed blades."
 	)
 	await _wait_process_frames(30)
 
