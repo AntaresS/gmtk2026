@@ -6,6 +6,11 @@ This directory contains the playable Godot 4.7 foundation for a top-down,
 forward-scrolling game. Forward is always negative world Y. Keep changes
 focused on the requested system and do not add unrelated gameplay features.
 
+# IMPORTANT CONTEXT
+
+- 精气神 fragment and its related system is no longer in active use. Do not touch it or involve them in
+the current dev. 
+
 ## Current structure
 
 ```text

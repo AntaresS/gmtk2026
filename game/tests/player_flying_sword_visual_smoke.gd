@@ -8,6 +8,9 @@ const FLYING_SWORD_DATA := preload(
 const FLYING_SWORD_TEXTURE := preload(
 	"res://assets/player_weapons/flying_sword.png"
 )
+const UniversalUpgradeTypesResource := preload(
+	"res://game/scripts/gameplay/universal_upgrade_types.gd"
+)
 
 var _failures: Array[String] = []
 
@@ -143,12 +146,29 @@ func _run() -> void:
 	)
 	var warning_position := sword_sprites[0].position
 	await _wait_seconds(0.28)
+	var readiness_strength: float = outline_material.get_shader_parameter(
+		&"readiness_strength"
+	)
+	var warning_energy: float = outline_material.get_shader_parameter(
+		&"warning_energy"
+	)
+	var warning_glow: Color = outline_material.get_shader_parameter(
+		&"glow_color"
+	)
 	_check(
 		player.get_flying_sword_warning_strength() > 0.60
-		and warning_outline.a > 0.60
+		and readiness_strength > 0.60
+		and warning_energy > 0.40
+		and warning_outline.is_equal_approx(Color("f6fbff"))
+		and warning_glow.is_equal_approx(
+			player.flying_sword_warning_glow_color
+		)
 		and sword_sprites[0].position.length() > 108.0
 		and sword_sprites[0].position.distance_to(warning_position) > 0.5,
-		"Nearby enemies did not expand, outline, and slowly rotate the sword ring."
+		(
+			"Nearby enemies did not brighten, glow, expand, and slowly "
+			+ "rotate the sword ring."
+		)
 	)
 
 	enemy.global_position = Vector2(
@@ -208,7 +228,10 @@ func _run() -> void:
 			% player.get_flying_sword_visual_filled_count()
 	)
 
-	enemy.queue_free()
+	enemy.global_position = Vector2(
+		player.get_current_attack_range() + 120.0,
+		0.0
+	)
 	await _wait_process_frames(2)
 	player.set("_attack_cooldown_remaining", 0.18)
 	await _wait_seconds(0.34)
@@ -217,6 +240,125 @@ func _run() -> void:
 		"Missing Flying Swords were not replenished when cooldown completed."
 	)
 
+	var firing_interval := FLYING_SWORD_DATA.projectile_sequence_interval
+	var reload_before_speed_fragment := player.get_current_attack_interval()
+	player.apply_universal_upgrade(
+		UniversalUpgradeTypesResource.UpgradeType.ATTACK_SPEED
+	)
+	_check(
+		player.get_current_attack_interval() < reload_before_speed_fragment
+		and is_equal_approx(
+			FLYING_SWORD_DATA.projectile_sequence_interval,
+			firing_interval
+		),
+		"Attack-speed fragment changed firing cadence instead of only reload."
+	)
+
+	player.set_physics_process(false)
+	var reload_enemy := ENEMY_SCENE.instantiate() as EnemyController
+	reload_enemy.player = player
+	reload_enemy.max_health = 999
+	reload_enemy.cruise_speed = 1.0
+	root.add_child(reload_enemy)
+	reload_enemy.set_physics_process(false)
+	player.set("_attack_cooldown_remaining", 999.0)
+	reload_enemy.global_position = (
+		player.global_position
+		+ Vector2(player.get_current_attack_range() - 16.0, 0.0)
+	)
+	await _wait_physics_frames(2)
+	player.set("_attack_cooldown_remaining", 0.0)
+	var reload_damage = player.call("_roll_current_attack_damage")
+	player.call("_begin_flying_sword_sequence", reload_damage)
+	reload_enemy.global_position = (
+		player.global_position
+		+ Vector2(player.get_current_attack_range() + 120.0, 0.0)
+	)
+	await _wait_physics_frames(2)
+	player.call("_launch_next_flying_sword")
+	_check(
+		player.get_pending_flying_sword_count() == 2
+		and not player.is_flying_sword_reloading()
+		and is_equal_approx(
+			player.get_flying_sword_target_loss_grace_remaining(),
+			0.5
+		),
+		"Flying Sword did not hold its partial volley for the target-loss grace."
+	)
+	player.call("_update_weapon_attack", 0.25)
+	_check(
+		player.get_pending_flying_sword_count() == 2
+		and not player.is_flying_sword_reloading()
+		and absf(
+			player.get_flying_sword_target_loss_grace_remaining() - 0.25
+		) < 0.02,
+		"Flying Sword cancelled before its target-loss grace elapsed."
+	)
+	reload_enemy.global_position = (
+		player.global_position
+		+ Vector2(player.get_current_attack_range() - 16.0, 0.0)
+	)
+	await _wait_physics_frames(2)
+	player.call("_update_weapon_attack", 0.01)
+	_check(
+		player.get_pending_flying_sword_count() == 1
+		and player.get_flying_sword_target_loss_grace_remaining() <= 0.0
+		and not player.is_flying_sword_reloading(),
+		"Flying Sword did not resume its held volley after reacquiring a target."
+	)
+	reload_enemy.global_position = (
+		player.global_position
+		+ Vector2(player.get_current_attack_range() + 120.0, 0.0)
+	)
+	await _wait_physics_frames(2)
+	player.call("_launch_next_flying_sword")
+	player.call("_update_weapon_attack", 0.51)
+	_check(
+		player.get_pending_flying_sword_count() == 0
+		and player.get_flying_sword_visual_filled_count() == 1
+		and player.is_flying_sword_reloading()
+		and player.get_flying_sword_reload_progress() < 0.01,
+		(
+			"Flying Sword did not reload after target-loss grace expired: "
+			+ "pending=%d, filled=%d, reloading=%s, progress=%.3f."
+		) % [
+			player.get_pending_flying_sword_count(),
+			player.get_flying_sword_visual_filled_count(),
+			player.is_flying_sword_reloading(),
+			player.get_flying_sword_reload_progress(),
+		]
+	)
+	var reload_duration := player.get_current_attack_interval()
+	player.call("_update_weapon_attack", reload_duration * 0.5)
+	_check(
+		player.is_flying_sword_reloading()
+		and player.get_flying_sword_visual_filled_count() == 1
+		and absf(player.get_flying_sword_reload_progress() - 0.5) < 0.02,
+		(
+			"Flying Sword reload did not preserve its partial-magazine midpoint: "
+			+ "filled=%d, reloading=%s, progress=%.3f."
+		) % [
+			player.get_flying_sword_visual_filled_count(),
+			player.is_flying_sword_reloading(),
+			player.get_flying_sword_reload_progress(),
+		]
+	)
+	reload_enemy.global_position = (
+		player.global_position
+		+ Vector2(player.get_current_attack_range() + 120.0, 0.0)
+	)
+	await _wait_physics_frames(2)
+	player.call("_update_weapon_attack", reload_duration * 0.5 + 0.01)
+	_check(
+		not player.is_flying_sword_reloading()
+		and player.get_flying_sword_visual_filled_count() == 3
+		and player.get_flying_sword_reload_progress() > 0.99,
+		"Flying Sword magazine did not refill after its full reload duration."
+	)
+
+	enemy.queue_free()
+	reload_enemy.queue_free()
+	await _wait_process_frames(2)
 	player.queue_free()
 	await _wait_process_frames(2)
 	if _failures.is_empty():

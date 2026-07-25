@@ -30,7 +30,8 @@ extends Resource
 
 @export_category("Attack Delivery")
 ## Player-wide additive attack-speed ratio before 气 progression. This reduces
-## every weapon's automatic-attack interval through the shared resolver.
+## every weapon's automatic-attack interval through the shared resolver;
+## Flying Sword consumes the result as its post-magazine reload duration.
 @export_range(0.0, 10.0, 0.01) var base_attack_speed_bonus: float = 0.0
 ## Player-wide additive projectile-speed ratio before 气 progression. Projectile
 ## weapons opt into the resolved multiplier through their attack implementation.
@@ -59,6 +60,6 @@ extends Resource
 @export_range(0.0, 600.0, 1.0) var close_range_mitigation_radius: float = 96.0
 
 @export_category("Combat Safety Limits")
-## Smallest permitted automatic-attack interval in seconds after all attack
-## speed bonuses. This bounds firing frequency for every weapon.
+## Smallest permitted automatic-attack or reload interval in seconds after all
+## attack-speed bonuses. Flying Sword's separate firing interval is unaffected.
 @export_range(0.01, 1.0, 0.01) var minimum_attack_interval: float = 0.05

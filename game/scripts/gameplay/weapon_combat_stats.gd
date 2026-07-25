@@ -20,6 +20,7 @@ var resolved_damage: int = 1
 var critical_chance: float = 0.0
 var critical_damage_multiplier: float = 1.0
 var attack_speed_bonus: float = 0.0
+## Resolved automatic-attack interval, or Flying Sword magazine reload time.
 var attack_interval: float = 0.7
 var attack_range: float = 72.0
 var targeting_range_bonus: float = 0.0

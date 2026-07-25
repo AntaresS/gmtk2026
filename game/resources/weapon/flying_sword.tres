@@ -17,3 +17,5 @@ maximum_damage = 8
 attack_range = 240.0
 attack_interval = 0.9
 projectile_scene = ExtResource("2_projectile")
+projectile_sequence_interval = 0.12
+base_delivery_count = 1

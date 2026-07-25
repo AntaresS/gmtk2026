@@ -51,6 +51,8 @@ var cultivation_type: int = -1
 ## this cone instead of damaging through its complete detection circle.
 @export_range(1.0, 180.0, 1.0) var directional_arc_degrees: float = 64.0
 ## Minimum seconds between automatic attacks while a valid target is present.
+## Magazine-based weapons such as Flying Sword use this as reload time after
+## their final sequential projectile instead of between individual shots.
 @export_range(0.05, 5.0, 0.01) var attack_interval: float = 0.7
 
 @export_category("Great Strength Palm")

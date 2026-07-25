@@ -73,6 +73,9 @@ const FANTIAN_SEAL_TEXTURE: Texture2D = preload(
 const OUTLINE_SHADER: Shader = preload(
 	"res://game/shaders/enemy_outline.gdshader"
 )
+const FLYING_SWORD_READINESS_SHADER: Shader = preload(
+	"res://game/shaders/flying_sword_readiness.gdshader"
+)
 const DISSOLVE_SHADER: Shader = preload(
 	"res://game/shaders/enemy_dissolve.gdshader"
 )
@@ -229,6 +232,32 @@ const DAO_MAX_ATTACK_TRAIL_COUNT: int = 24
 	DEFAULT_PLAYER_COMBAT_CONFIG
 )
 
+@export_category("Flying Sword Readability")
+## Pale energy color surrounding readied Flying Swords. The alpha channel is
+## multiplied by the live warning strength and the glow intensity below.
+@export var flying_sword_warning_glow_color: Color = Color("8ce6ff")
+## Maximum opacity of the soft readiness glow around each sword.
+@export_range(0.0, 1.0, 0.01) var flying_sword_warning_glow_strength := 0.32
+## Glow reach in source-texture pixels. Because the sword texture is scaled at
+## runtime, larger values widen the aura without changing combat geometry.
+@export_range(16.0, 128.0, 1.0) var flying_sword_warning_glow_width := 68.0
+## Fraction of glow intensity removed at the low point of its breathing pulse.
+## Zero keeps the glow steady; larger values make readiness easier to notice.
+@export_range(0.0, 0.8, 0.01) var flying_sword_warning_pulse_depth := 0.35
+## Breathing cycles per second while a target is inside the warning margin.
+## The first cycle begins bright to make target acquisition immediately clear.
+@export_range(0.1, 3.0, 0.05) var flying_sword_warning_pulse_hz := 0.75
+## Maximum amount the sword artwork itself shifts toward white while readied.
+@export_range(0.0, 0.5, 0.01) var flying_sword_warning_brighten := 0.12
+## Color and maximum opacity of the circular reload-progress cue drawn at the
+## current sword-orbit radius while any spent sword is being restored.
+@export var flying_sword_reload_ring_color := Color(0.55, 0.9, 1.0, 0.62)
+## World-pixel width of the Flying Sword reload-progress arc.
+@export_range(0.5, 8.0, 0.25) var flying_sword_reload_ring_width := 2.5
+## Seconds a partial Flying Sword volley waits for another valid target before
+## cancelling into reload. Zero restores immediate cancellation on target loss.
+@export_range(0.0, 2.0, 0.05) var flying_sword_target_loss_grace_duration := 0.5
+
 @export_category("Universal Upgrade Fragments")
 ## Additive attack-speed ratio granted by each global attack-speed fragment.
 @export_range(0.0, 1.0, 0.01) var attack_speed_bonus_per_fragment: float = 0.06
@@ -348,6 +377,7 @@ var _flying_sword_visual_summoning: bool = false
 var _flying_sword_visual_elapsed: float = 0.0
 var _flying_sword_orbit_phase: float = 0.0
 var _flying_sword_warning_strength: float = 0.0
+var _flying_sword_warning_pulse_elapsed: float = 0.0
 var _flying_sword_aim_target: EnemyController
 var _fantian_seal_visual_equipped: bool = false
 var _fantian_seal_visual_state: int = FantianSealVisualState.HIDDEN
@@ -393,6 +423,9 @@ var _flying_sword_sequence_launched: int = 0
 var _flying_sword_sequence_damage: int = 1
 var _flying_sword_sequence_is_critical: bool = false
 var _flying_sword_sequence_timer: float = 0.0
+var _flying_sword_target_loss_grace_remaining: float = 0.0
+var _flying_sword_reload_active: bool = false
+var _flying_sword_reload_duration: float = 0.0
 var _level_up_effect_remaining: float = 0.0
 var _breakthrough_effect_remaining: float = 0.0
 var _pending_qiankun_rings: int = 0
@@ -600,6 +633,7 @@ func _draw() -> void:
 		_draw_qi_shield()
 
 	_draw_dao_trails()
+	_draw_flying_sword_reload()
 	_draw_weapon_companions()
 	if _damage_flash_remaining > 0.0:
 		_draw_damage_feedback()
@@ -1358,6 +1392,33 @@ func get_pending_flying_sword_count() -> int:
 	return _pending_flying_swords
 
 
+## Reports whether spent Flying Swords are waiting for their shared magazine
+## reload. Attack-speed bonuses shorten this reload, not the firing interval.
+func is_flying_sword_reloading() -> bool:
+	return _flying_sword_reload_active
+
+
+## Returns seconds remaining before a targetless partial volley cancels into
+## reload. Reacquiring any valid target clears this grace immediately.
+func get_flying_sword_target_loss_grace_remaining() -> float:
+	return _flying_sword_target_loss_grace_remaining
+
+
+## Returns normalized Flying Sword reload completion. A fully ready magazine
+## reports 1.0, including while Flying Sword is not currently equipped.
+func get_flying_sword_reload_progress() -> float:
+	if (
+		not _flying_sword_reload_active
+		or _flying_sword_reload_duration <= 0.0
+	):
+		return 1.0
+	return 1.0 - clampf(
+		_attack_cooldown_remaining / _flying_sword_reload_duration,
+		0.0,
+		1.0
+	)
+
+
 ## Returns the number of idle weapons visibly accompanying the player.
 ## Equipped weapons always use one companion regardless of upgrade level.
 func get_visible_companion_weapon_count() -> int:
@@ -1738,7 +1799,24 @@ func _update_weapon_attack(delta: float) -> void:
 		_attack_cooldown_remaining - delta,
 		0.0
 	)
+	if _flying_sword_reload_active:
+		queue_redraw()
+		if _attack_cooldown_remaining > 0.0:
+			return
+		_complete_flying_sword_reload()
 	if _pending_flying_swords > 0:
+		if _flying_sword_target_loss_grace_remaining > 0.0:
+			if not _get_attack_targets().is_empty():
+				_flying_sword_target_loss_grace_remaining = 0.0
+				_launch_next_flying_sword()
+			else:
+				_flying_sword_target_loss_grace_remaining = maxf(
+					_flying_sword_target_loss_grace_remaining - delta,
+					0.0
+				)
+				if _flying_sword_target_loss_grace_remaining <= 0.0:
+					_cancel_flying_sword_sequence()
+			return
 		_flying_sword_sequence_timer -= delta
 		if _flying_sword_sequence_timer <= 0.0:
 			_launch_next_flying_sword()
@@ -1794,7 +1872,8 @@ func _update_weapon_attack(delta: float) -> void:
 	else:
 		_begin_palm_cast(targets[0], attack_damage)
 
-	_attack_cooldown_remaining = get_current_attack_interval()
+	if attack_kind != WeaponDataResource.AttackKind.FLYING_SWORD:
+		_attack_cooldown_remaining = get_current_attack_interval()
 	queue_redraw()
 
 
@@ -1808,6 +1887,7 @@ func _begin_flying_sword_sequence(
 	_flying_sword_sequence_damage = maxi(attack_damage.damage, 1)
 	_flying_sword_sequence_is_critical = attack_damage.is_critical
 	_flying_sword_sequence_timer = 0.0
+	_flying_sword_target_loss_grace_remaining = 0.0
 	_launch_next_flying_sword()
 
 
@@ -1816,8 +1896,14 @@ func _launch_next_flying_sword() -> void:
 		return
 	var targets := _get_attack_targets()
 	if targets.is_empty():
-		_cancel_flying_sword_sequence()
+		_flying_sword_target_loss_grace_remaining = maxf(
+			flying_sword_target_loss_grace_duration,
+			0.0
+		)
+		if _flying_sword_target_loss_grace_remaining <= 0.0:
+			_cancel_flying_sword_sequence()
 		return
+	_flying_sword_target_loss_grace_remaining = 0.0
 	var target := targets[
 		_flying_sword_sequence_launched % targets.size()
 	]
@@ -1830,6 +1916,9 @@ func _launch_next_flying_sword() -> void:
 	)
 	_flying_sword_sequence_launched += 1
 	_pending_flying_swords -= 1
+	if _pending_flying_swords <= 0:
+		_start_flying_sword_reload()
+		return
 	var weapon_data := _get_current_weapon_data()
 	_flying_sword_sequence_timer = maxf(
 		weapon_data.projectile_sequence_interval,
@@ -1838,11 +1927,39 @@ func _launch_next_flying_sword() -> void:
 
 
 func _cancel_flying_sword_sequence() -> void:
+	var spent_any_sword := _flying_sword_sequence_launched > 0
 	_pending_flying_swords = 0
 	_flying_sword_sequence_total = 0
 	_flying_sword_sequence_launched = 0
 	_flying_sword_sequence_is_critical = false
 	_flying_sword_sequence_timer = 0.0
+	_flying_sword_target_loss_grace_remaining = 0.0
+	if spent_any_sword and not _flying_sword_reload_active:
+		_start_flying_sword_reload()
+
+
+func _start_flying_sword_reload() -> void:
+	_flying_sword_sequence_total = 0
+	_flying_sword_sequence_launched = 0
+	_flying_sword_sequence_is_critical = false
+	_flying_sword_sequence_timer = 0.0
+	_flying_sword_target_loss_grace_remaining = 0.0
+	_flying_sword_reload_duration = maxf(
+		get_current_attack_interval(),
+		0.01
+	)
+	_attack_cooldown_remaining = _flying_sword_reload_duration
+	_flying_sword_reload_active = true
+	queue_redraw()
+
+
+func _complete_flying_sword_reload() -> void:
+	_flying_sword_reload_active = false
+	_flying_sword_reload_duration = 0.0
+	_attack_cooldown_remaining = 0.0
+	_refill_flying_sword_visual_slots()
+	_flying_sword_warning_pulse_elapsed = 0.0
+	queue_redraw()
 
 
 func _release_great_strength_palm(
@@ -3183,10 +3300,11 @@ func _refresh_flying_sword_visual_equipment() -> void:
 		_flying_sword_visual_equipped = false
 		_flying_sword_visual_summoning = false
 		_flying_sword_warning_strength = 0.0
+		_flying_sword_warning_pulse_elapsed = 0.0
 		_flying_sword_aim_target = null
 		for sword_sprite in _flying_sword_visual_sprites:
 			sword_sprite.hide()
-		_set_flying_sword_outline(0.0)
+		_set_flying_sword_readiness(0.0, 0.0)
 		return
 	var switching_to_sword := not _flying_sword_visual_equipped
 	_flying_sword_visual_equipped = true
@@ -3199,7 +3317,8 @@ func _refresh_flying_sword_visual_equipment() -> void:
 	_flying_sword_visual_elapsed = 0.0
 	_flying_sword_visual_summoning = true
 	for sword_index in _flying_sword_visual_sprites.size():
-		_flying_sword_visual_filled[sword_index] = true
+		if not _flying_sword_reload_active:
+			_flying_sword_visual_filled[sword_index] = true
 		_flying_sword_visual_visibility[sword_index] = 0.0
 		_flying_sword_visual_sprites[sword_index].hide()
 
@@ -3208,12 +3327,34 @@ func _ensure_flying_sword_visual_count(required_count: int) -> void:
 	var safe_count := maxi(required_count, 1)
 	if _flying_sword_outline_material == null:
 		_flying_sword_outline_material = ShaderMaterial.new()
-		_flying_sword_outline_material.shader = OUTLINE_SHADER
+		_flying_sword_outline_material.shader = (
+			FLYING_SWORD_READINESS_SHADER
+		)
 		_flying_sword_outline_material.set_shader_parameter(
 			&"outline_width",
 			FLYING_SWORD_OUTLINE_TEXTURE_WIDTH
 		)
-		_set_flying_sword_outline(0.0)
+		_flying_sword_outline_material.set_shader_parameter(
+			&"outline_color",
+			FLYING_SWORD_OUTLINE_COLOR
+		)
+		_flying_sword_outline_material.set_shader_parameter(
+			&"glow_color",
+			flying_sword_warning_glow_color
+		)
+		_flying_sword_outline_material.set_shader_parameter(
+			&"glow_width",
+			flying_sword_warning_glow_width
+		)
+		_flying_sword_outline_material.set_shader_parameter(
+			&"glow_strength",
+			flying_sword_warning_glow_strength
+		)
+		_flying_sword_outline_material.set_shader_parameter(
+			&"sword_brighten",
+			flying_sword_warning_brighten
+		)
+		_set_flying_sword_readiness(0.0, 0.0)
 	var previous_count := _flying_sword_visual_sprites.size()
 	while _flying_sword_visual_sprites.size() < safe_count:
 		var sword_index := _flying_sword_visual_sprites.size()
@@ -3227,7 +3368,9 @@ func _ensure_flying_sword_visual_count(required_count: int) -> void:
 		flying_sword_layer.add_child(sword_sprite)
 		_flying_sword_visual_sprites.append(sword_sprite)
 		_flying_sword_visual_visibility.append(0.0)
-		_flying_sword_visual_filled.append(true)
+		_flying_sword_visual_filled.append(
+			not _flying_sword_reload_active
+		)
 	while _flying_sword_visual_sprites.size() > safe_count:
 		var removed_sprite: Sprite2D = (
 			_flying_sword_visual_sprites.pop_back()
@@ -3240,15 +3383,19 @@ func _ensure_flying_sword_visual_count(required_count: int) -> void:
 		_flying_sword_visual_elapsed = 0.0
 
 
-func _set_flying_sword_outline(strength: float) -> void:
+func _set_flying_sword_readiness(
+	strength: float,
+	warning_energy: float
+) -> void:
 	if _flying_sword_outline_material == null:
 		return
 	_flying_sword_outline_material.set_shader_parameter(
-		&"outline_color",
-		Color(
-			FLYING_SWORD_OUTLINE_COLOR,
-			clampf(strength, 0.0, 1.0)
-		)
+		&"readiness_strength",
+		clampf(strength, 0.0, 1.0)
+	)
+	_flying_sword_outline_material.set_shader_parameter(
+		&"warning_energy",
+		clampf(warning_energy, 0.0, 1.0)
 	)
 
 
@@ -3374,6 +3521,7 @@ func _update_flying_sword_visuals(delta: float) -> void:
 			_flying_sword_aim_target.global_position
 		)
 	var attack_range := get_current_attack_range()
+	var previous_warning_strength := _flying_sword_warning_strength
 	if nearest_distance <= attack_range + FLYING_SWORD_WARNING_MARGIN:
 		_flying_sword_warning_strength = 1.0 - clampf(
 			(nearest_distance - attack_range)
@@ -3384,6 +3532,10 @@ func _update_flying_sword_visuals(delta: float) -> void:
 	else:
 		_flying_sword_warning_strength = 0.0
 	if _flying_sword_warning_strength > 0.0:
+		if previous_warning_strength <= 0.0:
+			_flying_sword_warning_pulse_elapsed = 0.0
+		else:
+			_flying_sword_warning_pulse_elapsed += delta
 		aim_direction = global_position.direction_to(
 			_flying_sword_aim_target.global_position
 		).normalized()
@@ -3395,12 +3547,30 @@ func _update_flying_sword_visuals(delta: float) -> void:
 			TAU
 		)
 	else:
+		_flying_sword_warning_pulse_elapsed = 0.0
 		_flying_sword_orbit_phase = lerp_angle(
 			_flying_sword_orbit_phase,
 			0.0,
 			1.0 - exp(-4.0 * delta)
 		)
-	_set_flying_sword_outline(_flying_sword_warning_strength)
+	var pulse_wave := (
+		0.5
+		+ 0.5
+			* cos(
+				_flying_sword_warning_pulse_elapsed
+					* TAU
+					* flying_sword_warning_pulse_hz
+			)
+	)
+	var pulse_multiplier := lerpf(
+		1.0 - flying_sword_warning_pulse_depth,
+		1.0,
+		pulse_wave
+	)
+	_set_flying_sword_readiness(
+		_flying_sword_warning_strength,
+		_flying_sword_warning_strength * pulse_multiplier
+	)
 	if (
 		_attack_cooldown_remaining <= 0.0
 		and _pending_flying_swords <= 0
@@ -3938,6 +4108,47 @@ func _publish_lifespan_decay_multiplier() -> void:
 		return
 	_last_lifespan_decay_multiplier = multiplier
 	lifespan_decay_multiplier_changed.emit(multiplier)
+
+
+func _draw_flying_sword_reload() -> void:
+	if not _is_flying_sword_equipped() or not _flying_sword_reload_active:
+		return
+	var sword_count := maxi(get_flying_sword_projectile_count(), 1)
+	var orbit_radius := maxf(
+		_get_flying_sword_slot_position(0, sword_count).length(),
+		24.0
+	)
+	var progress := get_flying_sword_reload_progress()
+	var ring_color := flying_sword_reload_ring_color
+	draw_arc(
+		Vector2.ZERO,
+		orbit_radius,
+		0.0,
+		TAU,
+		64,
+		Color(ring_color, ring_color.a * 0.16),
+		maxf(flying_sword_reload_ring_width * 0.65, 0.5),
+		true
+	)
+	if progress <= 0.001:
+		return
+	var start_angle := -PI * 0.5
+	var end_angle := start_angle + TAU * progress
+	draw_arc(
+		Vector2.ZERO,
+		orbit_radius,
+		start_angle,
+		end_angle,
+		maxi(ceili(64.0 * progress), 2),
+		ring_color,
+		maxf(flying_sword_reload_ring_width, 0.5),
+		true
+	)
+	draw_circle(
+		Vector2.from_angle(end_angle) * orbit_radius,
+		maxf(flying_sword_reload_ring_width * 1.15, 1.0),
+		Color(ring_color, minf(ring_color.a + 0.22, 1.0))
+	)
 
 
 func _draw_weapon_companions() -> void:
