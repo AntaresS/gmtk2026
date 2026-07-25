@@ -1,0 +1,287 @@
+{
+  "source": "image_asset\\fly_jindan\\image 9.png",
+  "order": "left-to-right, top-to-bottom",
+  "frame_count": 9,
+  "frame_size": [
+    544,
+    544
+  ],
+  "head_anchor": [
+    272,
+    121
+  ],
+  "target_head_to_bottom": 264,
+  "source_alpha_preserved": true,
+  "frames": [
+    {
+      "source_cell": [
+        0,
+        0
+      ],
+      "source_bbox": [
+        64,
+        37,
+        356,
+        377
+      ],
+      "source_head_anchor": [
+        212.0,
+        37.0
+      ],
+      "output": "golden_core_fly_00.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.7764705882352941,
+      "paste_offset": [
+        107,
+        92
+      ]
+    },
+    {
+      "source_cell": [
+        0,
+        1
+      ],
+      "source_bbox": [
+        43,
+        32,
+        344,
+        382
+      ],
+      "source_head_anchor": [
+        209.0,
+        33.0
+      ],
+      "output": "golden_core_fly_01.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.7564469914040115,
+      "paste_offset": [
+        114,
+        96
+      ]
+    },
+    {
+      "source_cell": [
+        0,
+        2
+      ],
+      "source_bbox": [
+        34,
+        33,
+        363,
+        388
+      ],
+      "source_head_anchor": [
+        208.0,
+        34.0
+      ],
+      "output": "golden_core_fly_02.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.7457627118644068,
+      "paste_offset": [
+        117,
+        96
+      ]
+    },
+    {
+      "source_cell": [
+        1,
+        0
+      ],
+      "source_bbox": [
+        28,
+        22,
+        393,
+        386
+      ],
+      "source_head_anchor": [
+        211.0,
+        22.0
+      ],
+      "output": "golden_core_fly_03.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.7252747252747253,
+      "paste_offset": [
+        119,
+        105
+      ]
+    },
+    {
+      "source_cell": [
+        1,
+        1
+      ],
+      "source_bbox": [
+        17,
+        21,
+        388,
+        385
+      ],
+      "source_head_anchor": [
+        207.0,
+        22.0
+      ],
+      "output": "golden_core_fly_04.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.7272727272727273,
+      "paste_offset": [
+        121,
+        105
+      ]
+    },
+    {
+      "source_cell": [
+        1,
+        2
+      ],
+      "source_bbox": [
+        16,
+        22,
+        387,
+        390
+      ],
+      "source_head_anchor": [
+        206.0,
+        22.0
+      ],
+      "output": "golden_core_fly_05.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.717391304347826,
+      "paste_offset": [
+        124,
+        105
+      ]
+    },
+    {
+      "source_cell": [
+        2,
+        0
+      ],
+      "source_bbox": [
+        17,
+        21,
+        378,
+        393
+      ],
+      "source_head_anchor": [
+        209.0,
+        21.0
+      ],
+      "output": "golden_core_fly_06.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.7096774193548387,
+      "paste_offset": [
+        124,
+        106
+      ]
+    },
+    {
+      "source_cell": [
+        2,
+        1
+      ],
+      "source_bbox": [
+        10,
+        21,
+        380,
+        395
+      ],
+      "source_head_anchor": [
+        204.0,
+        22.0
+      ],
+      "output": "golden_core_fly_07.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.707774798927614,
+      "paste_offset": [
+        128,
+        105
+      ]
+    },
+    {
+      "source_cell": [
+        2,
+        2
+      ],
+      "source_bbox": [
+        24,
+        21,
+        372,
+        394
+      ],
+      "source_head_anchor": [
+        204.0,
+        22.0
+      ],
+      "output": "golden_core_fly_08.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.7096774193548387,
+      "paste_offset": [
+        127,
+        105
+      ]
+    }
+  ]
+}

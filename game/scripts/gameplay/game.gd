@@ -3,6 +3,8 @@ extends Node2D
 ## Vertical camera lead in world pixels. Larger values show more road ahead and
 ## place the player lower on screen; smaller values move the player upward.
 @export var camera_forward_look_ahead: float = 180.0
+## Seconds used to ease the camera horizontally onto a committed branch.
+@export_range(0.1, 2.0, 0.05) var route_camera_pan_duration: float = 0.75
 ## Shows the runtime speed, traveled distance, and active chunk count overlay.
 @export var show_debug_ui: bool = false
 ## Configurable warning and lightning sequence used at non-fatal realm
@@ -42,6 +44,11 @@ var _active_annihilation: RealmAnnihilation
 var _fatal_breakthrough_triggered: bool = false
 var _camera_shake_remaining: float = 0.0
 var _camera_shake_strength: float = 0.0
+var _camera_route_center_x: float = 0.0
+var _camera_pan_start_x: float = 0.0
+var _camera_pan_target_x: float = 0.0
+var _camera_pan_elapsed: float = 0.0
+var _camera_pan_active: bool = false
 
 
 func _ready() -> void:
@@ -53,6 +60,11 @@ func _ready() -> void:
 	_active_annihilation = null
 	_fatal_breakthrough_triggered = false
 	_active_route_center_x = infinite_world.get_route_center_x()
+	_camera_route_center_x = _active_route_center_x
+	_camera_pan_start_x = _active_route_center_x
+	_camera_pan_target_x = _active_route_center_x
+	_camera_pan_elapsed = 0.0
+	_camera_pan_active = false
 	player.set_movement_enabled(true)
 	infinite_world.set_progression_enabled(true)
 	enemy_spawner.set_road_half_width(infinite_world.chunk_config.road_half_width)
@@ -66,6 +78,7 @@ func _ready() -> void:
 	road_fork_spawner.set_road_half_width_resolver(
 		Callable(infinite_world, "get_road_half_width_at_world_y")
 	)
+	road_fork_spawner.set_world_config(infinite_world.chunk_config)
 	road_fork_spawner.set_route_center_x(_active_route_center_x)
 	road_fork_spawner.set_forks_enabled(true)
 	enemy_spawner.set_route_center_x(_active_route_center_x)
@@ -104,6 +117,7 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_update_route_camera_pan(delta)
 	var camera_target := _get_camera_target()
 	if _camera_shake_remaining > 0.0:
 		_camera_shake_remaining = maxf(_camera_shake_remaining - delta, 0.0)
@@ -133,7 +147,7 @@ func _process(_delta: float) -> void:
 
 func _get_camera_target() -> Vector2:
 	return Vector2(
-		_active_route_center_x,
+		_camera_route_center_x,
 		player.global_position.y - camera_forward_look_ahead
 	)
 
@@ -143,13 +157,44 @@ func _on_route_committed(
 	branch_name: String
 ) -> void:
 	_active_route_center_x = route_center_x
+	_start_route_camera_pan(route_center_x)
 	infinite_world.set_route_center_x(route_center_x)
 	enemy_spawner.set_route_center_x(route_center_x)
 	var trial_hell_active := branch_name == "试炼地狱"
 	infinite_world.set_trial_hell_active(trial_hell_active)
 	enemy_spawner.set_trial_hell_active(trial_hell_active)
-	player.global_position.x = route_center_x
-	camera.global_position.x = route_center_x
+
+
+func _start_route_camera_pan(target_x: float) -> void:
+	_camera_pan_start_x = _camera_route_center_x
+	_camera_pan_target_x = target_x
+	_camera_pan_elapsed = 0.0
+	_camera_pan_active = not is_equal_approx(
+		_camera_pan_start_x,
+		_camera_pan_target_x
+	)
+	if not _camera_pan_active:
+		_camera_route_center_x = target_x
+
+
+func _update_route_camera_pan(delta: float) -> void:
+	if not _camera_pan_active:
+		return
+	_camera_pan_elapsed += maxf(delta, 0.0)
+	var ratio := clampf(
+		_camera_pan_elapsed / maxf(route_camera_pan_duration, 0.01),
+		0.0,
+		1.0
+	)
+	var smooth_ratio := ratio * ratio * (3.0 - 2.0 * ratio)
+	_camera_route_center_x = lerpf(
+		_camera_pan_start_x,
+		_camera_pan_target_x,
+		smooth_ratio
+	)
+	if ratio >= 1.0:
+		_camera_route_center_x = _camera_pan_target_x
+		_camera_pan_active = false
 
 
 func _on_breakthrough_requested(
@@ -276,6 +321,8 @@ func get_debug_snapshot() -> Dictionary:
 		"world": infinite_world.get_debug_snapshot(),
 		"enemies": enemy_spawner.get_debug_snapshot(),
 		"active_route_center_x": _active_route_center_x,
+		"camera_route_center_x": _camera_route_center_x,
+		"camera_route_pan_active": _camera_pan_active,
 		"trial_hell_active": enemy_spawner.is_trial_hell_active(),
 	}
 

@@ -64,7 +64,16 @@ func _run() -> void:
 		and character_sprite.sprite_frames.get_frame_count(&"qi_walk") == 9
 		and character_sprite.sprite_frames.get_frame_count(&"walk") == 9
 		and character_sprite.sprite_frames.get_frame_count(&"fly") == 9,
-		"Player did not load both realm running sets and the flying set."
+		"Player did not load both grounded sets and Foundation flight."
+	)
+	_check(
+		character_sprite.sprite_frames.get_frame_count(
+			&"golden_core_fly"
+		) == 9
+		and character_sprite.sprite_frames.get_frame_count(
+			&"nascent_soul_fly"
+		) == 9,
+		"Player did not load both advanced-realm flying sets."
 	)
 
 	var starting_y := player.global_position.y

@@ -1,0 +1,188 @@
+{
+  "frame_count": 6,
+  "frame_size": [
+    544,
+    544
+  ],
+  "alignment": "head",
+  "alignment_anchor": [
+    272,
+    121
+  ],
+  "frames": [
+    {
+      "source_bbox": [
+        95,
+        27,
+        260,
+        342
+      ],
+      "source_head_anchor": [
+        180.0,
+        27.0
+      ],
+      "source_alignment_anchor": [
+        180.0,
+        27.0
+      ],
+      "output_alignment_anchor": [
+        272,
+        121
+      ],
+      "output_head_position": [
+        272.34883720930236,
+        121.10232558139535
+      ],
+      "scale": 0.8186046511627907,
+      "paste_offset": [
+        125,
+        99
+      ]
+    },
+    {
+      "source_bbox": [
+        94,
+        28,
+        257,
+        344
+      ],
+      "source_head_anchor": [
+        184.0,
+        28.0
+      ],
+      "source_alignment_anchor": [
+        184.0,
+        28.0
+      ],
+      "output_alignment_anchor": [
+        272,
+        121
+      ],
+      "output_head_position": [
+        271.6232558139535,
+        120.92093023255813
+      ],
+      "scale": 0.8186046511627907,
+      "paste_offset": [
+        121,
+        98
+      ]
+    },
+    {
+      "source_bbox": [
+        89,
+        16,
+        252,
+        344
+      ],
+      "source_head_anchor": [
+        186.0,
+        16.0
+      ],
+      "source_alignment_anchor": [
+        186.0,
+        16.0
+      ],
+      "output_alignment_anchor": [
+        272,
+        121
+      ],
+      "output_head_position": [
+        272.2604651162791,
+        121.09767441860465
+      ],
+      "scale": 0.8186046511627907,
+      "paste_offset": [
+        120,
+        108
+      ]
+    },
+    {
+      "source_bbox": [
+        94,
+        18,
+        257,
+        344
+      ],
+      "source_head_anchor": [
+        184.0,
+        18.0
+      ],
+      "source_alignment_anchor": [
+        184.0,
+        18.0
+      ],
+      "output_alignment_anchor": [
+        272,
+        121
+      ],
+      "output_head_position": [
+        271.6232558139535,
+        120.73488372093023
+      ],
+      "scale": 0.8186046511627907,
+      "paste_offset": [
+        121,
+        106
+      ]
+    },
+    {
+      "source_bbox": [
+        96,
+        17,
+        260,
+        344
+      ],
+      "source_head_anchor": [
+        181.0,
+        17.0
+      ],
+      "source_alignment_anchor": [
+        181.0,
+        17.0
+      ],
+      "output_alignment_anchor": [
+        272,
+        121
+      ],
+      "output_head_position": [
+        272.16744186046515,
+        120.91627906976744
+      ],
+      "scale": 0.8186046511627907,
+      "paste_offset": [
+        124,
+        107
+      ]
+    },
+    {
+      "source_bbox": [
+        96,
+        18,
+        263,
+        337
+      ],
+      "source_head_anchor": [
+        180.0,
+        18.0
+      ],
+      "source_alignment_anchor": [
+        180.0,
+        18.0
+      ],
+      "output_alignment_anchor": [
+        272,
+        121
+      ],
+      "output_head_position": [
+        272.34883720930236,
+        120.73488372093023
+      ],
+      "scale": 0.8186046511627907,
+      "paste_offset": [
+        125,
+        106
+      ]
+    }
+  ]
+}

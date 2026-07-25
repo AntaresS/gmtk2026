@@ -28,6 +28,7 @@ var _next_branch_side: int = -1
 var _next_is_trial_hell: bool = false
 var _route_center_x: float = 0.0
 var _road_half_width_resolver: Callable
+var _world_config: WorldChunkConfig
 
 
 func _ready() -> void:
@@ -59,6 +60,11 @@ func set_road_half_width_resolver(resolver: Callable) -> void:
 	_road_half_width_resolver = resolver
 
 
+## Supplies the shared atlas and tile dimensions used by generated chunks.
+func set_world_config(value: WorldChunkConfig) -> void:
+	_world_config = value
+
+
 ## Moves later fork events to the active infinite route center.
 func set_route_center_x(value: float) -> void:
 	_route_center_x = value
@@ -82,12 +88,16 @@ func _spawn_fork() -> void:
 		push_error("RoadForkSpawner road_fork_scene must instantiate RoadFork.")
 		return
 	road_fork.player = player
-	add_child(road_fork)
 	var half_visible_height := (
 		get_viewport_rect().size.y / maxf(camera.zoom.y, 0.01) * 0.5
 	)
+	var camera_top_y := camera.global_position.y - half_visible_height
+	road_fork.set_world_config(_world_config)
+	road_fork.set_road_half_width_resolver(_road_half_width_resolver)
 	var spawn_y := (
-		camera.global_position.y - half_visible_height - spawn_ahead_margin
+		camera_top_y
+		- spawn_ahead_margin
+		- road_fork.get_visual_entry_bottom_y()
 	)
 	road_fork.set_road_half_width(_get_road_half_width_at(spawn_y))
 	road_fork.configure_side(_next_branch_side)
@@ -96,10 +106,11 @@ func _spawn_fork() -> void:
 	_next_is_trial_hell = not _next_is_trial_hell
 	road_fork.branch_selected.connect(_on_branch_selected)
 	road_fork.route_committed.connect(_on_route_committed)
-	road_fork.global_position = Vector2(
+	road_fork.position = to_local(Vector2(
 		_route_center_x,
 		spawn_y
-	)
+	))
+	add_child(road_fork)
 
 
 func _on_branch_selected(branch_name: String) -> void:

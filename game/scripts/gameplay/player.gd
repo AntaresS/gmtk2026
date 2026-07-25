@@ -58,6 +58,96 @@ const DEFAULT_PLAYER_COMBAT_CONFIG: PlayerCombatConfigResource = preload(
 const DEFAULT_PLAYER_ECHO_SCENE: PackedScene = preload(
 	"res://game/scenes/gameplay/player_echo.tscn"
 )
+const DAO_WEAPON_TEXTURE: Texture2D = preload(
+	"res://assets/player_weapons/dao_knife.png"
+)
+const PALM_WEAPON_TEXTURE: Texture2D = preload(
+	"res://assets/player_weapons/great_strength_palm.png"
+)
+const FLYING_SWORD_TEXTURE: Texture2D = preload(
+	"res://assets/player_weapons/flying_sword.png"
+)
+const FANTIAN_SEAL_TEXTURE: Texture2D = preload(
+	"res://assets/player_weapons/fantian_seal.png"
+)
+const OUTLINE_SHADER: Shader = preload(
+	"res://game/shaders/enemy_outline.gdshader"
+)
+enum PalmVisualState {
+	HIDDEN,
+	SUMMONING,
+	IDLE,
+	STRIKING,
+	RETURNING,
+}
+enum FantianSealVisualState {
+	HIDDEN,
+	SUMMONING,
+	ASCENDING,
+	ABSENT,
+	SHADOW_DELAY,
+	SHADOW_SHRINK,
+}
+
+const PALM_NORMAL_SCALE: float = 0.035
+const PALM_CHARGED_SCALE: float = 0.025
+const PALM_STRIKE_SCALE: float = 0.105
+const PALM_CENTER_OFFSET_PIXELS: float = 88.0
+const PALM_IDLE_RADIUS: float = 68.0
+const PALM_CHARGED_RADIUS: float = 24.0
+const PALM_WARNING_MARGIN: float = 74.0
+const PALM_SUMMON_DURATION: float = 0.24
+const PALM_STRIKE_DURATION: float = 0.13
+const PALM_RETURN_DURATION: float = 0.18
+const PALM_OUTLINE_TEXTURE_WIDTH: float = 20.0
+const PALM_GLOW_COLOR: Color = Color("d9ffff")
+const FLYING_SWORD_SCALE: float = 0.032
+const FLYING_SWORD_MIN_RADIUS_RATIO: float = 1.0 / 3.0
+const FLYING_SWORD_MAX_RADIUS_RATIO: float = 2.0 / 3.0
+const FLYING_SWORD_RADIUS_RATIO_PER_EXTRA_SWORD: float = 1.0 / 30.0
+const FLYING_SWORD_WARNING_EXPANSION_RATIO: float = 0.10
+const FLYING_SWORD_WARNING_MARGIN: float = 90.0
+const FLYING_SWORD_WARNING_ORBIT_SPEED: float = 0.22
+const FLYING_SWORD_SUMMON_DURATION: float = 0.18
+const FLYING_SWORD_SUMMON_STAGGER: float = 0.045
+const FLYING_SWORD_MAX_SUMMON_WINDOW: float = 0.28
+const FLYING_SWORD_REFILL_DURATION: float = 0.14
+const FLYING_SWORD_OUTLINE_TEXTURE_WIDTH: float = 22.0
+const FLYING_SWORD_OUTLINE_COLOR: Color = Color("f6fbff")
+const FANTIAN_SEAL_IDLE_SCALE: float = 0.052
+const FANTIAN_SEAL_IDLE_POSITION: Vector2 = Vector2(54.0, -8.0)
+const FANTIAN_SEAL_SUMMON_DURATION: float = 0.18
+const FANTIAN_SEAL_ASCENT_DURATION: float = 0.48
+const FANTIAN_SEAL_SWITCH_SHADOW_DELAY: float = 0.3
+const FANTIAN_SEAL_SWITCH_SHADOW_DURATION: float = 0.3
+const FANTIAN_SEAL_RANGE_SHADOW_COLOR: Color = Color(
+	0.055,
+	0.09,
+	0.055,
+	0.20
+)
+const DAO_WEAPON_SCALE: float = 0.045
+const DAO_WEAPON_TIP_OFFSET_PIXELS: float = 665.0
+const DAO_IDLE_ORBIT_SPEED: float = 0.9
+const DAO_ATTACK_ORBIT_SPEED: float = 8.5
+const DAO_ATTACK_VISUAL_HOLD_DURATION: float = 0.75
+const DAO_ORBIT_ACCELERATION: float = 18.0
+const DAO_WARNING_MARGIN: float = 70.0
+const DAO_WARNING_SHAKE_START: float = 0.38
+const DAO_SUMMON_DURATION: float = 0.22
+const DAO_RECALL_DURATION: float = 0.16
+const DAO_AUXILIARY_STAGGER: float = 0.055
+const DAO_MAX_AUXILIARY_STAGGER_WINDOW: float = 0.24
+const DAO_OUTLINE_WORLD_WIDTH: float = 1.0
+const DAO_OUTLINE_COLOR: Color = Color("ffd95a")
+const DAO_IDLE_TRAIL_ARC: float = PI
+const DAO_ATTACK_TRAIL_ARC: float = PI * 1.35
+const DAO_IDLE_TRAIL_SEGMENTS: int = 28
+const DAO_ATTACK_TRAIL_SEGMENTS: int = 32
+const DAO_IDLE_TRAIL_COLOR: Color = Color("e5bb50")
+const DAO_ATTACK_TRAIL_COLOR: Color = Color("ffc53d")
+const DAO_ATTACK_TRAIL_HIGHLIGHT: Color = Color("fff1a8")
+const DAO_MAX_ATTACK_TRAIL_COUNT: int = 24
 
 @export_category("Forward Movement")
 ## Normal automatic forward travel speed in world pixels per second.
@@ -75,8 +165,12 @@ const DEFAULT_PLAYER_ECHO_SCENE: PackedScene = preload(
 @export var qi_refining_grounded_animation: StringName = &"qi_walk"
 ## Ground-running animation used after reaching Foundation.
 @export var grounded_animation: StringName = &"walk"
-## Animation used whenever the player's visual elevation is above the road.
+## Foundation animation used while temporary flight lifts the player.
 @export var airborne_animation: StringName = &"fly"
+## Golden Core animation used during the realm's continuous flight.
+@export var golden_core_airborne_animation: StringName = &"golden_core_fly"
+## Nascent Soul animation used for both the body and projected spirit.
+@export var nascent_soul_airborne_animation: StringName = &"nascent_soul_fly"
 ## Lowest playback multiplier allowed while the player is moving slowly.
 @export_range(0.1, 1.0, 0.05) var minimum_animation_speed_scale: float = 0.45
 ## Highest playback multiplier allowed while the player is accelerating.
@@ -194,6 +288,10 @@ const DEFAULT_PLAYER_ECHO_SCENE: PackedScene = preload(
 )
 @onready var character_sprite: AnimatedSprite2D = $CharacterSprite
 @onready var spirit_sprite: AnimatedSprite2D = $SpiritSprite
+@onready var dao_weapon_layer: Node2D = $DaoWeapons
+@onready var flying_sword_layer: Node2D = $FlyingSwordWeapons
+@onready var palm_weapon: Sprite2D = $PalmWeapon
+@onready var fantian_seal_weapon: Sprite2D = $FantianSealWeapon
 @onready var damage_taken_label: Label = $DamageTakenLabel
 @onready var realm_abilities: RealmAbilityController = $RealmAbilities
 @onready var golden_bell: GoldenBellController = $GoldenBell
@@ -214,6 +312,34 @@ var _last_echo_cooldown_report: int = -1
 var _attack_cooldown_remaining: float = 0.0
 var _attack_flash_remaining: float = 0.0
 var _palm_attack_direction: Vector2 = Vector2.UP
+var _palm_aim_target: EnemyController
+var _palm_visual_state: int = PalmVisualState.HIDDEN
+var _palm_visual_equipped: bool = false
+var _palm_visual_elapsed: float = 0.0
+var _palm_visual_target: EnemyController
+var _palm_visual_impact_global_position: Vector2 = Vector2.ZERO
+var _palm_visual_start_position: Vector2 = Vector2.ZERO
+var _palm_visual_start_scale: float = PALM_NORMAL_SCALE
+var _palm_warning_strength: float = 0.0
+var _palm_glow_material: ShaderMaterial
+var _palm_visual_pending_damage: int = 0
+var _palm_visual_pending_critical: bool = false
+var _flying_sword_visual_sprites: Array[Sprite2D] = []
+var _flying_sword_visual_visibility: Array[float] = []
+var _flying_sword_visual_filled: Array[bool] = []
+var _flying_sword_outline_material: ShaderMaterial
+var _flying_sword_visual_equipped: bool = false
+var _flying_sword_visual_summoning: bool = false
+var _flying_sword_visual_elapsed: float = 0.0
+var _flying_sword_orbit_phase: float = 0.0
+var _flying_sword_warning_strength: float = 0.0
+var _flying_sword_aim_target: EnemyController
+var _fantian_seal_visual_equipped: bool = false
+var _fantian_seal_visual_state: int = FantianSealVisualState.HIDDEN
+var _fantian_seal_visual_elapsed: float = 0.0
+var _fantian_seal_visual_start_position: Vector2 = Vector2.ZERO
+var _fantian_seal_switch_shadow_active: bool = false
+var _fantian_seal_switch_shadow_elapsed: float = 0.0
 var _damage_flash_remaining: float = 0.0
 var _shield_flash_remaining: float = 0.0
 var _last_shield_blocked_damage: float = 0.0
@@ -223,6 +349,21 @@ var _character_sprite_rest_position: Vector2 = Vector2.ZERO
 var _character_sprite_rest_modulate: Color = Color.WHITE
 var _dao_attack_remaining: float = 0.0
 var _companion_phase: float = 0.0
+var _dao_weapon_sprites: Array[Sprite2D] = []
+var _dao_weapon_visibility: Array[float] = []
+var _dao_outline_material: ShaderMaterial
+var _dao_visual_equipped: bool = false
+var _dao_combat_active: bool = false
+var _dao_summoning_auxiliaries: bool = false
+var _dao_recalling_auxiliaries: bool = false
+var _dao_transition_elapsed: float = 0.0
+var _dao_orbit_phase: float = -PI * 0.5
+var _dao_orbit_speed: float = 0.0
+var _dao_warning_strength: float = 0.0
+var _dao_attack_visual_hold_remaining: float = 0.0
+var _dao_idle_trail_unit_points := PackedVector2Array()
+var _dao_attack_trail_unit_points := PackedVector2Array()
+var _dao_attack_highlight_unit_points := PackedVector2Array()
 var _equipment_inventory: Array[Dictionary] = []
 var _current_equipment_index: int = 0
 var _weapon_power_level: int = 0
@@ -272,6 +413,7 @@ var _current_weapon_combat_stats: WeaponCombatStatsResource = (
 
 func _ready() -> void:
 	_movement_enabled = true
+	_prepare_dao_trail_geometry()
 	_character_sprite_rest_position = character_sprite.position
 	_character_sprite_rest_modulate = character_sprite.modulate
 	damage_taken_label.hide()
@@ -307,6 +449,10 @@ func _ready() -> void:
 	_rebuild_combat_stats()
 	_apply_attack_range()
 	_apply_attraction_range()
+	_refresh_palm_visual_equipment()
+	_refresh_flying_sword_visual_equipment()
+	_refresh_fantian_seal_visual_equipment()
+	_refresh_dao_visual_equipment()
 	_publish_equipment()
 	queue_redraw()
 
@@ -410,15 +556,28 @@ func _draw() -> void:
 	if (
 		attack_kind == WeaponDataResource.AttackKind.GREAT_STRENGTH_PALM
 	):
-		_draw_palm_range(attack_range, range_color)
-	elif attack_kind != WeaponDataResource.AttackKind.GOLDEN_BELL:
+		pass
+	elif (
+		attack_kind != WeaponDataResource.AttackKind.GOLDEN_BELL
+		and attack_kind != WeaponDataResource.AttackKind.DAO
+		and attack_kind != WeaponDataResource.AttackKind.FLYING_SWORD
+	):
 		if attack_kind == WeaponDataResource.AttackKind.FANTIAN_SEAL:
-			var attack_square := Rect2(
-				Vector2.ONE * -attack_range,
-				Vector2.ONE * attack_range * 2.0
-			)
-			draw_rect(attack_square, Color(range_color, 0.035), true)
-			draw_rect(attack_square, Color(range_color, 0.52), false, 2.0)
+			if _fantian_seal_switch_shadow_active:
+				_draw_fantian_seal_switch_shadow(attack_range)
+			elif (
+				_fantian_seal_visual_state
+				== FantianSealVisualState.ABSENT
+			):
+				var attack_square := Rect2(
+					Vector2.ONE * -attack_range,
+					Vector2.ONE * attack_range * 2.0
+				)
+				draw_rect(
+					attack_square,
+					FANTIAN_SEAL_RANGE_SHADOW_COLOR,
+					true
+				)
 		else:
 			draw_circle(Vector2.ZERO, attack_range, Color(range_color, 0.035))
 			draw_arc(
@@ -434,8 +593,9 @@ func _draw() -> void:
 	if realm_abilities.is_qi_shield_enabled():
 		_draw_qi_shield()
 
+	_draw_dao_trails()
 	_draw_weapon_companions()
-	if _attack_flash_remaining > 0.0:
+	if _attack_flash_remaining > 0.0 and not _palm_visual_equipped:
 		var palm_angle := _palm_attack_direction.angle()
 		var half_arc := deg_to_rad(
 			_get_current_weapon_data().directional_arc_degrees * 0.5
@@ -464,38 +624,6 @@ func _draw() -> void:
 				4.0,
 				true
 			)
-	if _dao_attack_remaining > 0.0:
-		var progress := 1.0 - _dao_attack_remaining / 0.28
-		var dao_angle := progress * TAU - PI * 0.5
-		var orbit_count := get_dao_orbit_count()
-		for orbit_index in orbit_count:
-			var orbit_angle := (
-				dao_angle
-				+ TAU * float(orbit_index) / float(orbit_count)
-			)
-			var orbit_radius := get_dao_orbit_radius(orbit_index)
-			var dao_position := (
-				Vector2.from_angle(orbit_angle) * orbit_radius
-			)
-			var orbit_color := Color(1.0, 0.72, 0.18, 0.9).lerp(
-				Color(1.0, 0.94, 0.48, 0.95),
-				float(orbit_index) / float(maxi(orbit_count - 1, 1))
-			)
-			draw_arc(
-				Vector2.ZERO,
-				orbit_radius,
-				orbit_angle - 1.15,
-				orbit_angle,
-				20,
-				orbit_color,
-				6.0,
-				true
-			)
-			_draw_dao(
-				dao_position,
-				orbit_angle + PI * 0.5,
-				true
-			)
 	if _damage_flash_remaining > 0.0:
 		_draw_damage_feedback()
 	if _level_up_effect_remaining > 0.0:
@@ -504,42 +632,31 @@ func _draw() -> void:
 		_draw_breakthrough_effect()
 
 
-func _draw_palm_range(attack_range: float, range_color: Color) -> void:
-	var direction_angle := _palm_attack_direction.angle()
-	var half_arc := deg_to_rad(
-		_get_current_weapon_data().directional_arc_degrees * 0.5
+func _draw_fantian_seal_switch_shadow(attack_range: float) -> void:
+	var progress := clampf(
+		_fantian_seal_switch_shadow_elapsed
+			/ FANTIAN_SEAL_SWITCH_SHADOW_DURATION,
+		0.0,
+		1.0
 	)
-	var sector_points := PackedVector2Array([Vector2.ZERO])
-	for point_index in 17:
-		var ratio := float(point_index) / 16.0
-		var point_angle := lerpf(
-			direction_angle - half_arc,
-			direction_angle + half_arc,
-			ratio
-		)
-		sector_points.append(Vector2.from_angle(point_angle) * attack_range)
-	draw_colored_polygon(sector_points, Color(range_color, 0.055))
-	draw_arc(
-		Vector2.ZERO,
+	var viewport_size := get_viewport_rect().size
+	var fullscreen_half_extent := (
+		maxf(viewport_size.x, viewport_size.y) * 0.75
+	)
+	var eased_shrink := progress * progress * (3.0 - 2.0 * progress)
+	var half_extent := lerpf(
+		fullscreen_half_extent,
 		attack_range,
-		direction_angle - half_arc,
-		direction_angle + half_arc,
-		32,
-		Color(range_color, 0.62),
-		2.0,
+		eased_shrink
+	)
+	var shadow_alpha := lerpf(0.07, 0.20, eased_shrink)
+	draw_rect(
+		Rect2(
+			Vector2.ONE * -half_extent,
+			Vector2.ONE * half_extent * 2.0
+		),
+		Color(0.055, 0.09, 0.055, shadow_alpha),
 		true
-	)
-	draw_line(
-		Vector2.ZERO,
-		Vector2.from_angle(direction_angle - half_arc) * attack_range,
-		Color(range_color, 0.34),
-		2.0
-	)
-	draw_line(
-		Vector2.ZERO,
-		Vector2.from_angle(direction_angle + half_arc) * attack_range,
-		Color(range_color, 0.34),
-		2.0
 	)
 
 
@@ -1052,17 +1169,20 @@ func get_current_weapon_data() -> WeaponDataResource:
 	return _get_current_weapon_data()
 
 
-## Every collected Dao level occupies one persistent concentric orbit.
+## Every collected Dao level occupies one persistent concentric orbit while an
+## enemy is inside attack range.
 func get_dao_orbit_count() -> int:
 	return get_current_delivery_count()
 
 
-## Returns a stable radius for one Dao path. Lv.2 through the configured range
-## cap place each new path just inside its matching attack boundary; excess
-## levels share the capped outer path instead of expanding beyond the hit area.
+## Returns the displayed Dao distance from sprite center to blade tip in pixels.
+func get_dao_weapon_tip_length() -> float:
+	return DAO_WEAPON_TIP_OFFSET_PIXELS * DAO_WEAPON_SCALE
+
+
+## Returns the blade-center radius for one Dao path. The authored blade tip,
+## rather than a synthetic circle, reaches the matching attack boundary.
 func get_dao_orbit_radius(orbit_index: int) -> float:
-	if orbit_index <= 0:
-		return 52.0
 	var weapon_data := _get_current_weapon_data()
 	var capped_level := mini(
 		maxi(orbit_index + 1, 1),
@@ -1072,8 +1192,8 @@ func get_dao_orbit_radius(orbit_index: int) -> float:
 		weapon_data.attack_range
 			+ float(capped_level - 1)
 				* maxf(weapon_data.attack_range_increase_per_level, 0.0)
-			- 12.0,
-		62.0
+			- get_dao_weapon_tip_length(),
+		28.0
 	)
 
 
@@ -1535,6 +1655,11 @@ func _update_weapon_attack(delta: float) -> void:
 	var attack_damage := _roll_current_attack_damage()
 
 	if attack_kind == WeaponDataResource.AttackKind.DAO:
+		_dao_attack_visual_hold_remaining = maxf(
+			_dao_attack_visual_hold_remaining,
+			DAO_ATTACK_VISUAL_HOLD_DURATION
+		)
+		_dao_orbit_speed = DAO_ATTACK_ORBIT_SPEED
 		for enemy in targets:
 			enemy.take_melee_damage(
 				attack_damage.damage,
@@ -1560,6 +1685,7 @@ func _update_weapon_attack(delta: float) -> void:
 func _begin_flying_sword_sequence(
 	attack_damage: AttackDamageResultResource
 ) -> void:
+	_refill_flying_sword_visual_slots()
 	_flying_sword_sequence_total = get_flying_sword_projectile_count()
 	_pending_flying_swords = _flying_sword_sequence_total
 	_flying_sword_sequence_launched = 0
@@ -1670,7 +1796,10 @@ func _release_palm_wave(
 	)
 	var attack_range_squared := pow(get_current_attack_range(), 2.0)
 	if is_instance_valid(primary_target) and primary_target.is_combat_active():
-		_apply_palm_hit(primary_target, attack_damage)
+		if _palm_visual_equipped:
+			_begin_palm_visual_strike(primary_target, attack_damage)
+		else:
+			_apply_palm_hit(primary_target, attack_damage)
 	for enemy_node in get_tree().get_nodes_in_group("enemies"):
 		if enemy_node is not EnemyController:
 			continue
@@ -1699,6 +1828,15 @@ func _apply_palm_hit(
 	if _palm_sequence_hit_ids.has(enemy_id):
 		return
 	_palm_sequence_hit_ids[enemy_id] = true
+	_apply_palm_damage(enemy, attack_damage)
+
+
+func _apply_palm_damage(
+	enemy: EnemyController,
+	attack_damage: AttackDamageResultResource
+) -> void:
+	if not is_instance_valid(enemy) or not enemy.is_combat_active():
+		return
 	var realm_index := _get_current_realm_index()
 	var knockback_speed := 0.0
 	if realm_index == 1:
@@ -1843,7 +1981,9 @@ func _launch_next_special_projectile() -> void:
 				target,
 				_special_sequence_damage,
 				maxf(get_current_aoe_radius(), 48.0),
-				_special_sequence_is_critical
+				_special_sequence_is_critical,
+				global_position,
+				get_current_attack_range()
 			)
 			if get_parent().has_method("request_camera_shake"):
 				seal.impact_landed.connect(
@@ -1855,8 +1995,6 @@ func _launch_next_special_projectile() -> void:
 		weapon_data.projectile_sequence_interval,
 		0.01
 	)
-
-
 func _cancel_special_projectile_sequence() -> void:
 	_pending_special_projectiles = 0
 	_special_sequence_kind = -1
@@ -1899,13 +2037,9 @@ func _launch_flying_sword(
 			+ "FlyingSwordProjectile."
 		)
 		return
-	var lateral_offset := (
-		float(projectile_index) - float(projectile_count - 1) * 0.5
-	) * 9.0
-	var forward_direction := global_position.direction_to(target.global_position)
-	var spawn_position := (
-		global_position
-		+ forward_direction.orthogonal() * lateral_offset
+	var spawn_position := _consume_flying_sword_visual(
+		projectile_index,
+		projectile_count
 	)
 	var direction := spawn_position.direction_to(target.global_position)
 	get_parent().add_child(projectile)
@@ -1984,9 +2118,1264 @@ func _update_visual_state(delta: float) -> void:
 		0.0
 	)
 	_update_palm_aim()
+	_update_palm_weapon_visual(delta)
+	_update_flying_sword_visuals(delta)
+	_update_fantian_seal_visual(delta)
+	_update_dao_weapon_visuals(delta)
 	_update_character_animation()
 	_update_damage_feedback_presentation()
 	queue_redraw()
+
+
+func _is_dao_equipped() -> bool:
+	return (
+		not _equipment_inventory.is_empty()
+		and _get_current_weapon_data().attack_kind
+			== WeaponDataResource.AttackKind.DAO
+	)
+
+
+func _refresh_dao_visual_equipment() -> void:
+	if not is_instance_valid(dao_weapon_layer):
+		return
+	if not _is_dao_equipped():
+		_dao_visual_equipped = false
+		_dao_combat_active = false
+		_dao_warning_strength = 0.0
+		_dao_attack_visual_hold_remaining = 0.0
+		for weapon_index in _dao_weapon_sprites.size():
+			_dao_weapon_visibility[weapon_index] = 0.0
+			_dao_weapon_sprites[weapon_index].hide()
+		return
+	var switching_to_dao := not _dao_visual_equipped
+	_dao_visual_equipped = true
+	_ensure_dao_weapon_count(get_dao_orbit_count())
+	if not switching_to_dao:
+		return
+	_dao_attack_visual_hold_remaining = 0.0
+	for weapon_index in _dao_weapon_sprites.size():
+		_dao_weapon_visibility[weapon_index] = 0.0
+		_dao_weapon_sprites[weapon_index].hide()
+	_dao_combat_active = (
+		_get_nearest_dao_enemy_distance()
+		<= get_current_attack_range()
+	)
+	_dao_transition_elapsed = 0.0
+	_dao_summoning_auxiliaries = _dao_combat_active
+	_dao_recalling_auxiliaries = false
+	_dao_orbit_speed = (
+		DAO_ATTACK_ORBIT_SPEED
+		if _dao_combat_active
+		else 0.0
+	)
+
+
+func _ensure_dao_weapon_count(required_count: int) -> void:
+	var safe_count := maxi(required_count, 1)
+	if _dao_outline_material == null:
+		_dao_outline_material = ShaderMaterial.new()
+		_dao_outline_material.shader = OUTLINE_SHADER
+		_dao_outline_material.set_shader_parameter(
+			&"outline_width",
+			DAO_OUTLINE_WORLD_WIDTH / DAO_WEAPON_SCALE
+		)
+		_dao_outline_material.set_shader_parameter(
+			&"outline_color",
+			Color.TRANSPARENT
+		)
+	while _dao_weapon_sprites.size() < safe_count:
+		var weapon_index := _dao_weapon_sprites.size()
+		var weapon_sprite := Sprite2D.new()
+		weapon_sprite.name = "DaoWeapon%d" % (weapon_index + 1)
+		weapon_sprite.texture = DAO_WEAPON_TEXTURE
+		weapon_sprite.material = _dao_outline_material
+		weapon_sprite.scale = Vector2.ONE * DAO_WEAPON_SCALE
+		weapon_sprite.z_index = weapon_index
+		weapon_sprite.hide()
+		dao_weapon_layer.add_child(weapon_sprite)
+		_dao_weapon_sprites.append(weapon_sprite)
+		_dao_weapon_visibility.append(0.0)
+	while _dao_weapon_sprites.size() > safe_count:
+		var removed_sprite: Sprite2D = _dao_weapon_sprites.pop_back()
+		_dao_weapon_visibility.pop_back()
+		removed_sprite.queue_free()
+
+
+func _get_nearest_dao_enemy_distance() -> float:
+	var nearest_distance := INF
+	for enemy_node in get_tree().get_nodes_in_group("enemies"):
+		if enemy_node is not EnemyController:
+			continue
+		var enemy := enemy_node as EnemyController
+		if not enemy.is_combat_active():
+			continue
+		nearest_distance = minf(
+			nearest_distance,
+			global_position.distance_to(enemy.global_position)
+		)
+	return nearest_distance
+
+
+func _get_dao_spawn_position(weapon_index: int, weapon_count: int) -> Vector2:
+	var spawn_angle := (
+		-PI * 0.5
+		+ TAU * float(weapon_index) / float(maxi(weapon_count, 1))
+	)
+	return Vector2.from_angle(spawn_angle) * 22.0
+
+
+func _get_dao_orbit_index(weapon_index: int, weapon_count: int) -> int:
+	if weapon_index == 0:
+		return maxi(weapon_count - 1, 0)
+	return weapon_index - 1
+
+
+func _get_dao_transition_delay(
+	weapon_index: int,
+	weapon_count: int
+) -> float:
+	var auxiliary_index := maxi(weapon_index - 1, 0)
+	var final_auxiliary_index := maxi(weapon_count - 2, 1)
+	var effective_stagger := minf(
+		DAO_AUXILIARY_STAGGER,
+		DAO_MAX_AUXILIARY_STAGGER_WINDOW
+			/ float(final_auxiliary_index)
+	)
+	return float(auxiliary_index) * effective_stagger
+
+
+func _set_dao_outline(strength: float) -> void:
+	if _dao_outline_material == null:
+		return
+	_dao_outline_material.set_shader_parameter(
+		&"outline_color",
+		Color(
+			DAO_OUTLINE_COLOR,
+			clampf(strength, 0.0, 1.0)
+		)
+	)
+
+
+func _draw_dao_trails() -> void:
+	if not _dao_visual_equipped or not _is_dao_equipped():
+		return
+	var weapon_count := _dao_weapon_sprites.size()
+	var trail_points := PackedVector2Array()
+	var glow_colors := PackedColorArray()
+	var core_colors := PackedColorArray()
+	var highlight_points := PackedVector2Array()
+	var highlight_colors := PackedColorArray()
+	var attack_trail_stride := maxi(
+		ceili(
+			float(weapon_count)
+			/ float(DAO_MAX_ATTACK_TRAIL_COUNT)
+		),
+		1
+	)
+	for weapon_index in weapon_count:
+		var visibility := _dao_weapon_visibility[weapon_index]
+		if visibility <= 0.04:
+			continue
+		if (
+			_dao_combat_active
+			and weapon_index % attack_trail_stride != 0
+		):
+			continue
+		var orbit_angle := (
+			_dao_orbit_phase
+			+ TAU * float(weapon_index) / float(maxi(weapon_count, 1))
+		)
+		var orbit_radius := get_dao_orbit_radius(
+			_get_dao_orbit_index(weapon_index, weapon_count)
+		)
+		if _dao_combat_active:
+			var trail_visibility := smoothstep(0.12, 0.82, visibility)
+			_append_dao_trail_segments(
+				trail_points,
+				glow_colors,
+				orbit_radius,
+				orbit_angle,
+				_dao_attack_trail_unit_points,
+				DAO_ATTACK_TRAIL_COLOR,
+				0.16 * trail_visibility
+			)
+			_append_dao_trail_segments(
+				highlight_points,
+				highlight_colors,
+				orbit_radius,
+				orbit_angle,
+				_dao_attack_highlight_unit_points,
+				DAO_ATTACK_TRAIL_HIGHLIGHT,
+				0.88 * trail_visibility
+			)
+		elif weapon_index == 0:
+			_append_dao_trail_segments(
+				trail_points,
+				glow_colors,
+				orbit_radius,
+				orbit_angle,
+				_dao_idle_trail_unit_points,
+				DAO_IDLE_TRAIL_COLOR,
+				0.10 * visibility
+			)
+	if trail_points.size() > 1:
+		var glow_width := 13.0 if _dao_combat_active else 7.0
+		var core_width := 4.8 if _dao_combat_active else 2.5
+		var core_alpha_scale := 4.5 if _dao_combat_active else 3.8
+		core_colors.resize(glow_colors.size())
+		for color_index in glow_colors.size():
+			var glow_color := glow_colors[color_index]
+			core_colors[color_index] = Color(
+				glow_color,
+				glow_color.a * core_alpha_scale
+			)
+		draw_multiline_colors(
+			trail_points,
+			glow_colors,
+			glow_width,
+			true
+		)
+		draw_multiline_colors(
+			trail_points,
+			core_colors,
+			core_width,
+			true
+		)
+	if highlight_points.size() > 1:
+		draw_multiline_colors(
+			highlight_points,
+			highlight_colors,
+			1.8,
+			true
+		)
+
+
+func _prepare_dao_trail_geometry() -> void:
+	_dao_idle_trail_unit_points = _build_dao_trail_unit_points(
+		DAO_IDLE_TRAIL_ARC,
+		DAO_IDLE_TRAIL_SEGMENTS
+	)
+	_dao_attack_trail_unit_points = _build_dao_trail_unit_points(
+		DAO_ATTACK_TRAIL_ARC,
+		DAO_ATTACK_TRAIL_SEGMENTS
+	)
+	_dao_attack_highlight_unit_points = _build_dao_trail_unit_points(
+		DAO_ATTACK_TRAIL_ARC * 0.48,
+		DAO_ATTACK_TRAIL_SEGMENTS >> 1
+	)
+
+
+func _build_dao_trail_unit_points(
+	arc_length: float,
+	segment_count: int
+) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	var safe_segment_count := maxi(segment_count, 1)
+	points.resize(safe_segment_count * 2)
+	for segment_index in safe_segment_count:
+		var start_ratio := (
+			float(segment_index) / float(safe_segment_count)
+		)
+		var end_ratio := (
+			float(segment_index + 1) / float(safe_segment_count)
+		)
+		points[segment_index * 2] = Vector2.from_angle(
+			-arc_length * (1.0 - start_ratio)
+		)
+		points[segment_index * 2 + 1] = Vector2.from_angle(
+			-arc_length * (1.0 - end_ratio)
+		)
+	return points
+
+
+func _append_dao_trail_segments(
+	points: PackedVector2Array,
+	primary_colors: PackedColorArray,
+	radius: float,
+	head_angle: float,
+	unit_points: PackedVector2Array,
+	color: Color,
+	primary_alpha: float
+) -> void:
+	var safe_segment_count := unit_points.size() >> 1
+	var rotation_transform := Transform2D(head_angle, Vector2.ZERO)
+	for segment_index in safe_segment_count:
+		var end_ratio := (
+			float(segment_index + 1) / float(safe_segment_count)
+		)
+		var end_fade := end_ratio * end_ratio
+		var point_offset := segment_index * 2
+		points.append(
+			rotation_transform * (unit_points[point_offset] * radius)
+		)
+		points.append(
+			rotation_transform * (unit_points[point_offset + 1] * radius)
+		)
+		primary_colors.append(
+			Color(color, primary_alpha * end_fade)
+		)
+
+
+func _update_dao_weapon_visuals(delta: float) -> void:
+	if not _dao_visual_equipped or not _is_dao_equipped():
+		return
+	_ensure_dao_weapon_count(get_dao_orbit_count())
+	_dao_attack_visual_hold_remaining = maxf(
+		_dao_attack_visual_hold_remaining - delta,
+		0.0
+	)
+	var nearest_distance := _get_nearest_dao_enemy_distance()
+	var attack_range := get_current_attack_range()
+	var next_combat_active := (
+		nearest_distance <= attack_range
+		or _dao_attack_visual_hold_remaining > 0.0
+	)
+	if next_combat_active != _dao_combat_active:
+		_dao_combat_active = next_combat_active
+		_dao_transition_elapsed = 0.0
+		_dao_summoning_auxiliaries = next_combat_active
+		_dao_recalling_auxiliaries = not next_combat_active
+	else:
+		_dao_transition_elapsed += delta
+	var target_speed := (
+		DAO_ATTACK_ORBIT_SPEED
+		if _dao_combat_active
+		else DAO_IDLE_ORBIT_SPEED
+	)
+	_dao_orbit_speed = move_toward(
+		_dao_orbit_speed,
+		target_speed,
+		DAO_ORBIT_ACCELERATION * delta
+	)
+	_dao_orbit_phase = fmod(
+		_dao_orbit_phase + _dao_orbit_speed * delta,
+		TAU
+	)
+	if nearest_distance <= attack_range + DAO_WARNING_MARGIN:
+		_dao_warning_strength = 1.0 - clampf(
+			(nearest_distance - attack_range) / DAO_WARNING_MARGIN,
+			0.0,
+			1.0
+		)
+	else:
+		_dao_warning_strength = 0.0
+	_set_dao_outline(
+		1.0 if _dao_combat_active else _dao_warning_strength
+	)
+
+	var weapon_count := _dao_weapon_sprites.size()
+	for weapon_index in weapon_count:
+		var transition_delay := _get_dao_transition_delay(
+			weapon_index,
+			weapon_count
+		)
+		var target_visibility := 1.0 if weapon_index == 0 else 0.0
+		if weapon_index > 0 and _dao_combat_active:
+			target_visibility = (
+				1.0
+				if (
+					not _dao_summoning_auxiliaries
+					or _dao_transition_elapsed >= transition_delay
+				)
+				else 0.0
+			)
+		elif weapon_index > 0 and _dao_recalling_auxiliaries:
+			target_visibility = (
+				0.0
+				if _dao_transition_elapsed >= transition_delay
+				else 1.0
+			)
+		var transition_duration := (
+			DAO_SUMMON_DURATION
+			if target_visibility > _dao_weapon_visibility[weapon_index]
+			else DAO_RECALL_DURATION
+		)
+		_dao_weapon_visibility[weapon_index] = move_toward(
+			_dao_weapon_visibility[weapon_index],
+			target_visibility,
+			delta / transition_duration
+		)
+		_update_one_dao_weapon(
+			weapon_index,
+			weapon_count,
+			_dao_weapon_visibility[weapon_index]
+		)
+	var final_auxiliary_delay := _get_dao_transition_delay(
+		maxi(weapon_count - 1, 0),
+		weapon_count
+	)
+	if (
+		_dao_transition_elapsed
+		>= final_auxiliary_delay
+			+ maxf(DAO_SUMMON_DURATION, DAO_RECALL_DURATION)
+	):
+		_dao_summoning_auxiliaries = false
+		_dao_recalling_auxiliaries = false
+
+
+func _update_one_dao_weapon(
+	weapon_index: int,
+	weapon_count: int,
+	visibility: float
+) -> void:
+	var weapon_sprite := _dao_weapon_sprites[weapon_index]
+	if visibility <= 0.0:
+		weapon_sprite.hide()
+		return
+	weapon_sprite.show()
+	var orbit_angle := (
+		_dao_orbit_phase
+		+ TAU * float(weapon_index) / float(maxi(weapon_count, 1))
+	)
+	var orbit_index := _get_dao_orbit_index(
+		weapon_index,
+		weapon_count
+	)
+	var orbit_position := (
+		Vector2.from_angle(orbit_angle)
+		* get_dao_orbit_radius(orbit_index)
+	)
+	var summon_position := _get_dao_spawn_position(
+		weapon_index,
+		weapon_count
+	)
+	var eased_visibility := (
+		visibility * visibility * (3.0 - 2.0 * visibility)
+	)
+	weapon_sprite.position = summon_position.lerp(
+		orbit_position,
+		eased_visibility
+	)
+	weapon_sprite.rotation = orbit_angle + PI
+	if (
+		weapon_index == 0
+		and not _dao_combat_active
+		and _dao_warning_strength > DAO_WARNING_SHAKE_START
+	):
+		var shake_strength := clampf(
+			(
+				_dao_warning_strength - DAO_WARNING_SHAKE_START
+			) / (1.0 - DAO_WARNING_SHAKE_START),
+			0.0,
+			1.0
+		)
+		weapon_sprite.position += Vector2(
+			sin(_companion_phase * 47.0),
+			cos(_companion_phase * 41.0)
+		) * (5.0 * shake_strength)
+		weapon_sprite.rotation += (
+			sin(_companion_phase * 59.0) * 0.14 * shake_strength
+		)
+	var summon_scale := (
+		lerpf(0.52, 1.0, visibility)
+		+ sin(visibility * PI) * 0.2
+	)
+	weapon_sprite.scale = (
+		Vector2.ONE * DAO_WEAPON_SCALE * summon_scale
+	)
+	weapon_sprite.modulate = Color(1.0, 1.0, 1.0, visibility)
+
+
+## Returns whether Dao visuals currently use the high-speed combat orbit.
+func is_dao_combat_visual_active() -> bool:
+	return _dao_visual_equipped and _dao_combat_active
+
+
+## Returns the number of Dao sprites currently visible, including blades that
+## are still flying between the player and their assigned orbit.
+func get_visible_dao_weapon_count() -> int:
+	var visible_count := 0
+	for weapon_sprite in _dao_weapon_sprites:
+		if is_instance_valid(weapon_sprite) and weapon_sprite.visible:
+			visible_count += 1
+	return visible_count
+
+
+## Returns the nearest-enemy Dao warning intensity from zero to one.
+func get_dao_warning_strength() -> float:
+	return _dao_warning_strength
+
+
+func _is_palm_equipped() -> bool:
+	return (
+		not _equipment_inventory.is_empty()
+		and _get_current_weapon_data().attack_kind
+			== WeaponDataResource.AttackKind.GREAT_STRENGTH_PALM
+	)
+
+
+func _refresh_palm_visual_equipment() -> void:
+	if not is_instance_valid(palm_weapon):
+		return
+	if _palm_glow_material == null:
+		_palm_glow_material = ShaderMaterial.new()
+		_palm_glow_material.shader = OUTLINE_SHADER
+		_palm_glow_material.set_shader_parameter(
+			&"outline_width",
+			PALM_OUTLINE_TEXTURE_WIDTH
+		)
+	palm_weapon.texture = PALM_WEAPON_TEXTURE
+	palm_weapon.material = _palm_glow_material
+	if not _is_palm_equipped():
+		_palm_visual_equipped = false
+		_palm_visual_state = PalmVisualState.HIDDEN
+		_palm_visual_target = null
+		_palm_aim_target = null
+		_palm_warning_strength = 0.0
+		_palm_visual_pending_damage = 0
+		_palm_visual_pending_critical = false
+		palm_weapon.hide()
+		return
+	if _palm_visual_equipped:
+		return
+	_palm_visual_equipped = true
+	_palm_visual_state = PalmVisualState.SUMMONING
+	_palm_visual_elapsed = 0.0
+	_palm_visual_target = null
+	_palm_visual_start_position = (
+		Vector2.from_angle(_companion_phase - PI * 0.5) * 12.0
+	)
+	palm_weapon.position = _palm_visual_start_position
+	palm_weapon.rotation = _get_palm_rotation(_palm_attack_direction)
+	palm_weapon.scale = Vector2.ONE * PALM_NORMAL_SCALE * 0.32
+	_set_palm_glow(0.0, 0.0)
+	palm_weapon.show()
+
+
+func _get_palm_rotation(direction: Vector2) -> float:
+	var safe_direction := direction.normalized()
+	if safe_direction.is_zero_approx():
+		safe_direction = Vector2.UP
+	return safe_direction.angle() + PI * 0.5
+
+
+func _get_palm_idle_position() -> Vector2:
+	var direction := _palm_attack_direction.normalized()
+	if is_instance_valid(_palm_aim_target):
+		direction = global_position.direction_to(
+			_palm_aim_target.global_position
+		).normalized()
+	if direction.is_zero_approx():
+		direction = Vector2.UP
+	return direction * lerpf(
+		PALM_IDLE_RADIUS,
+		PALM_CHARGED_RADIUS,
+		_palm_warning_strength
+	)
+
+
+func _get_palm_idle_scale() -> float:
+	return lerpf(
+		PALM_NORMAL_SCALE,
+		PALM_CHARGED_SCALE,
+		_palm_warning_strength
+	)
+
+
+func _set_palm_glow(strength: float, alpha: float = 1.0) -> void:
+	var safe_strength := clampf(strength, 0.0, 1.0)
+	var safe_alpha := clampf(alpha, 0.0, 1.0)
+	var brightness := lerpf(1.0, 1.42, safe_strength)
+	palm_weapon.modulate = Color(
+		brightness,
+		brightness,
+		brightness,
+		safe_alpha
+	)
+	if _palm_glow_material != null:
+		_palm_glow_material.set_shader_parameter(
+			&"outline_color",
+			Color(
+				PALM_GLOW_COLOR,
+				safe_strength * safe_alpha
+			)
+		)
+
+
+func _get_palm_impact_position(
+	impact_global_position: Vector2,
+	direction: Vector2,
+	scale_value: float
+) -> Vector2:
+	var rotation := _get_palm_rotation(direction)
+	var palm_center_offset := (
+		Vector2.DOWN.rotated(rotation)
+		* PALM_CENTER_OFFSET_PIXELS
+		* scale_value
+	)
+	return to_local(impact_global_position) - palm_center_offset
+
+
+func _begin_palm_visual_strike(
+	target: EnemyController,
+	attack_damage: AttackDamageResultResource
+) -> void:
+	if not _palm_visual_equipped or not is_instance_valid(target):
+		return
+	_palm_visual_target = target
+	_palm_sequence_hit_ids[target.get_instance_id()] = true
+	_palm_visual_pending_damage = maxi(attack_damage.damage, 1)
+	_palm_visual_pending_critical = attack_damage.is_critical
+	_palm_visual_impact_global_position = target.global_position
+	_palm_visual_start_position = palm_weapon.position
+	_palm_visual_start_scale = palm_weapon.scale.x
+	_palm_visual_elapsed = 0.0
+	_palm_visual_state = PalmVisualState.STRIKING
+	palm_weapon.show()
+
+
+func _begin_palm_visual_return() -> void:
+	_palm_visual_start_position = palm_weapon.position
+	_palm_visual_start_scale = palm_weapon.scale.x
+	_palm_visual_elapsed = 0.0
+	_palm_visual_state = PalmVisualState.RETURNING
+	_palm_visual_target = null
+
+
+func _update_palm_warning() -> void:
+	if not is_instance_valid(_palm_aim_target):
+		_palm_warning_strength = 0.0
+		return
+	var nearest_distance := global_position.distance_to(
+		_palm_aim_target.global_position
+	)
+	var attack_range := get_current_attack_range()
+	if nearest_distance > attack_range + PALM_WARNING_MARGIN:
+		_palm_warning_strength = 0.0
+		return
+	_palm_warning_strength = 1.0 - clampf(
+		(nearest_distance - attack_range) / PALM_WARNING_MARGIN,
+		0.0,
+		1.0
+	)
+
+
+func _update_palm_weapon_visual(delta: float) -> void:
+	if not _palm_visual_equipped or not _is_palm_equipped():
+		return
+	_update_palm_warning()
+	_palm_visual_elapsed += delta
+	var aim_direction := _palm_attack_direction
+	if is_instance_valid(_palm_aim_target):
+		aim_direction = global_position.direction_to(
+			_palm_aim_target.global_position
+		).normalized()
+	match _palm_visual_state:
+		PalmVisualState.SUMMONING:
+			var progress := clampf(
+				_palm_visual_elapsed / PALM_SUMMON_DURATION,
+				0.0,
+				1.0
+			)
+			var eased := progress * progress * (3.0 - 2.0 * progress)
+			palm_weapon.position = _palm_visual_start_position.lerp(
+				_get_palm_idle_position(),
+				eased
+			)
+			var summon_scale := lerpf(
+				PALM_NORMAL_SCALE * 0.32,
+				_get_palm_idle_scale(),
+				eased
+			)
+			palm_weapon.scale = Vector2.ONE * summon_scale
+			palm_weapon.rotation = lerp_angle(
+				palm_weapon.rotation,
+				_get_palm_rotation(aim_direction),
+				1.0 - exp(-18.0 * delta)
+			)
+			_set_palm_glow(_palm_warning_strength, eased)
+			if progress >= 1.0:
+				_palm_visual_state = PalmVisualState.IDLE
+				_palm_visual_elapsed = 0.0
+		PalmVisualState.IDLE:
+			var follow_weight := 1.0 - exp(-14.0 * delta)
+			palm_weapon.position = palm_weapon.position.lerp(
+				_get_palm_idle_position(),
+				follow_weight
+			)
+			var target_scale := _get_palm_idle_scale()
+			var next_scale := lerpf(
+				palm_weapon.scale.x,
+				target_scale,
+				follow_weight
+			)
+			palm_weapon.scale = Vector2.ONE * next_scale
+			palm_weapon.rotation = lerp_angle(
+				palm_weapon.rotation,
+				_get_palm_rotation(aim_direction),
+				1.0 - exp(-20.0 * delta)
+			)
+			_set_palm_glow(_palm_warning_strength)
+		PalmVisualState.STRIKING:
+			if (
+				is_instance_valid(_palm_visual_target)
+				and _palm_visual_target.is_combat_active()
+			):
+				_palm_visual_impact_global_position = (
+					_palm_visual_target.global_position
+				)
+			var strike_direction := global_position.direction_to(
+				_palm_visual_impact_global_position
+			).normalized()
+			if strike_direction.is_zero_approx():
+				strike_direction = aim_direction
+			var strike_progress := clampf(
+				_palm_visual_elapsed / PALM_STRIKE_DURATION,
+				0.0,
+				1.0
+			)
+			var strike_eased := 1.0 - pow(1.0 - strike_progress, 3.0)
+			var impact_position := _get_palm_impact_position(
+				_palm_visual_impact_global_position,
+				strike_direction,
+				PALM_STRIKE_SCALE
+			)
+			palm_weapon.position = _palm_visual_start_position.lerp(
+				impact_position,
+				strike_eased
+			)
+			var strike_scale := lerpf(
+				_palm_visual_start_scale,
+				PALM_STRIKE_SCALE,
+				strike_eased
+			)
+			strike_scale *= 1.0 + sin(strike_progress * PI) * 0.12
+			palm_weapon.scale = Vector2.ONE * strike_scale
+			palm_weapon.rotation = _get_palm_rotation(strike_direction)
+			_set_palm_glow(
+				lerpf(_palm_warning_strength, 0.0, strike_eased)
+			)
+			if strike_progress >= 1.0:
+				if (
+					is_instance_valid(_palm_visual_target)
+					and _palm_visual_target.is_combat_active()
+				):
+					if _palm_visual_pending_damage > 0:
+						_apply_palm_damage(
+							_palm_visual_target,
+							AttackDamageResultResource.new(
+								_palm_visual_pending_damage,
+								_palm_visual_pending_critical
+							)
+						)
+					_palm_visual_pending_damage = 0
+					_palm_visual_pending_critical = false
+					_begin_palm_visual_return()
+				else:
+					_palm_visual_pending_damage = 0
+					_palm_visual_pending_critical = false
+					_begin_palm_visual_return()
+		PalmVisualState.RETURNING:
+			var return_progress := clampf(
+				_palm_visual_elapsed / PALM_RETURN_DURATION,
+				0.0,
+				1.0
+			)
+			var return_eased := (
+				return_progress
+				* return_progress
+				* (3.0 - 2.0 * return_progress)
+			)
+			palm_weapon.position = _palm_visual_start_position.lerp(
+				_get_palm_idle_position(),
+				return_eased
+			)
+			var return_scale := lerpf(
+				_palm_visual_start_scale,
+				_get_palm_idle_scale(),
+				return_eased
+			)
+			palm_weapon.scale = Vector2.ONE * return_scale
+			palm_weapon.rotation = lerp_angle(
+				palm_weapon.rotation,
+				_get_palm_rotation(aim_direction),
+				1.0 - exp(-22.0 * delta)
+			)
+			_set_palm_glow(
+				_palm_warning_strength * return_eased
+			)
+			if return_progress >= 1.0:
+				_palm_visual_state = PalmVisualState.IDLE
+				_palm_visual_elapsed = 0.0
+
+
+func get_palm_visual_state() -> int:
+	return _palm_visual_state
+
+
+func get_palm_warning_strength() -> float:
+	return _palm_warning_strength
+
+
+func _is_flying_sword_equipped() -> bool:
+	return (
+		not _equipment_inventory.is_empty()
+		and _get_current_weapon_data().attack_kind
+			== WeaponDataResource.AttackKind.FLYING_SWORD
+	)
+
+
+func _refresh_flying_sword_visual_equipment() -> void:
+	if not is_instance_valid(flying_sword_layer):
+		return
+	if not _is_flying_sword_equipped():
+		_flying_sword_visual_equipped = false
+		_flying_sword_visual_summoning = false
+		_flying_sword_warning_strength = 0.0
+		_flying_sword_aim_target = null
+		for sword_sprite in _flying_sword_visual_sprites:
+			sword_sprite.hide()
+		_set_flying_sword_outline(0.0)
+		return
+	var switching_to_sword := not _flying_sword_visual_equipped
+	_flying_sword_visual_equipped = true
+	_ensure_flying_sword_visual_count(
+		get_flying_sword_projectile_count()
+	)
+	if not switching_to_sword:
+		return
+	_flying_sword_orbit_phase = 0.0
+	_flying_sword_visual_elapsed = 0.0
+	_flying_sword_visual_summoning = true
+	for sword_index in _flying_sword_visual_sprites.size():
+		_flying_sword_visual_filled[sword_index] = true
+		_flying_sword_visual_visibility[sword_index] = 0.0
+		_flying_sword_visual_sprites[sword_index].hide()
+
+
+func _ensure_flying_sword_visual_count(required_count: int) -> void:
+	var safe_count := maxi(required_count, 1)
+	if _flying_sword_outline_material == null:
+		_flying_sword_outline_material = ShaderMaterial.new()
+		_flying_sword_outline_material.shader = OUTLINE_SHADER
+		_flying_sword_outline_material.set_shader_parameter(
+			&"outline_width",
+			FLYING_SWORD_OUTLINE_TEXTURE_WIDTH
+		)
+		_set_flying_sword_outline(0.0)
+	var previous_count := _flying_sword_visual_sprites.size()
+	while _flying_sword_visual_sprites.size() < safe_count:
+		var sword_index := _flying_sword_visual_sprites.size()
+		var sword_sprite := Sprite2D.new()
+		sword_sprite.name = "FlyingSword%d" % (sword_index + 1)
+		sword_sprite.texture = FLYING_SWORD_TEXTURE
+		sword_sprite.material = _flying_sword_outline_material
+		sword_sprite.scale = Vector2.ONE * FLYING_SWORD_SCALE
+		sword_sprite.z_index = sword_index
+		sword_sprite.hide()
+		flying_sword_layer.add_child(sword_sprite)
+		_flying_sword_visual_sprites.append(sword_sprite)
+		_flying_sword_visual_visibility.append(0.0)
+		_flying_sword_visual_filled.append(true)
+	while _flying_sword_visual_sprites.size() > safe_count:
+		var removed_sprite: Sprite2D = (
+			_flying_sword_visual_sprites.pop_back()
+		)
+		_flying_sword_visual_visibility.pop_back()
+		_flying_sword_visual_filled.pop_back()
+		removed_sprite.queue_free()
+	if previous_count < safe_count and _flying_sword_visual_equipped:
+		_flying_sword_visual_summoning = true
+		_flying_sword_visual_elapsed = 0.0
+
+
+func _set_flying_sword_outline(strength: float) -> void:
+	if _flying_sword_outline_material == null:
+		return
+	_flying_sword_outline_material.set_shader_parameter(
+		&"outline_color",
+		Color(
+			FLYING_SWORD_OUTLINE_COLOR,
+			clampf(strength, 0.0, 1.0)
+		)
+	)
+
+
+func _get_flying_sword_summon_delay(
+	sword_index: int,
+	sword_count: int
+) -> float:
+	var final_index := maxi(sword_count - 1, 1)
+	var effective_stagger := minf(
+		FLYING_SWORD_SUMMON_STAGGER,
+		FLYING_SWORD_MAX_SUMMON_WINDOW / float(final_index)
+	)
+	return float(sword_index) * effective_stagger
+
+
+func _get_flying_sword_slot_angle(
+	sword_index: int,
+	sword_count: int
+) -> float:
+	return (
+		-PI * 0.5
+		+ _flying_sword_orbit_phase
+		+ TAU * float(sword_index) / float(maxi(sword_count, 1))
+	)
+
+
+func _get_flying_sword_slot_position(
+	sword_index: int,
+	sword_count: int
+) -> Vector2:
+	var attack_range := get_current_attack_range()
+	var minimum_radius := (
+		attack_range * FLYING_SWORD_MIN_RADIUS_RATIO
+	)
+	var maximum_radius := (
+		attack_range * FLYING_SWORD_MAX_RADIUS_RATIO
+	)
+	var idle_radius := clampf(
+		minimum_radius
+			+ attack_range
+				* FLYING_SWORD_RADIUS_RATIO_PER_EXTRA_SWORD
+				* float(maxi(sword_count - 1, 0)),
+		minimum_radius,
+		maximum_radius
+	)
+	var radius := minf(
+		idle_radius
+			+ attack_range
+				* FLYING_SWORD_WARNING_EXPANSION_RATIO
+				* _flying_sword_warning_strength,
+		maximum_radius
+	)
+	return (
+		Vector2.from_angle(
+			_get_flying_sword_slot_angle(sword_index, sword_count)
+		)
+		* radius
+	)
+
+
+func _get_nearest_flying_sword_target() -> EnemyController:
+	var nearest_target: EnemyController
+	var nearest_distance_squared := INF
+	for enemy_node in get_tree().get_nodes_in_group("enemies"):
+		if enemy_node is not EnemyController:
+			continue
+		var enemy := enemy_node as EnemyController
+		if not enemy.is_combat_active():
+			continue
+		var distance_squared := global_position.distance_squared_to(
+			enemy.global_position
+		)
+		if distance_squared < nearest_distance_squared:
+			nearest_distance_squared = distance_squared
+			nearest_target = enemy
+	return nearest_target
+
+
+func _refill_flying_sword_visual_slots() -> void:
+	for sword_index in _flying_sword_visual_filled.size():
+		if _flying_sword_visual_filled[sword_index]:
+			continue
+		_flying_sword_visual_filled[sword_index] = true
+		_flying_sword_visual_visibility[sword_index] = 0.0
+
+
+func _consume_flying_sword_visual(
+	projectile_index: int,
+	projectile_count: int
+) -> Vector2:
+	if not _flying_sword_visual_equipped:
+		return global_position
+	_ensure_flying_sword_visual_count(projectile_count)
+	if _flying_sword_visual_sprites.is_empty():
+		return global_position
+	var sword_index := (
+		projectile_index % _flying_sword_visual_sprites.size()
+	)
+	var sword_sprite := _flying_sword_visual_sprites[sword_index]
+	var launch_position := flying_sword_layer.to_global(
+		sword_sprite.position
+	)
+	_flying_sword_visual_filled[sword_index] = false
+	_flying_sword_visual_visibility[sword_index] = 0.0
+	sword_sprite.hide()
+	return launch_position
+
+
+func _update_flying_sword_visuals(delta: float) -> void:
+	if (
+		not _flying_sword_visual_equipped
+		or not _is_flying_sword_equipped()
+	):
+		return
+	_ensure_flying_sword_visual_count(
+		get_flying_sword_projectile_count()
+	)
+	_flying_sword_aim_target = _get_nearest_flying_sword_target()
+	var nearest_distance := INF
+	var aim_direction := Vector2.UP
+	if is_instance_valid(_flying_sword_aim_target):
+		nearest_distance = global_position.distance_to(
+			_flying_sword_aim_target.global_position
+		)
+	var attack_range := get_current_attack_range()
+	if nearest_distance <= attack_range + FLYING_SWORD_WARNING_MARGIN:
+		_flying_sword_warning_strength = 1.0 - clampf(
+			(nearest_distance - attack_range)
+				/ FLYING_SWORD_WARNING_MARGIN,
+			0.0,
+			1.0
+		)
+	else:
+		_flying_sword_warning_strength = 0.0
+	if _flying_sword_warning_strength > 0.0:
+		aim_direction = global_position.direction_to(
+			_flying_sword_aim_target.global_position
+		).normalized()
+		_flying_sword_orbit_phase = fmod(
+			_flying_sword_orbit_phase
+				+ FLYING_SWORD_WARNING_ORBIT_SPEED
+					* _flying_sword_warning_strength
+					* delta,
+			TAU
+		)
+	else:
+		_flying_sword_orbit_phase = lerp_angle(
+			_flying_sword_orbit_phase,
+			0.0,
+			1.0 - exp(-4.0 * delta)
+		)
+	_set_flying_sword_outline(_flying_sword_warning_strength)
+	if (
+		_attack_cooldown_remaining <= 0.0
+		and _pending_flying_swords <= 0
+	):
+		_refill_flying_sword_visual_slots()
+	if _flying_sword_visual_summoning:
+		_flying_sword_visual_elapsed += delta
+	var sword_count := _flying_sword_visual_sprites.size()
+	for sword_index in sword_count:
+		var target_visibility := (
+			1.0 if _flying_sword_visual_filled[sword_index] else 0.0
+		)
+		if (
+			_flying_sword_visual_summoning
+			and _flying_sword_visual_elapsed
+				< _get_flying_sword_summon_delay(
+					sword_index,
+					sword_count
+				)
+		):
+			target_visibility = 0.0
+		var duration := (
+			FLYING_SWORD_SUMMON_DURATION
+			if _flying_sword_visual_summoning
+			else FLYING_SWORD_REFILL_DURATION
+		)
+		_flying_sword_visual_visibility[sword_index] = move_toward(
+			_flying_sword_visual_visibility[sword_index],
+			target_visibility,
+			delta / duration
+		)
+		var visibility := _flying_sword_visual_visibility[sword_index]
+		var sword_sprite := _flying_sword_visual_sprites[sword_index]
+		if visibility <= 0.0:
+			sword_sprite.hide()
+			continue
+		sword_sprite.show()
+		var slot_position := _get_flying_sword_slot_position(
+			sword_index,
+			sword_count
+		)
+		var spawn_position := (
+			slot_position.normalized() * 12.0
+			if not slot_position.is_zero_approx()
+			else Vector2.UP * 12.0
+		)
+		var eased_visibility := (
+			visibility * visibility * (3.0 - 2.0 * visibility)
+		)
+		sword_sprite.position = spawn_position.lerp(
+			slot_position,
+			eased_visibility
+		)
+		sword_sprite.rotation = _get_palm_rotation(aim_direction)
+		var summon_scale := (
+			lerpf(0.38, 1.0, visibility)
+			+ sin(visibility * PI) * 0.16
+		)
+		sword_sprite.scale = (
+			Vector2.ONE * FLYING_SWORD_SCALE * summon_scale
+		)
+		sword_sprite.modulate = Color(1.0, 1.0, 1.0, visibility)
+	var final_summon_delay := _get_flying_sword_summon_delay(
+		maxi(sword_count - 1, 0),
+		sword_count
+	)
+	if (
+		_flying_sword_visual_summoning
+		and _flying_sword_visual_elapsed
+			>= final_summon_delay + FLYING_SWORD_SUMMON_DURATION
+	):
+		_flying_sword_visual_summoning = false
+
+
+func get_flying_sword_visual_filled_count() -> int:
+	var filled_count := 0
+	for is_filled in _flying_sword_visual_filled:
+		if is_filled:
+			filled_count += 1
+	return filled_count
+
+
+func get_flying_sword_warning_strength() -> float:
+	return _flying_sword_warning_strength
+
+
+func _is_fantian_seal_equipped() -> bool:
+	return (
+		not _equipment_inventory.is_empty()
+		and _get_current_weapon_data().attack_kind
+			== WeaponDataResource.AttackKind.FANTIAN_SEAL
+	)
+
+
+func _refresh_fantian_seal_visual_equipment() -> void:
+	if not is_instance_valid(fantian_seal_weapon):
+		return
+	fantian_seal_weapon.texture = FANTIAN_SEAL_TEXTURE
+	if not _is_fantian_seal_equipped():
+		_fantian_seal_visual_equipped = false
+		_fantian_seal_visual_state = FantianSealVisualState.HIDDEN
+		_fantian_seal_switch_shadow_active = false
+		fantian_seal_weapon.hide()
+		return
+	if _fantian_seal_visual_equipped:
+		return
+	_fantian_seal_visual_equipped = true
+	_fantian_seal_visual_state = FantianSealVisualState.SUMMONING
+	_fantian_seal_visual_elapsed = 0.0
+	_fantian_seal_switch_shadow_active = false
+	_fantian_seal_switch_shadow_elapsed = 0.0
+	_fantian_seal_visual_start_position = Vector2(14.0, 2.0)
+	fantian_seal_weapon.position = _fantian_seal_visual_start_position
+	fantian_seal_weapon.rotation = 0.0
+	fantian_seal_weapon.scale = (
+		Vector2.ONE * FANTIAN_SEAL_IDLE_SCALE * 0.32
+	)
+	fantian_seal_weapon.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	fantian_seal_weapon.show()
+
+
+func _update_fantian_seal_visual(delta: float) -> void:
+	if (
+		not _fantian_seal_visual_equipped
+		or not _is_fantian_seal_equipped()
+	):
+		return
+	_fantian_seal_visual_elapsed += delta
+	match _fantian_seal_visual_state:
+		FantianSealVisualState.SUMMONING:
+			var progress := clampf(
+				_fantian_seal_visual_elapsed
+					/ FANTIAN_SEAL_SUMMON_DURATION,
+				0.0,
+				1.0
+			)
+			var eased := progress * progress * (3.0 - 2.0 * progress)
+			fantian_seal_weapon.position = (
+				_fantian_seal_visual_start_position.lerp(
+					FANTIAN_SEAL_IDLE_POSITION,
+					eased
+				)
+			)
+			var summon_scale := (
+				FANTIAN_SEAL_IDLE_SCALE
+				* (lerpf(0.32, 1.0, eased) + sin(progress * PI) * 0.12)
+			)
+			fantian_seal_weapon.scale = Vector2.ONE * summon_scale
+			fantian_seal_weapon.rotation = 0.0
+			fantian_seal_weapon.modulate = Color(
+				1.0,
+				1.0,
+				1.0,
+				eased
+			)
+			if progress >= 1.0:
+				_fantian_seal_visual_state = (
+					FantianSealVisualState.ASCENDING
+				)
+				_fantian_seal_visual_elapsed = 0.0
+				_fantian_seal_visual_start_position = (
+					fantian_seal_weapon.position
+				)
+		FantianSealVisualState.ASCENDING:
+			var progress := clampf(
+				_fantian_seal_visual_elapsed
+					/ FANTIAN_SEAL_ASCENT_DURATION,
+				0.0,
+				1.0
+			)
+			var ascent_eased := progress * progress
+			var ascent_target := Vector2(
+				FANTIAN_SEAL_IDLE_POSITION.x,
+				-get_viewport_rect().size.y * 0.78
+			)
+			fantian_seal_weapon.position = (
+				_fantian_seal_visual_start_position.lerp(
+					ascent_target,
+					ascent_eased
+				)
+			)
+			fantian_seal_weapon.scale = Vector2.ONE * lerpf(
+				FANTIAN_SEAL_IDLE_SCALE,
+				FANTIAN_SEAL_IDLE_SCALE * 0.72,
+				progress
+			)
+			fantian_seal_weapon.rotation = 0.0
+			fantian_seal_weapon.modulate = Color(
+				1.0,
+				1.0,
+				1.0,
+				1.0 - smoothstep(0.68, 1.0, progress)
+			)
+			if progress >= 1.0:
+				_fantian_seal_visual_state = (
+					FantianSealVisualState.SHADOW_DELAY
+				)
+				_fantian_seal_visual_elapsed = 0.0
+				fantian_seal_weapon.hide()
+		FantianSealVisualState.SHADOW_DELAY:
+			fantian_seal_weapon.hide()
+			if (
+				_fantian_seal_visual_elapsed
+				>= FANTIAN_SEAL_SWITCH_SHADOW_DELAY
+			):
+				_fantian_seal_visual_state = (
+					FantianSealVisualState.SHADOW_SHRINK
+				)
+				_fantian_seal_visual_elapsed = 0.0
+				_fantian_seal_switch_shadow_elapsed = 0.0
+				_fantian_seal_switch_shadow_active = true
+				queue_redraw()
+		FantianSealVisualState.SHADOW_SHRINK:
+			fantian_seal_weapon.hide()
+			_fantian_seal_switch_shadow_elapsed = (
+				_fantian_seal_visual_elapsed
+			)
+			if (
+				_fantian_seal_visual_elapsed
+				>= FANTIAN_SEAL_SWITCH_SHADOW_DURATION
+			):
+				_fantian_seal_visual_state = (
+					FantianSealVisualState.ABSENT
+				)
+				_fantian_seal_switch_shadow_active = false
+				queue_redraw()
+		FantianSealVisualState.ABSENT:
+			fantian_seal_weapon.hide()
+
+
+func get_fantian_seal_visual_state() -> int:
+	return _fantian_seal_visual_state
+
+
+func is_fantian_seal_switch_shadow_active() -> bool:
+	return _fantian_seal_switch_shadow_active
 
 
 func _update_character_animation() -> void:
@@ -2010,6 +3399,7 @@ func _update_character_animation() -> void:
 		realm_abilities.get_current_flight_elevation()
 		> maxf(airborne_animation_threshold, 0.0)
 	)
+	var realm_airborne_animation := _get_realm_airborne_animation()
 	var grounded_target := grounded_animation
 	if (
 		_cultivation_resources == null
@@ -2017,7 +3407,7 @@ func _update_character_animation() -> void:
 	):
 		grounded_target = qi_refining_grounded_animation
 	var target_animation := (
-		airborne_animation if is_airborne else grounded_target
+		realm_airborne_animation if is_airborne else grounded_target
 	)
 	if (
 		character_sprite.sprite_frames != null
@@ -2030,13 +3420,24 @@ func _update_character_animation() -> void:
 	character_sprite.speed_scale = animation_speed
 	if (
 		spirit_sprite.sprite_frames != null
-		and spirit_sprite.sprite_frames.has_animation(airborne_animation)
+		and spirit_sprite.sprite_frames.has_animation(
+			realm_airborne_animation
+		)
 	):
-		if spirit_sprite.animation != airborne_animation:
-			spirit_sprite.play(airborne_animation)
+		if spirit_sprite.animation != realm_airborne_animation:
+			spirit_sprite.play(realm_airborne_animation)
 		elif not spirit_sprite.is_playing():
 			spirit_sprite.play()
 		spirit_sprite.speed_scale = animation_speed
+
+
+func _get_realm_airborne_animation() -> StringName:
+	var realm_index := _get_current_realm_index()
+	if realm_index >= 3:
+		return nascent_soul_airborne_animation
+	if realm_index == 2:
+		return golden_core_airborne_animation
+	return airborne_animation
 
 
 func _update_palm_aim() -> void:
@@ -2060,6 +3461,7 @@ func _update_palm_aim() -> void:
 		if distance_squared < nearest_distance_squared:
 			nearest_distance_squared = distance_squared
 			nearest_target = enemy
+	_palm_aim_target = nearest_target
 	if is_instance_valid(nearest_target):
 		_palm_attack_direction = global_position.direction_to(
 			nearest_target.global_position
@@ -2282,6 +3684,9 @@ func _draw_weapon_companions() -> void:
 	if (
 		attack_kind == WeaponDataResource.AttackKind.GREAT_STRENGTH_PALM
 		or attack_kind == WeaponDataResource.AttackKind.GOLDEN_BELL
+		or attack_kind == WeaponDataResource.AttackKind.DAO
+		or attack_kind == WeaponDataResource.AttackKind.FLYING_SWORD
+		or attack_kind == WeaponDataResource.AttackKind.FANTIAN_SEAL
 	):
 		return
 	if (
@@ -2290,27 +3695,7 @@ func _draw_weapon_companions() -> void:
 	):
 		return
 	var angle := _companion_phase
-	if attack_kind == WeaponDataResource.AttackKind.DAO:
-		var inner_position := Vector2.from_angle(angle) * 52.0
-		draw_circle(
-			inner_position,
-			12.0,
-			Color(1.0, 0.9, 0.4, 0.2)
-		)
-		_draw_dao(inner_position, angle + PI * 0.5, true)
-	elif attack_kind == WeaponDataResource.AttackKind.FLYING_SWORD:
-		var companion_position := Vector2.from_angle(angle) * 38.0
-		draw_circle(
-			companion_position,
-			12.0,
-			Color(1.0, 0.9, 0.4, 0.2)
-		)
-		_draw_flying_sword(
-			companion_position,
-			angle + PI * 0.5,
-			true
-		)
-	elif attack_kind == WeaponDataResource.AttackKind.THUNDER_HAMMER:
+	if attack_kind == WeaponDataResource.AttackKind.THUNDER_HAMMER:
 		var hammer_position := Vector2.from_angle(angle) * 40.0
 		draw_rect(
 			Rect2(hammer_position - Vector2(8.0, 6.0), Vector2(16.0, 12.0)),
@@ -2322,18 +3707,6 @@ func _draw_weapon_companions() -> void:
 			Color("e8d7ae"),
 			4.0
 		)
-	elif attack_kind == WeaponDataResource.AttackKind.FANTIAN_SEAL:
-		var seal_position := Vector2.from_angle(angle) * 40.0
-		draw_rect(
-			Rect2(seal_position - Vector2(9.0, 8.0), Vector2(18.0, 16.0)),
-			Color("d85a24")
-		)
-		draw_rect(
-			Rect2(seal_position - Vector2(9.0, 8.0), Vector2(18.0, 16.0)),
-			Color("ffd166"),
-			false,
-			2.0
-		)
 	else:
 		var ring_position := Vector2.from_angle(angle) * 40.0
 		draw_circle(
@@ -2342,36 +3715,6 @@ func _draw_weapon_companions() -> void:
 			Color(1.0, 0.35, 0.82, 0.16)
 		)
 		_draw_qiankun_ring(ring_position)
-
-
-func _draw_dao(position: Vector2, angle: float, active: bool) -> void:
-	var direction := Vector2.from_angle(angle)
-	var perpendicular := direction.orthogonal()
-	var color := Color("ffd166") if active else Color("c9a75b")
-	draw_line(
-		position - direction * 9.0,
-		position + direction * 9.0,
-		color,
-		4.0
-	)
-	draw_line(
-		position - direction * 8.0 - perpendicular * 4.0,
-		position - direction * 8.0 + perpendicular * 4.0,
-		Color("e6d5af"),
-		3.0
-	)
-
-
-func _draw_flying_sword(position: Vector2, angle: float, active: bool) -> void:
-	var direction := Vector2.from_angle(angle)
-	var color := Color("85e7ff") if active else Color("739baa")
-	draw_line(
-		position - direction * 11.0,
-		position + direction * 11.0,
-		color,
-		3.0
-	)
-	draw_circle(position + direction * 11.0, 2.5, Color.WHITE)
 
 
 func _draw_qiankun_ring(position: Vector2) -> void:
@@ -2709,6 +4052,10 @@ func _on_current_equipment_changed() -> void:
 	_cancel_special_projectile_sequence()
 	_rebuild_combat_stats()
 	_apply_attack_range()
+	_refresh_palm_visual_equipment()
+	_refresh_flying_sword_visual_equipment()
+	_refresh_fantian_seal_visual_equipment()
+	_refresh_dao_visual_equipment()
 	_publish_equipment()
 	queue_redraw()
 

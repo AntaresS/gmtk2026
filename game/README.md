@@ -78,7 +78,9 @@
 
 - 练气跑步动画来自 `image_asset/walk_0/frames`。
 - 筑基地面跑步动画来自 `image_asset/walk/sequence_frames`。
-- 飞行动画沿用原有角色动画，并会随加速和减速改变播放速度。
+- 筑基沿用原飞行动画；金丹和元婴分别使用
+  `assets/chara_golden_core_fly_frames` 与
+  `assets/chara_nascent_soul_fly_frames`，并会随加速和减速改变播放速度。
 - 玩家会根据地面、短暂驭空、持续飞行、翻滚、虚影和灵体状态切换对应表现。
 - 玩家拥有独立地面阴影；离地越高，角色和阴影的距离变化越明显。
 - 筑基、金丹和元婴的空中角色会逐级放大；当前基础缩放倍率分别约为 1.30、1.45、1.55。
@@ -217,9 +219,8 @@ HUD 侧边栏已经从旧精气神显示改为上述碎片系统，会显示持�
 
 ### 特殊敌人
 
-- 自爆怪：普通敌人变体，基础出现概率约 12%，生命值约为普通敌人的 38%；接近目标后自爆。
-- 治疗怪：普通变体概率约 10%，会周期性治疗周围敌人。
-- 精英治疗怪：精英变体概率约 16%，治疗光环范围约为普通治疗怪的 1.65 倍。
+- 自爆怪：普通敌人变体，基础出现概率约 12%，生命值与普通敌人相同；会轻微横向追踪玩家，并在接近目标后造成范围自爆。
+- 治疗怪：仅作为普通地面变体出现，概率约 10%，会周期性治疗周围敌人；不会成为精英或飞行单位。
 - 飞行怪：拥有翅膀、独立空中高度和更高渲染表现。
 - 远程飞行怪：在攻击范围内蓄力并进行远程打击。
 - 自主位移怪：除了追踪目标之外，还会横向游走和主动变向。
@@ -329,6 +330,7 @@ HUD 侧边栏已经从旧精气神显示改为上述碎片系统，会显示持�
 - `tests/cultivation_smoke.gd`
 - `tests/latest_weapon_design_smoke.gd`
 - `tests/realm_variants_debug_smoke.gd`
+- `tests/bomber_behavior_smoke.gd`
 
 在 `game` 目录中可以使用 Godot 4.7 逐项运行：
 
@@ -338,6 +340,7 @@ godot --headless --path . --script res://tests/gameplay_loop_smoke.gd --log-file
 godot --headless --path . --script res://tests/cultivation_smoke.gd --log-file .godot/cultivation-smoke.log
 godot --headless --path . --script res://tests/latest_weapon_design_smoke.gd --log-file .godot/latest-weapon-design-smoke.log
 godot --headless --path . --script res://tests/realm_variants_debug_smoke.gd --log-file .godot/realm-variants-debug-smoke.log
+godot --headless --path . --script res://tests/bomber_behavior_smoke.gd --log-file .godot/bomber-behavior-smoke.log
 ```
 
 Windows 下运行无界面测试时，应给每项测试设置独立日志文件和外部超时，避免多个 Godot 进程竞争同一个用户日志；如果测试超时，应先终止该次新启动的无界面进程再继续下一项，不要关闭正在使用的编辑器。

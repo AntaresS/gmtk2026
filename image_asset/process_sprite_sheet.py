@@ -11,10 +11,12 @@ from PIL import Image
 
 GRID_SIZE = 3
 ALPHA_THRESHOLD = 16
-HEAD_SCAN_HEIGHT = 38
-FRAME_PADDING_X = 20
-FRAME_PADDING_TOP = 24
-FRAME_PADDING_BOTTOM = 20
+OUTPUT_SIZE = 544
+# Relative to the canvas center this matches the legacy 418px flying frames:
+# head y ~= 57 and bottom y ~= 321. The larger canvas leaves room for wide
+# sleeves and the Nascent Soul halo without changing the in-game body size.
+TARGET_HEAD_ANCHOR = (OUTPUT_SIZE // 2, 121)
+TARGET_HEAD_TO_BOTTOM = 264
 
 
 def flood_background(candidate: np.ndarray) -> np.ndarray:
@@ -52,13 +54,74 @@ def flood_background(candidate: np.ndarray) -> np.ndarray:
     return background
 
 
-def remove_background(cell: Image.Image) -> Image.Image:
+def detect_dark_head(
+    rgb: np.ndarray,
+    alpha: np.ndarray | None = None,
+) -> tuple[float, float]:
+    """Locate the dark hair/head independently of bright halos and ribbons."""
+    height, width, _ = rgb.shape
+    luminance = rgb.mean(axis=2)
+    central = np.zeros((height, width), dtype=bool)
+    central[:, int(width * 0.28) : int(width * 0.72)] = True
+    central[int(height * 0.62) :, :] = False
+    dark = (luminance < 115.0) & central
+    if alpha is not None:
+        dark &= alpha >= 128
+    ys, xs = np.where(dark)
+    if len(xs) == 0:
+        raise ValueError("Could not locate the character's dark head/hair")
+
+    top = int(ys.min())
+    head_band = dark & (
+        np.indices(dark.shape)[0] <= min(top + 44, height - 1)
+    )
+    head_ys, head_xs = np.where(head_band)
+    if len(head_xs) == 0:
+        return float(width / 2), float(top)
+    return float(np.median(head_xs)), float(top)
+
+
+def remove_background(cell: Image.Image) -> tuple[Image.Image, tuple[float, float]]:
     rgb = np.asarray(cell.convert("RGB"), dtype=np.float32)
     height, width, _ = rgb.shape
+    head_anchor = detect_dark_head(rgb)
 
-    # The source has a gently varying warm-white background. Estimate it from
-    # edge pixels that are bright and low-chroma; the character never touches
-    # the left/right edges, even in the bottom row.
+    # Both supplied sheets use a warm, low-chroma studio background. Treat
+    # neutral warm pixels (including the soft floor shadow) as removable, but
+    # only when they connect to the cell edge. Connectivity protects enclosed
+    # white robe panels from being punched out.
+    luminance = rgb.mean(axis=2)
+    chroma = np.ptp(rgb, axis=2)
+    red, green, blue = rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
+    candidate = (
+        (luminance > 145.0)
+        # A narrow neutral band removes the warm studio matte while retaining
+        # the slightly blue/gray white fabric at open sleeve edges.
+        & (chroma < 24.0)
+        & (red + 3.0 >= green)
+        & (green + 3.0 >= blue)
+    )
+    # Only force-seed edge pixels that are clearly background-toned.
+    # Unconditional seeding of the full border strip causes the flood-fill to
+    # walk into light-coloured sleeves / arms that extend near the cell edge —
+    # those arms then become transparent.  Restricting seeds to pixels with
+    # high luminance AND low chroma keeps the behaviour correct for plain
+    # studio backgrounds while preserving limbs near the boundary.
+    edge_strip = np.zeros_like(candidate, dtype=bool)
+    edge_strip[:3, :] = True
+    edge_strip[-3:, :] = True
+    edge_strip[:, :3] = True
+    edge_strip[:, -3:] = True
+    candidate |= edge_strip & (luminance > 185.0) & (chroma < 30.0)
+    background = flood_background(candidate)
+
+    # Bright halo rings can enclose patches of the original background above
+    # the head. Those patches are safe to clear because no robe occupies this
+    # vertical region.
+    rows = np.indices(background.shape)[0]
+    background |= candidate & (rows < int(head_anchor[1]))
+
+    # Estimate the matte color from clean edge pixels for antialias recovery.
     strip = max(8, min(height, width) // 32)
     edge_samples = np.concatenate(
         [
@@ -69,21 +132,16 @@ def remove_background(cell: Image.Image) -> Image.Image:
         ],
         axis=0,
     )
-    bright = edge_samples.mean(axis=1) > 225
-    low_chroma = np.ptp(edge_samples, axis=1) < 20
-    clean_samples = edge_samples[bright & low_chroma]
-    background_color = np.median(clean_samples, axis=0)
-
-    distance = np.linalg.norm(rgb - background_color[None, None, :], axis=2)
-    luminance = rgb.mean(axis=2)
-    chroma = np.ptp(rgb, axis=2)
-    candidate = (distance < 24.0) & (luminance > 222.0) & (chroma < 24.0)
-    background = flood_background(candidate)
+    clean = (edge_samples.mean(axis=1) > 205.0) & (
+        np.ptp(edge_samples, axis=1) < 30.0
+    )
+    background_color = np.median(edge_samples[clean], axis=0)
+    distance = np.linalg.norm(
+        rgb - background_color[None, None, :],
+        axis=2,
+    )
 
     alpha = np.where(background, 0.0, 255.0)
-
-    # Recover antialias coverage only along the exterior edge. Interior light
-    # garment pixels remain fully opaque.
     adjacent_to_background = np.zeros_like(background)
     for dy in (-1, 0, 1):
         for dx in (-1, 0, 1):
@@ -98,13 +156,13 @@ def remove_background(cell: Image.Image) -> Image.Image:
             adjacent_to_background |= shifted
 
     fringe = (~background) & adjacent_to_background
-    coverage = np.clip((distance - 2.0) / 22.0, 0.0, 1.0)
-    alpha[fringe] = np.minimum(alpha[fringe], coverage[fringe] * 255.0)
+    coverage = np.clip((distance - 3.0) / 28.0, 0.0, 1.0)
+    alpha[fringe] = coverage[fringe] * 255.0
 
-    # Unmix the warm background from partially covered edge pixels to avoid
-    # a pale halo when the PNG is drawn over dark game backgrounds.
+    # Unmix the warm source matte from partially covered exterior pixels so
+    # the frames do not show a pale fringe over the game's darker terrain.
     out_rgb = rgb.copy()
-    partial = fringe & (alpha > 0.0) & (alpha < 255.0)
+    partial = fringe & (alpha > 6.0) & (alpha < 249.0)
     a = alpha[partial, None] / 255.0
     out_rgb[partial] = np.clip(
         (rgb[partial] - (1.0 - a) * background_color[None, :]) / a,
@@ -113,7 +171,7 @@ def remove_background(cell: Image.Image) -> Image.Image:
     )
 
     rgba = np.dstack([out_rgb, alpha]).astype(np.uint8)
-    return Image.fromarray(rgba, "RGBA")
+    return Image.fromarray(rgba, "RGBA"), head_anchor
 
 
 def content_bbox(image: Image.Image) -> tuple[int, int, int, int]:
@@ -124,30 +182,20 @@ def content_bbox(image: Image.Image) -> tuple[int, int, int, int]:
     return int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
 
 
-def head_anchor_x(image: Image.Image, bbox: tuple[int, int, int, int]) -> float:
-    alpha = np.asarray(image.getchannel("A"))
-    left, top, right, bottom = bbox
-    scan_bottom = min(bottom, top + HEAD_SCAN_HEIGHT)
-    row_centers: list[float] = []
-    for y in range(top, scan_bottom):
-        xs = np.flatnonzero(alpha[y] >= 96)
-        if len(xs) >= 2:
-            row_centers.append((float(xs[0]) + float(xs[-1])) / 2.0)
-    if not row_centers:
-        return (left + right - 1) / 2.0
-    return float(np.median(row_centers))
-
-
-def round_up_even(value: float) -> int:
-    integer = int(np.ceil(value))
-    return integer if integer % 2 == 0 else integer + 1
-
-
-def process(source: Path, output_dir: Path) -> dict:
-    sheet = Image.open(source).convert("RGB")
+def process(
+    source: Path,
+    output_dir: Path,
+    prefix: str,
+    preserve_alpha: bool = False,
+) -> dict:
+    sheet = Image.open(source).convert("RGBA")
     if sheet.width % GRID_SIZE or sheet.height % GRID_SIZE:
         raise ValueError(
             f"Expected a 3x3 sheet with divisible dimensions, got {sheet.size}"
+        )
+    if preserve_alpha and sheet.getchannel("A").getextrema()[0] == 255:
+        raise ValueError(
+            "--preserve-alpha requires a source with transparent pixels"
         )
 
     cell_width = sheet.width // GRID_SIZE
@@ -165,84 +213,87 @@ def process(source: Path, output_dir: Path) -> dict:
                     (row + 1) * cell_height,
                 )
             )
-            rgba = remove_background(cell)
+            if preserve_alpha:
+                rgba = cell.copy()
+                cell_data = np.asarray(rgba, dtype=np.uint8)
+                head_anchor = detect_dark_head(
+                    cell_data[:, :, :3].astype(np.float32),
+                    cell_data[:, :, 3],
+                )
+            else:
+                rgba, head_anchor = remove_background(cell)
             bbox = content_bbox(rgba)
-            anchor_x = head_anchor_x(rgba, bbox)
             extracted.append(rgba)
             metadata.append(
                 {
                     "source_cell": [row, col],
                     "source_bbox": list(bbox),
-                    "source_head_anchor": [anchor_x, float(bbox[1])],
+                    "source_head_anchor": list(head_anchor),
                 }
             )
 
-    left_extent = max(
-        anchor["source_head_anchor"][0] - anchor["source_bbox"][0]
-        for anchor in metadata
-    )
-    right_extent = max(
-        anchor["source_bbox"][2] - anchor["source_head_anchor"][0]
-        for anchor in metadata
-    )
-    down_extent = max(
-        anchor["source_bbox"][3] - anchor["source_bbox"][1]
-        for anchor in metadata
-    )
-
-    canvas_width = round_up_even(
-        2.0 * max(left_extent, right_extent) + 2 * FRAME_PADDING_X
-    )
-    canvas_height = round_up_even(
-        FRAME_PADDING_TOP + down_extent + FRAME_PADDING_BOTTOM
-    )
-    target_anchor_x = canvas_width // 2
-    target_anchor_y = FRAME_PADDING_TOP
-
     output_dir.mkdir(parents=True, exist_ok=True)
     aligned_frames: list[Image.Image] = []
-    for index, (rgba, frame_meta) in enumerate(zip(extracted, metadata), start=1):
+    for index, (rgba, frame_meta) in enumerate(zip(extracted, metadata)):
         left, top, right, bottom = frame_meta["source_bbox"]
-        crop = rgba.crop((left, top, right, bottom))
-        source_anchor_x = frame_meta["source_head_anchor"][0] - left
-        paste_x = int(round(target_anchor_x - source_anchor_x))
-        paste_y = target_anchor_y
+        source_head_x, source_head_y = frame_meta["source_head_anchor"]
+        body_height = max(float(bottom) - source_head_y, 1.0)
+        scale = TARGET_HEAD_TO_BOTTOM / body_height
+        resized = rgba.resize(
+            (
+                max(1, int(round(rgba.width * scale))),
+                max(1, int(round(rgba.height * scale))),
+            ),
+            Image.Resampling.LANCZOS,
+        )
 
-        frame = Image.new("RGBA", (canvas_width, canvas_height), (0, 0, 0, 0))
-        frame.alpha_composite(crop, (paste_x, paste_y))
-        frame_path = output_dir / f"frame_{index:02d}.png"
+        paste_x = int(round(TARGET_HEAD_ANCHOR[0] - source_head_x * scale))
+        paste_y = int(round(TARGET_HEAD_ANCHOR[1] - source_head_y * scale))
+        frame = Image.new(
+            "RGBA",
+            (OUTPUT_SIZE, OUTPUT_SIZE),
+            (0, 0, 0, 0),
+        )
+        frame.alpha_composite(resized, (paste_x, paste_y))
+        frame_path = output_dir / f"{prefix}_{index:02d}.png"
         frame.save(frame_path, optimize=True)
         aligned_frames.append(frame)
 
         frame_meta.update(
             {
                 "output": frame_path.name,
-                "output_size": [canvas_width, canvas_height],
-                "output_head_anchor": [target_anchor_x, target_anchor_y],
+                "output_size": [OUTPUT_SIZE, OUTPUT_SIZE],
+                "output_head_anchor": list(TARGET_HEAD_ANCHOR),
+                "scale": scale,
                 "paste_offset": [paste_x, paste_y],
             }
         )
 
     preview = Image.new(
         "RGBA",
-        (canvas_width * GRID_SIZE, canvas_height * GRID_SIZE),
+        (OUTPUT_SIZE * GRID_SIZE, OUTPUT_SIZE * GRID_SIZE),
         (0, 0, 0, 0),
     )
     for index, frame in enumerate(aligned_frames):
         row, col = divmod(index, GRID_SIZE)
-        preview.alpha_composite(frame, (col * canvas_width, row * canvas_height))
-    preview_path = output_dir / "sequence_preview.png"
+        preview.alpha_composite(
+            frame,
+            (col * OUTPUT_SIZE, row * OUTPUT_SIZE),
+        )
+    preview_path = output_dir / f"{prefix}_preview.png"
     preview.save(preview_path, optimize=True)
 
     manifest = {
         "source": str(source),
         "order": "left-to-right, top-to-bottom",
         "frame_count": len(aligned_frames),
-        "frame_size": [canvas_width, canvas_height],
-        "head_anchor": [target_anchor_x, target_anchor_y],
+        "frame_size": [OUTPUT_SIZE, OUTPUT_SIZE],
+        "head_anchor": list(TARGET_HEAD_ANCHOR),
+        "target_head_to_bottom": TARGET_HEAD_TO_BOTTOM,
+        "source_alpha_preserved": preserve_alpha,
         "frames": metadata,
     }
-    (output_dir / "sequence_manifest.json").write_text(
+    (output_dir / f"{prefix}_manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -253,8 +304,19 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("source", type=Path)
     parser.add_argument("output_dir", type=Path)
+    parser.add_argument("--prefix", required=True)
+    parser.add_argument(
+        "--preserve-alpha",
+        action="store_true",
+        help="Use the source alpha unchanged; do not run background removal.",
+    )
     args = parser.parse_args()
-    manifest = process(args.source, args.output_dir)
+    manifest = process(
+        args.source,
+        args.output_dir,
+        args.prefix,
+        args.preserve_alpha,
+    )
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
 
 

@@ -313,7 +313,7 @@ func get_road_half_width_at_local_y(local_y: float) -> float:
 
 
 ## Switches the runtime road between its normal palette and Trial Hell's
-## persistent red-black palette without rebuilding deterministic contents.
+## dark volcanic surface without rebuilding deterministic contents.
 func set_trial_hell_active(active: bool) -> void:
 	_trial_hell_active = active
 	queue_redraw()
@@ -452,9 +452,14 @@ func _draw() -> void:
 
 	var chunk_size := config.get_pixel_size()
 	if not _show_fallback:
-		_draw_road_guides(chunk_size)
+		_draw_loess_terrain_base(chunk_size)
 		if _trial_hell_active:
 			_draw_trial_hell_overlay(chunk_size)
+		else:
+			_draw_bluestone_road_texture(chunk_size)
+			_draw_road_surface_wear(chunk_size)
+			_draw_irregular_road_edges(chunk_size)
+			_draw_road_edge_decorations(chunk_size)
 		return
 	_draw_fallback_terrain(chunk_size)
 	if _trial_hell_active:
@@ -463,44 +468,170 @@ func _draw() -> void:
 
 func _draw_trial_hell_overlay(chunk_size: Vector2) -> void:
 	var chunk_rect := Rect2(-chunk_size * 0.5, chunk_size)
-	draw_rect(chunk_rect, Color(0.22, 0.0, 0.015, 0.58))
+	draw_rect(chunk_rect, Color(0.085, 0.045, 0.032, 1.0))
+	_draw_trial_hell_background_variation(chunk_size)
 	draw_colored_polygon(
-		_get_road_polygon(chunk_size, -10.0),
-		Color(0.34, 0.025, 0.015, 0.92)
+		_get_road_polygon(chunk_size, -12.0),
+		Color(0.30, 0.105, 0.035, 1.0)
 	)
 	draw_colored_polygon(
 		_get_road_polygon(chunk_size),
-		Color(0.10, 0.008, 0.012, 0.88)
+		Color(0.19, 0.105, 0.060, 1.0)
 	)
-	var first_mark_y := -chunk_size.y * 0.5 + 34.0
-	for mark_index in int(ceilf(chunk_size.y / 92.0)):
-		var mark_y := first_mark_y + float(mark_index) * 92.0
-		var mark_color := Color(1.0, 0.20, 0.04, 0.80)
-		var mark_half_width := _get_road_half_width_for_local_y(mark_y)
-		draw_line(
-			Vector2(-mark_half_width + 12.0, mark_y),
-			Vector2(-mark_half_width + 34.0, mark_y - 20.0),
-			mark_color,
-			3.0
+	_draw_trial_hell_surface(chunk_size)
+
+
+func _draw_trial_hell_background_variation(chunk_size: Vector2) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(Vector3i(config.world_seed, chunk_index, 82981))
+	var patch_count := maxi(roundi(chunk_size.y / 44.0), 14)
+	for _patch in patch_count:
+		var center := Vector2(
+			rng.randf_range(-chunk_size.x * 0.5, chunk_size.x * 0.5),
+			rng.randf_range(-chunk_size.y * 0.5, chunk_size.y * 0.5)
 		)
-		draw_line(
-			Vector2(mark_half_width - 12.0, mark_y),
-			Vector2(mark_half_width - 34.0, mark_y - 20.0),
-			mark_color,
-			3.0
+		var radii := Vector2(
+			rng.randf_range(18.0, 96.0),
+			rng.randf_range(9.0, 42.0)
 		)
+		var color := Color(0.13, 0.063, 0.040, 0.62)
+		match rng.randi_range(0, 3):
+			1:
+				color = Color(0.055, 0.030, 0.026, 0.72)
+			2:
+				color = Color(0.17, 0.075, 0.038, 0.42)
+			3:
+				color = Color(0.105, 0.080, 0.066, 0.45)
+		draw_colored_polygon(
+			_make_irregular_ellipse(
+				center,
+				radii,
+				Vector2.RIGHT,
+				Vector2.DOWN,
+				rng
+			),
+			color
+		)
+
+
+func _draw_trial_hell_surface(chunk_size: Vector2) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(Vector3i(config.world_seed, chunk_index, 84011))
+	var patch_count := maxi(roundi(chunk_size.y / 34.0), 16)
+	for patch_index in patch_count:
+		var center_y := rng.randf_range(
+			-chunk_size.y * 0.5 + 14.0,
+			chunk_size.y * 0.5 - 14.0
+		)
+		var limits := _get_visual_road_x_limits(center_y, 18.0)
+		var radius_x := rng.randf_range(7.0, 44.0)
+		var radius_y := rng.randf_range(4.0, 24.0)
+		if patch_index % 4 == 0:
+			radius_x = rng.randf_range(30.0, 68.0)
+			radius_y = rng.randf_range(12.0, 31.0)
+		var center := Vector2(
+			rng.randf_range(
+				limits.x + radius_x,
+				limits.y - radius_x
+			),
+			center_y
+		)
+		var patch_color := Color(0.255, 0.135, 0.068, 0.62)
+		match rng.randi_range(0, 4):
+			1:
+				patch_color = Color(0.125, 0.060, 0.035, 0.76)
+			2:
+				patch_color = Color(0.34, 0.155, 0.055, 0.46)
+			3:
+				patch_color = Color(0.215, 0.085, 0.035, 0.68)
+			4:
+				patch_color = Color(0.29, 0.19, 0.105, 0.44)
+		draw_colored_polygon(
+			_make_irregular_ellipse(
+				center,
+				Vector2(radius_x, radius_y),
+				Vector2.RIGHT,
+				Vector2.DOWN,
+				rng
+			),
+			patch_color
+		)
+
+	var pit_count := maxi(roundi(chunk_size.y / 58.0), 10)
+	for _pit in pit_count:
+		var pit_y := rng.randf_range(
+			-chunk_size.y * 0.5 + 12.0,
+			chunk_size.y * 0.5 - 12.0
+		)
+		var pit_limits := _get_visual_road_x_limits(pit_y, 28.0)
+		var pit_center := Vector2(
+			rng.randf_range(pit_limits.x, pit_limits.y),
+			pit_y
+		)
+		var pit_radius := Vector2(
+			rng.randf_range(5.0, 19.0),
+			rng.randf_range(3.0, 10.0)
+		)
+		draw_colored_polygon(
+			_make_irregular_ellipse(
+				pit_center + Vector2(0.0, 1.5),
+				pit_radius * 1.22,
+				Vector2.RIGHT,
+				Vector2.DOWN,
+				rng
+			),
+			Color(0.38, 0.19, 0.075, 0.42)
+		)
+		draw_colored_polygon(
+			_make_irregular_ellipse(
+				pit_center,
+				pit_radius,
+				Vector2.RIGHT,
+				Vector2.DOWN,
+				rng
+			),
+			Color(0.075, 0.035, 0.024, 0.84)
+		)
+
+
+func _make_irregular_ellipse(
+	center: Vector2,
+	radii: Vector2,
+	axis_x: Vector2,
+	axis_y: Vector2,
+	rng: RandomNumberGenerator
+) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	var point_count := rng.randi_range(8, 12)
+	for point_index in point_count:
+		var angle := TAU * float(point_index) / float(point_count)
+		var distortion := rng.randf_range(0.76, 1.18)
+		points.append(
+			center
+			+ axis_x * cos(angle) * radii.x * distortion
+			+ axis_y * sin(angle) * radii.y * distortion
+		)
+	return points
 
 
 func _draw_fallback_terrain(chunk_size: Vector2) -> void:
+	_draw_loess_terrain_base(chunk_size)
+	if not _trial_hell_active:
+		_draw_bluestone_road_texture(chunk_size)
+		_draw_road_surface_wear(chunk_size)
+		_draw_irregular_road_edges(chunk_size, 8.0)
+		_draw_road_edge_decorations(chunk_size, 8.0)
+
+
+func _draw_loess_terrain_base(chunk_size: Vector2) -> void:
 	var chunk_rect := Rect2(-chunk_size * 0.5, chunk_size)
-	draw_rect(chunk_rect, Color("31523a"))
+	draw_rect(chunk_rect, Color(0.43, 0.31, 0.145, 1.0))
 	_draw_ground_variation(chunk_size)
 	draw_colored_polygon(
 		_get_road_polygon(chunk_size, -8.0),
-		Color("806f50")
+		Color(0.34, 0.25, 0.14, 1.0)
 	)
-	draw_colored_polygon(_get_road_polygon(chunk_size), Color("3e4248"))
-	_draw_road_guides(chunk_size, 8.0)
+	draw_colored_polygon(_get_road_polygon(chunk_size), Color("625f55"))
 
 
 func _draw_editor_preview() -> void:
@@ -513,9 +644,17 @@ func _draw_editor_preview() -> void:
 		drew_atlas = _draw_atlas_preview(chunk_size)
 
 	if drew_atlas:
-		_draw_road_guides(chunk_size)
+		_draw_loess_terrain_base(chunk_size)
+		_draw_bluestone_road_texture(chunk_size)
+		_draw_road_surface_wear(chunk_size)
+		_draw_irregular_road_edges(chunk_size)
+		_draw_road_edge_decorations(chunk_size)
 	elif config.use_terrain_painting and _tile_map_layer.visible:
-		_draw_road_guides(chunk_size)
+		_draw_loess_terrain_base(chunk_size)
+		_draw_bluestone_road_texture(chunk_size)
+		_draw_road_surface_wear(chunk_size)
+		_draw_irregular_road_edges(chunk_size)
+		_draw_road_edge_decorations(chunk_size)
 	else:
 		_draw_fallback_terrain(chunk_size)
 	_draw_editor_helpers(chunk_size)
@@ -601,54 +740,560 @@ func _draw_atlas_tile(
 	)
 
 
-func _draw_road_guides(chunk_size: Vector2, edge_inset: float = 0.0) -> void:
-	var edge_points := _get_road_edge_points(chunk_size, edge_inset)
-	draw_polyline(edge_points[0], Color("d7c7a2"), 2.0, true)
-	draw_polyline(edge_points[1], Color("d7c7a2"), 2.0, true)
+## Adds deterministic, staggered bluestone slabs without repeating one atlas
+## cell across the whole road. Each chunk keeps a stable pattern for its seed.
+func _draw_bluestone_road_texture(chunk_size: Vector2) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(Vector3i(config.world_seed, chunk_index, 24859))
+	var row_y := -chunk_size.y * 0.5 + rng.randf_range(6.0, 16.0)
+	while row_y < chunk_size.y * 0.5:
+		var small_row := rng.randf() < 0.68
+		var slab_height := (
+			rng.randf_range(10.0, 22.0)
+			if small_row
+			else rng.randf_range(22.0, 32.0)
+		)
+		var road_limits := _get_visual_road_x_limits(
+			row_y + slab_height * 0.5,
+			10.0
+		)
+		var slab_x := road_limits.x + rng.randf_range(-24.0, 10.0)
+		while slab_x < road_limits.y:
+			var small_slab := rng.randf() < 0.68
+			var slab_width := (
+				rng.randf_range(14.0, 48.0)
+				if small_slab
+				else rng.randf_range(48.0, 98.0)
+			)
+			var gap := rng.randf_range(1.5, 22.0)
+			var left := maxf(slab_x, road_limits.x)
+			var right := minf(slab_x + slab_width, road_limits.y)
+			if right - left >= 8.0 and rng.randf() > 0.10:
+				_draw_bluestone_slab(
+					Rect2(
+						Vector2(left, row_y),
+						Vector2(right - left, slab_height)
+					),
+					rng
+				)
+			slab_x += slab_width + gap
+		row_y += slab_height + rng.randf_range(2.0, 16.0)
 
-	var first_dash_y := -chunk_size.y * 0.5
-	for dash_index in int(ceilf(chunk_size.y / 64.0)):
-		var dash_y := first_dash_y + dash_index * 64.0
-		draw_rect(
-			Rect2(Vector2(-2.0, dash_y + 16.0), Vector2(4.0, 28.0)),
-			Color("d9d5b8")
+
+func _draw_bluestone_slab(
+	rect: Rect2,
+	rng: RandomNumberGenerator
+) -> void:
+	var corner_jitter := minf(rect.size.y * 0.16, 3.5)
+	var points := PackedVector2Array([
+		rect.position + Vector2(
+			rng.randf_range(0.0, corner_jitter),
+			rng.randf_range(0.0, corner_jitter)
+		),
+		Vector2(rect.end.x, rect.position.y) + Vector2(
+			-rng.randf_range(0.0, corner_jitter),
+			rng.randf_range(0.0, corner_jitter)
+		),
+		rect.end - Vector2(
+			rng.randf_range(0.0, corner_jitter),
+			rng.randf_range(0.0, corner_jitter)
+		),
+		Vector2(rect.position.x, rect.end.y) + Vector2(
+			rng.randf_range(0.0, corner_jitter),
+			-rng.randf_range(0.0, corner_jitter)
+		),
+	])
+	var base_color := Color(0.57, 0.55, 0.49, 1.0)
+	match rng.randi_range(0, 4):
+		1:
+			base_color = Color(0.52, 0.51, 0.47, 1.0)
+		2:
+			base_color = Color(0.62, 0.59, 0.51, 1.0)
+		3:
+			base_color = Color(0.65, 0.61, 0.53, 1.0)
+		4:
+			base_color = Color(0.55, 0.54, 0.50, 1.0)
+	var shade := rng.randf_range(-0.028, 0.035)
+	var fill_color := Color(
+		base_color.r + shade,
+		base_color.g + shade,
+		base_color.b + shade,
+		rng.randf_range(0.62, 0.80)
+	)
+	draw_colored_polygon(points, fill_color)
+	var outline := PackedVector2Array(points)
+	outline.append(points[0])
+	draw_polyline(outline, Color(0.18, 0.17, 0.14, 0.34), 1.0, true)
+	var detail_variant := rng.randi_range(0, 4)
+	match detail_variant:
+		0:
+			var grain_y := rect.position.y + rect.size.y * 0.58
+			draw_line(
+				Vector2(rect.position.x + 7.0, grain_y),
+				Vector2(rect.end.x - 7.0, grain_y + rng.randf_range(-2.0, 2.0)),
+				Color(0.68, 0.66, 0.57, 0.22),
+				1.0,
+				true
+			)
+		1:
+			for _pit in rng.randi_range(1, 3):
+				draw_circle(
+					rect.get_center() + Vector2(
+						rng.randf_range(-rect.size.x * 0.32, rect.size.x * 0.32),
+						rng.randf_range(-rect.size.y * 0.26, rect.size.y * 0.26)
+					),
+					rng.randf_range(0.7, 1.6),
+					Color(0.08, 0.14, 0.15, 0.20)
+				)
+		2:
+			draw_line(
+				Vector2(rect.position.x + 5.0, rect.end.y - 3.0),
+				Vector2(
+					rect.position.x + rect.size.x * rng.randf_range(0.35, 0.78),
+					rect.end.y - 2.0
+				),
+				Color(0.24, 0.39, 0.25, 0.24),
+				2.0,
+				true
+			)
+		3:
+			if rect.size.x > 28.0:
+				var crack_start := rect.get_center() + Vector2(
+					rng.randf_range(-rect.size.x * 0.18, rect.size.x * 0.12),
+					-rng.randf_range(1.0, rect.size.y * 0.22)
+				)
+				draw_line(
+					crack_start,
+					crack_start + Vector2(
+						rng.randf_range(5.0, 13.0),
+						rng.randf_range(3.0, 8.0)
+					),
+					Color(0.07, 0.12, 0.13, 0.28),
+					1.0,
+					true
+				)
+	if (
+		detail_variant != 3
+		and rect.size.x > 24.0
+		and rng.randf() < 0.38
+	):
+		var extra_crack_start := rect.get_center() + Vector2(
+			rng.randf_range(-rect.size.x * 0.24, rect.size.x * 0.14),
+			rng.randf_range(-rect.size.y * 0.20, rect.size.y * 0.10)
+		)
+		var extra_crack_middle := extra_crack_start + Vector2(
+			rng.randf_range(3.0, minf(10.0, rect.size.x * 0.24)),
+			rng.randf_range(2.0, minf(6.0, rect.size.y * 0.30))
+		)
+		draw_polyline(
+			PackedVector2Array([
+				extra_crack_start,
+				extra_crack_middle,
+				extra_crack_middle + Vector2(
+					rng.randf_range(-3.0, 5.0),
+					rng.randf_range(2.0, 5.0)
+				),
+			]),
+			Color(0.07, 0.12, 0.13, 0.32),
+			1.0,
+			true
+		)
+
+
+func _draw_road_edge_decorations(
+	chunk_size: Vector2,
+	edge_inset: float = 0.0
+) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(Vector3i(config.world_seed, chunk_index, 51071))
+	var local_y := -chunk_size.y * 0.5 + rng.randf_range(8.0, 20.0)
+	while local_y < chunk_size.y * 0.5 - 10.0:
+		for side_value in [-1.0, 1.0]:
+			if rng.randf() > 0.92:
+				continue
+			var road_limits := _get_visual_road_x_limits(
+				local_y,
+				edge_inset
+			)
+			var outward := Vector2(side_value, 0.0)
+			var edge_x := (
+				road_limits.x if side_value < 0.0 else road_limits.y
+			)
+			var root := Vector2(edge_x, local_y)
+			root += outward * rng.randf_range(1.0, 7.0)
+			root.y += rng.randf_range(-5.0, 5.0)
+			if rng.randf() < 0.90:
+				_draw_loess_cluster(root, outward, rng)
+			else:
+				_draw_rock_cluster(root, rng)
+		local_y += rng.randf_range(24.0, 36.0)
+
+
+func _draw_loess_cluster(
+	root: Vector2,
+	outward: Vector2,
+	rng: RandomNumberGenerator
+) -> void:
+	var scale := rng.randf_range(0.78, 1.55)
+	var tangent := Vector2(-outward.y, outward.x)
+	draw_line(
+		root - tangent * 15.0 * scale,
+		root + tangent * 15.0 * scale,
+		Color(0.24, 0.14, 0.045, 0.92),
+		8.0 * scale,
+		true
+	)
+	draw_circle(
+		root + outward * 2.0 + Vector2(2.0, 3.0),
+		13.0 * scale,
+		Color(0.08, 0.045, 0.015, 0.38)
+	)
+	for layer_index in 3:
+		var clod_count := rng.randi_range(4, 7)
+		if layer_index == 0:
+			clod_count = rng.randi_range(1, 2)
+		elif layer_index == 1:
+			clod_count = rng.randi_range(2, 4)
+		for _clod in clod_count:
+			var size := rng.randf_range(2.4, 5.5) * scale
+			if layer_index == 0:
+				size = rng.randf_range(13.0, 23.0) * scale
+			elif layer_index == 1:
+				size = rng.randf_range(6.0, 12.0) * scale
+			var outward_offset := rng.randf_range(-5.0, 4.0) * scale
+			if layer_index == 0:
+				outward_offset = rng.randf_range(3.0, 10.0) * scale
+			elif layer_index == 1:
+				outward_offset = rng.randf_range(-1.0, 7.0) * scale
+			var center := (
+				root
+				+ tangent * rng.randf_range(-16.0, 16.0) * scale
+				+ outward * outward_offset
+				+ Vector2(0.0, float(layer_index) * 2.0)
+			)
+			_draw_single_loess_clod(center, size, rng)
+
+
+func _draw_single_loess_clod(
+	center: Vector2,
+	size: float,
+	rng: RandomNumberGenerator
+) -> void:
+	var points := PackedVector2Array()
+	var point_count := rng.randi_range(6, 9)
+	for point_index in point_count:
+		var angle := TAU * float(point_index) / float(point_count)
+		var radius := size * rng.randf_range(0.72, 1.16)
+		points.append(
+			center + Vector2(
+				cos(angle) * radius,
+				sin(angle) * radius * rng.randf_range(0.58, 0.82)
+			)
+		)
+	var base_color := Color(0.43, 0.27, 0.09, 0.98)
+	match rng.randi_range(0, 3):
+		1:
+			base_color = Color(0.49, 0.32, 0.12, 0.98)
+		2:
+			base_color = Color(0.36, 0.21, 0.065, 0.98)
+		3:
+			base_color = Color(0.53, 0.36, 0.15, 0.98)
+	draw_colored_polygon(points, base_color)
+	if size > 5.5 and rng.randf() < 0.58:
+		draw_line(
+			center + Vector2(-size * 0.48, -size * 0.20),
+			center + Vector2(size * 0.12, -size * 0.34),
+			Color(0.67, 0.46, 0.21, 0.38),
+			maxf(size * 0.10, 1.0),
+			true
+		)
+	if size > 10.0 and rng.randf() < 0.36:
+		draw_line(
+			center + Vector2(-size * 0.05, -size * 0.10),
+			center + Vector2(size * 0.24, size * 0.20),
+			Color(0.20, 0.11, 0.03, 0.65),
+			1.0,
+			true
+		)
+	if size > 6.0 and rng.randf() < 0.32:
+		draw_circle(
+			center + Vector2(
+				rng.randf_range(-size * 0.42, size * 0.42),
+				rng.randf_range(-size * 0.24, size * 0.24)
+			),
+			rng.randf_range(0.6, 1.25),
+			Color(0.22, 0.13, 0.035, 0.54)
+		)
+
+
+func _draw_road_surface_wear(chunk_size: Vector2) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(Vector3i(config.world_seed, chunk_index, 60493))
+	var stain_count := maxi(roundi(chunk_size.y / 48.0), 6)
+	for _stain in stain_count:
+		var center_y := rng.randf_range(
+			-chunk_size.y * 0.5 + 12.0,
+			chunk_size.y * 0.5 - 12.0
+		)
+		var road_limits := _get_visual_road_x_limits(center_y, 18.0)
+		var center := Vector2(
+			rng.randf_range(road_limits.x, road_limits.y),
+			center_y
+		)
+		var radius_x := rng.randf_range(10.0, 38.0)
+		var radius_y := rng.randf_range(5.0, 17.0)
+		var stain_points := PackedVector2Array()
+		var point_count := rng.randi_range(7, 10)
+		for point_index in point_count:
+			var angle := TAU * float(point_index) / float(point_count)
+			var distortion := rng.randf_range(0.68, 1.18)
+			stain_points.append(
+				center + Vector2(
+					cos(angle) * radius_x * distortion,
+					sin(angle) * radius_y * distortion
+				)
+			)
+		draw_colored_polygon(
+			stain_points,
+			Color(0.15, 0.12, 0.085, rng.randf_range(0.08, 0.17))
+		)
+
+	var crack_count := maxi(roundi(chunk_size.y / 44.0), 7)
+	for _crack in crack_count:
+		var crack_y := rng.randf_range(
+			-chunk_size.y * 0.5 + 16.0,
+			chunk_size.y * 0.5 - 28.0
+		)
+		var road_limits := _get_visual_road_x_limits(crack_y, 24.0)
+		var crack_points := PackedVector2Array()
+		var current := Vector2(
+			rng.randf_range(road_limits.x, road_limits.y),
+			crack_y
+		)
+		crack_points.append(current)
+		for _segment in rng.randi_range(2, 4):
+			current += Vector2(
+				rng.randf_range(-8.0, 8.0),
+				rng.randf_range(4.0, 10.0)
+			)
+			crack_points.append(current)
+		draw_polyline(
+			crack_points,
+			Color(0.07, 0.075, 0.07, rng.randf_range(0.28, 0.46)),
+			rng.randf_range(0.8, 1.4),
+			true
+		)
+		if rng.randf() < 0.45 and crack_points.size() >= 3:
+			var branch_start := crack_points[rng.randi_range(
+				1,
+				crack_points.size() - 2
+			)]
+			draw_line(
+				branch_start,
+				branch_start + Vector2(
+					rng.randf_range(-7.0, 7.0),
+					rng.randf_range(3.0, 7.0)
+				),
+				Color(0.07, 0.075, 0.07, 0.34),
+				1.0,
+				true
+			)
+
+
+func _draw_irregular_road_edges(
+	chunk_size: Vector2,
+	edge_inset: float = 0.0
+) -> void:
+	for side_index in 2:
+		var side := -1.0 if side_index == 0 else 1.0
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash(Vector3i(
+			config.world_seed,
+			chunk_index,
+			61879 + side_index * 997
+		))
+		var local_y := (
+			-chunk_size.y * 0.5 + rng.randf_range(5.0, 28.0)
+		)
+		while local_y < chunk_size.y * 0.5:
+			var road_limits := _get_visual_road_x_limits(
+				local_y,
+				edge_inset
+			)
+			var edge_x := (
+				road_limits.x if side < 0.0 else road_limits.y
+			)
+			var outward := Vector2(side, 0.0)
+			var tangent := Vector2(0.0, 1.0)
+			var block_length := (
+				rng.randf_range(6.0, 16.0)
+				if rng.randf() < 0.68
+				else rng.randf_range(18.0, 30.0)
+			)
+			var half_length := block_length * 0.5
+			var missing := rng.randf() < 0.43
+			var inner_depth := (
+				rng.randf_range(6.0, 30.0)
+				if missing
+				else rng.randf_range(1.0, 7.0)
+			)
+			var outer_depth := (
+				rng.randf_range(2.0, 8.0)
+				if missing
+				else rng.randf_range(4.0, 24.0)
+			)
+			var edge := Vector2(edge_x, local_y)
+			var inner := edge - outward * inner_depth
+			var outer := edge + outward * outer_depth
+			var jitter := rng.randf_range(
+				0.5,
+				minf(4.0, half_length * 0.70)
+			)
+			var block := PackedVector2Array([
+				inner - tangent * (half_length - rng.randf_range(0.0, jitter)),
+				outer - tangent * (half_length - rng.randf_range(0.0, jitter)),
+				outer + tangent * (half_length - rng.randf_range(0.0, jitter)),
+				inner + tangent * (half_length - rng.randf_range(0.0, jitter)),
+			])
+			if missing:
+				draw_colored_polygon(
+					block,
+					Color(
+						rng.randf_range(0.37, 0.47),
+						rng.randf_range(0.255, 0.335),
+						rng.randf_range(0.105, 0.17),
+						0.98
+					)
+				)
+				if rng.randf() < 0.55:
+					draw_circle(
+						edge - outward * rng.randf_range(5.0, inner_depth),
+						rng.randf_range(1.2, 2.8),
+						Color(0.24, 0.145, 0.045, 0.48)
+					)
+			else:
+				var stone_tint := rng.randf_range(-0.035, 0.04)
+				draw_colored_polygon(
+					block,
+					Color(
+						0.53 + stone_tint,
+						0.52 + stone_tint,
+						0.47 + stone_tint,
+						0.96
+					)
+				)
+				if rng.randf() < 0.52:
+					draw_line(
+						edge - tangent * half_length * 0.55,
+						edge + outward * outer_depth * 0.72,
+						Color(0.12, 0.18, 0.18, 0.38),
+						1.0,
+						true
+					)
+			local_y += rng.randf_range(18.0, 68.0)
+
+
+func _draw_rock_cluster(
+	root: Vector2,
+	rng: RandomNumberGenerator
+) -> void:
+	var cluster_scale := rng.randf_range(0.75, 1.4)
+	var rock_count := rng.randi_range(1, 3)
+	draw_circle(
+		root + Vector2(2.0, 3.0),
+		10.0 * cluster_scale,
+		Color(0.04, 0.08, 0.07, 0.25)
+	)
+	for rock_index in rock_count:
+		var radius := rng.randf_range(5.0, 11.0) * cluster_scale
+		if rock_index > 0:
+			radius *= rng.randf_range(0.48, 0.72)
+		var center := root + Vector2(
+			rng.randf_range(-7.0, 8.0),
+			float(rock_index) * 3.0 + rng.randf_range(-3.0, 3.0)
+		)
+		_draw_single_rock(center, radius, rng)
+
+
+func _draw_single_rock(
+	center: Vector2,
+	radius: float,
+	rng: RandomNumberGenerator
+) -> void:
+	var points := PackedVector2Array()
+	var point_count := rng.randi_range(6, 8)
+	for point_index in point_count:
+		var angle := TAU * float(point_index) / float(point_count)
+		var point_radius := radius * rng.randf_range(0.78, 1.12)
+		points.append(
+			center + Vector2(
+				cos(angle) * point_radius,
+				sin(angle) * point_radius * rng.randf_range(0.58, 0.76)
+			)
+		)
+	var tint := rng.randf_range(-0.05, 0.06)
+	draw_colored_polygon(
+		points,
+		Color(0.35 + tint, 0.39 + tint, 0.38 + tint, 0.98)
+	)
+	var outline := PackedVector2Array(points)
+	outline.append(points[0])
+	draw_polyline(outline, Color(0.12, 0.15, 0.14, 0.75), 1.2, true)
+	draw_line(
+		center + Vector2(-radius * 0.45, -radius * 0.20),
+		center + Vector2(radius * 0.18, -radius * 0.34),
+		Color(0.65, 0.69, 0.64, 0.42),
+		maxf(radius * 0.12, 1.0),
+		true
+	)
+	if radius > 7.0 and rng.randf() < 0.55:
+		draw_line(
+			center + Vector2(-radius * 0.08, -radius * 0.12),
+			center + Vector2(radius * 0.28, radius * 0.22),
+			Color(0.16, 0.19, 0.18, 0.55),
+			1.0,
+			true
 		)
 
 
 func _draw_ground_variation(chunk_size: Vector2) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _chunk_seed()
-	var top_left := -chunk_size * 0.5
-
-	for y in config.size_tiles.y:
-		var local_y := (
-			(float(y) + 0.5) * config.tile_size
-			- chunk_size.y * 0.5
+	var patch_count := maxi(roundi(chunk_size.y / 12.0), 28)
+	for _patch in patch_count:
+		var center := Vector2(
+			rng.randf_range(-chunk_size.x * 0.5, chunk_size.x * 0.5),
+			rng.randf_range(-chunk_size.y * 0.5, chunk_size.y * 0.5)
 		)
-		var row_road_half_width := _get_road_half_width_for_local_y(local_y)
-		for x in config.size_tiles.x:
-			var local_x := (
-				(float(x) + 0.5) * config.tile_size
-				- chunk_size.x * 0.5
+		var road_limits := _get_visual_road_x_limits(center.y, -12.0)
+		if center.x >= road_limits.x and center.x <= road_limits.y:
+			continue
+		var radius_x := rng.randf_range(7.0, 28.0)
+		var radius_y := rng.randf_range(4.0, 16.0)
+		var points := PackedVector2Array()
+		var point_count := rng.randi_range(6, 9)
+		for point_index in point_count:
+			var angle := TAU * float(point_index) / float(point_count)
+			var distortion := rng.randf_range(0.70, 1.22)
+			points.append(
+				center + Vector2(
+					cos(angle) * radius_x * distortion,
+					sin(angle) * radius_y * distortion
+				)
 			)
-			if absf(local_x) <= row_road_half_width + 8.0:
-				continue
-			if rng.randf() > config.ground_variation_chance:
-				continue
-			var tile_position := (
-				top_left + Vector2(x, y) * config.tile_size
-			)
-			var variation_color := (
-				Color("395d42")
-				if rng.randf() < 0.5
-				else Color("294832")
-			)
-			draw_rect(
-				Rect2(
-					tile_position,
-					Vector2(config.tile_size, config.tile_size)
-				),
-				variation_color
+		var variation_color := (
+			Color(0.50, 0.37, 0.18, 0.48)
+			if rng.randf() < 0.5
+			else Color(0.34, 0.225, 0.085, 0.42)
+		)
+		draw_colored_polygon(points, variation_color)
+		if rng.randf() < 0.18:
+			draw_line(
+				center + Vector2(-radius_x * 0.25, -1.0),
+				center + Vector2(radius_x * 0.22, radius_y * 0.20),
+				Color(0.23, 0.14, 0.045, 0.34),
+				1.0,
+				true
 			)
 
 
@@ -661,6 +1306,57 @@ func _get_road_half_width_for_local_y(local_y: float) -> float:
 		chunk_index,
 		normalized_y
 	)
+
+
+func _get_visual_road_x_limits(
+	local_y: float,
+	edge_inset: float = 0.0
+) -> Vector2:
+	var half_width := maxf(
+		_get_road_half_width_for_local_y(local_y) - edge_inset,
+		1.0
+	)
+	var left_radius := maxf(
+		half_width + _get_visual_edge_delta(local_y, 0),
+		32.0
+	)
+	var right_radius := maxf(
+		half_width + _get_visual_edge_delta(local_y, 1),
+		32.0
+	)
+	var maximum_radius := maxf(
+		config.get_pixel_size().x * 0.5 - float(config.tile_size),
+		32.0
+	)
+	return Vector2(
+		-clampf(left_radius, 32.0, maximum_radius),
+		clampf(right_radius, 32.0, maximum_radius)
+	)
+
+
+## Uses independent continuous noise on the two sides. Sampling absolute
+## generated-world Y keeps the asymmetry seamless across recycled chunks.
+func _get_visual_edge_delta(local_y: float, side_index: int) -> float:
+	var chunk_height := maxf(config.get_pixel_size().y, 1.0)
+	var generated_world_y := float(chunk_index) * chunk_height + local_y
+	var segment_length := 64.0
+	var coordinate := generated_world_y / segment_length
+	var anchor_index := floori(coordinate)
+	var ratio := coordinate - float(anchor_index)
+	var smooth_ratio := ratio * ratio * (3.0 - 2.0 * ratio)
+	var first := _get_visual_edge_anchor(anchor_index, side_index)
+	var second := _get_visual_edge_anchor(anchor_index + 1, side_index)
+	return lerpf(first, second, smooth_ratio)
+
+
+func _get_visual_edge_anchor(anchor_index: int, side_index: int) -> float:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(Vector3i(
+		config.world_seed,
+		anchor_index,
+		7319 + side_index * 104729
+	))
+	return rng.randf_range(-24.0, 34.0)
 
 
 func _get_road_edge_points(
@@ -677,12 +1373,9 @@ func _get_road_edge_points(
 			chunk_size.y * 0.5,
 			ratio
 		)
-		var half_width := maxf(
-			_get_road_half_width_for_local_y(local_y) - edge_inset,
-			1.0
-		)
-		left_points.append(Vector2(-half_width, local_y))
-		right_points.append(Vector2(half_width, local_y))
+		var limits := _get_visual_road_x_limits(local_y, edge_inset)
+		left_points.append(Vector2(limits.x, local_y))
+		right_points.append(Vector2(limits.y, local_y))
 	return [left_points, right_points]
 
 

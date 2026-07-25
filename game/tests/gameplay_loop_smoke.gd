@@ -1216,6 +1216,19 @@ func _run() -> void:
 	if not fork_nodes.is_empty():
 		var road_fork := fork_nodes[0] as RoadFork
 		road_fork.configure_side(-1)
+		var fork_camera_top_y := (
+			road_fork_spawner.camera.global_position.y
+			- road_fork_spawner.get_viewport_rect().size.y
+				/ maxf(road_fork_spawner.camera.zoom.y, 0.01)
+				* 0.5
+		)
+		_check(
+			road_fork.global_position.y
+				+ road_fork.get_visual_entry_bottom_y()
+				<= fork_camera_top_y
+					+ 0.01,
+			"Road fork entrance was not fully generated beyond the camera."
+		)
 		_check(
 			is_equal_approx(
 				road_fork.main_road_half_width,
@@ -1225,6 +1238,47 @@ func _run() -> void:
 			),
 			"Branch road width did not match the infinite main road."
 		)
+		var curve_points := road_fork.get_curve_centerline_points()
+		var visible_road_polygons: Array = road_fork.call(
+			"_get_visible_road_polygons"
+		)
+		var junction_road_polygons: Array = road_fork.call(
+			"_get_junction_road_polygons"
+		)
+		_check(
+			curve_points.size() > 20
+			and is_zero_approx(curve_points[0].x)
+			and is_equal_approx(
+				curve_points[curve_points.size() - 1].x,
+				float(road_fork.branch_side)
+					* road_fork.branch_center_offset
+			),
+			"Branch road did not generate a continuous curved centerline."
+		)
+		_check(
+			not visible_road_polygons.is_empty(),
+			"Branch road did not generate its visible road ribbon."
+		)
+		_check(
+			not junction_road_polygons.is_empty(),
+			"Branch road did not cover its junction below the main road."
+		)
+		_check(
+			road_fork.get_node_or_null("GeneratedRoadTiles") == null,
+			"Branch road recreated the synchronous generated tile layer."
+		)
+		road_fork.set("_selected_branch", "继续当前主路")
+		var rejected_curve_points := road_fork.get_curve_centerline_points()
+		_check(
+			rejected_curve_points.size() > curve_points.size()
+			and absf(rejected_curve_points[-1].x)
+				> absf(curve_points[-1].x)
+					+ road_fork.get_viewport_rect().size.x * 0.75
+			and rejected_curve_points[-1].y < curve_points[-1].y,
+			"Rejected branch did not continue naturally beyond the map edge."
+		)
+		road_fork.set("_selected_branch", "")
+		road_fork.queue_redraw()
 		road_fork.global_position = Vector2(
 			world.get_route_center_x(),
 			player.global_position.y - 200.0
@@ -1243,7 +1297,8 @@ func _run() -> void:
 			player.global_position.y - 400.0
 		)
 		await _wait_process_frames(2)
-		player.global_position.x = committed_center
+		var player_branch_x := committed_center + 24.0
+		player.global_position.x = player_branch_x
 		player.global_position.y = road_fork.global_position.y + 50.0
 		await _wait_physics_frames(2)
 		_check(
@@ -1256,9 +1311,13 @@ func _run() -> void:
 			"Committed branch did not become the new infinite road center."
 		)
 		_check(
-			is_equal_approx(player.global_position.x, committed_center)
-			and is_equal_approx(camera.global_position.x, committed_center),
-			"Player and camera were not recentered on the committed branch."
+			absf(player.global_position.x - player_branch_x) < 1.0,
+			"Committing a branch snapped the player to the road center."
+		)
+		_check(
+			bool(game.get("_camera_pan_active"))
+			and absf(camera.global_position.x - committed_center) > 1.0,
+			"Branch camera did not begin a gradual horizontal pan."
 		)
 		_check(
 			not is_instance_valid(old_route_enemy),
@@ -1285,6 +1344,14 @@ func _run() -> void:
 		_check(
 			spawned_on_committed_route,
 			"Enemy spawning did not follow the player's committed road."
+		)
+		var pan_frame_count := ceili(
+			game.route_camera_pan_duration * 60.0
+		) + 4
+		await _wait_physics_frames(pan_frame_count)
+		_check(
+			absf(camera.global_position.x - committed_center) < 0.5,
+			"Branch camera did not finish centered on the committed route."
 		)
 		road_fork_spawner.call("_spawn_fork")
 		await _wait_process_frames(2)
@@ -1975,7 +2042,7 @@ func _run() -> void:
 					)
 					and not player.realm_abilities
 						.is_temporary_flight_active()
-					and character_sprite.animation == &"fly"
+					and character_sprite.animation == &"golden_core_fly"
 					and character_sprite.z_index > 4,
 					"Golden Core did not maintain continuous flight."
 				)
@@ -1988,6 +2055,10 @@ func _run() -> void:
 			] > 0.0
 			and player_shadow.get_elevation() > 0.0,
 			"Golden Core and Nascent Soul transitions did not unlock flight."
+		)
+		_check(
+			character_sprite.animation == &"nascent_soul_fly",
+			"Nascent Soul did not select its realm-specific flying animation."
 		)
 		_check(
 			player.realm_abilities.toggle_spirit_projection()

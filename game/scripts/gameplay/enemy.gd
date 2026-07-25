@@ -23,9 +23,79 @@ const CriticalHitVfxResource = preload(
 const DEFAULT_CRITICAL_HIT_VFX_SCENE: PackedScene = preload(
 	"res://game/scenes/gameplay/critical_hit_vfx.tscn"
 )
+const ENEMY_OUTLINE_SHADER: Shader = preload(
+	"res://game/shaders/enemy_outline.gdshader"
+)
+const ENEMY_DISSOLVE_SHADER: Shader = preload(
+	"res://game/shaders/enemy_dissolve.gdshader"
+)
+const NORMAL_WALK_ATLAS: Texture2D = preload(
+	"res://assets/enemy_frames/normal_walk.png"
+)
+const NORMAL_HEAL_WALK_ATLAS: Texture2D = preload(
+	"res://assets/enemy_frames/normal_heal_walk.png"
+)
+const BOOMER_WALK_ATLAS: Texture2D = preload(
+	"res://assets/enemy_frames/boomer_walk.png"
+)
+const NORMAL_FLY_ATLAS: Texture2D = preload(
+	"res://assets/enemy_frames/normal_fly.png"
+)
+const ELITE_WALK_ATLAS: Texture2D = preload(
+	"res://assets/enemy_frames/elite_walk.png"
+)
+const ELITE_FLY_ATLAS: Texture2D = preload(
+	"res://assets/enemy_frames/elite_fly.png"
+)
+const BOOMER_BOOM_ATLAS: Texture2D = preload(
+	"res://assets/enemy_frames/boomer_boom.png"
+)
+const FLY_BOOMER_FLY_ATLAS: Texture2D = preload(
+	"res://assets/enemy_frames/fly_boomer_fly.png"
+)
+const FLY_BOOMER_BOOM_ATLAS: Texture2D = preload(
+	"res://assets/enemy_frames/fly_boomer_boom.png"
+)
+const NORMAL_MELEE_WEAPON_TEXTURE: Texture2D = preload(
+	"res://assets/enemy_weapons/normal_knife.png"
+)
+const ELITE_MELEE_WEAPON_TEXTURE: Texture2D = preload(
+	"res://assets/enemy_weapons/elite_knife.png"
+)
+const ENEMY_SPRITE_FRAME_SIZE: int = 544
+const ENEMY_MOVE_FRAME_COUNT: int = 6
+const FLY_BOOMER_MOVE_FRAME_COUNT: int = 9
+const BOOMER_BOOM_FRAME_COUNT: int = 9
+const ENEMY_MOVE_ANIMATION_SPEED: float = 10.0
+const BOOMER_BOOM_ANIMATION_SPEED: float = 14.0
+const BOMBER_WARNING_RANGE_MULTIPLIER: float = 2.25
+const BOMBER_WARNING_SLOW_PULSE_SPEED: float = 5.0
+const BOMBER_WARNING_FAST_PULSE_SPEED: float = 18.0
+const BOMBER_FAST_WARNING_PROGRESS: float = 0.65
+const BOMBER_WARNING_OUTLINE_COLOR: Color = Color("ff2020")
+const HEALING_PULSE_DURATION: float = 0.9
+const HEALING_PULSE_EXPANSION_FRACTION: float = 0.72
+const HEALING_PULSE_MINIMUM_RADIUS: float = 14.0
+const MELEE_WEAPON_TIP_OFFSET_PIXELS: float = 720.0
+const MELEE_WEAPON_SCALE: float = 0.04
+const MELEE_WEAPON_SUMMON_DURATION: float = 0.2
+const MELEE_WEAPON_RETURN_DURATION: float = 0.18
+const MELEE_WEAPON_HOVER_POSITION: Vector2 = Vector2(34.0, -12.0)
+const MELEE_WEAPON_SHAKE_START: float = 0.65
+const MELEE_WEAPON_OUTLINE_WORLD_WIDTH: float = 1.0
+const MELEE_WEAPON_TRAIL_COUNT: int = 3
+const MELEE_WEAPON_TRAIL_ANGLE_STEP: float = 0.16
+const MELEE_WEAPON_DARK_OUTLINE: Color = Color("681018")
+const MELEE_WEAPON_BRIGHT_OUTLINE: Color = Color("ffb347")
+const DEATH_DISSOLVE_DURATION: float = 0.48
+const IMMOBILIZED_STATUS_PULSE_SPEED: float = 15.0
 
+@onready var enemy_sprite: AnimatedSprite2D = $EnemySprite
+@onready var melee_weapon: Sprite2D = $MeleeWeapon
+@onready var enemy_shadow: Node2D = $EnemyShadow
 @onready var elite_label: Label = $EliteLabel
 @onready var attack_warning_label: Label = $AttackWarningLabel
+@onready var immobilized_status_label: Label = $ImmobilizedStatusLabel
 
 ## Player pursued and attacked by this enemy. EnemySpawner injects the active
 ## player when the enemy is created.
@@ -70,14 +140,20 @@ const DEFAULT_CRITICAL_HIT_VFX_SCENE: PackedScene = preload(
 @export_range(0.0, 800.0, 5.0) var autonomous_lateral_speed: float = 0.0
 ## Seconds between left-right autonomous direction changes.
 @export_range(0.2, 8.0, 0.1) var autonomous_turn_interval: float = 1.8
-## Radius in world pixels at which a bomber detonates.
-@export_range(20.0, 200.0, 5.0) var explosion_radius: float = 70.0
+## Radius in world pixels at which a bomber detonates near its combat target.
+@export_range(20.0, 300.0, 5.0) var explosion_radius: float = 100.0
+## World-space radius in pixels damaged when a bomber detonates.
+@export_range(20.0, 300.0, 5.0) var explosion_damage_radius: float = 100.0
 ## Damage dealt by a bomber before it destroys itself.
 @export_range(0.1, 100.0, 0.5) var explosion_damage: float = 12.0
+## Maximum sideways tracking speed in pixels per second for bombers. This is
+## intentionally much lower than player movement so bombers only adjust gently.
+@export_range(0.0, 300.0, 5.0) var bomber_tracking_speed: float = 60.0
 ## Healing radius in world pixels for support enemies.
 @export_range(40.0, 600.0, 5.0) var healing_radius: float = 150.0
-## Health restored to each nearby enemy per pulse.
-@export_range(1, 100, 1) var healing_amount: int = 2
+## Health restored to every nearby enemy per pulse. The six-point default makes
+## one support enemy materially extend a damaged group's survival.
+@export_range(1, 100, 1) var healing_amount: int = 6
 ## Seconds between area-healing pulses.
 @export_range(0.2, 10.0, 0.1) var healing_interval: float = 2.0
 
@@ -113,6 +189,17 @@ var _knockback_recovery: float = 920.0
 var _autonomous_time_remaining: float = 0.0
 var _autonomous_direction: float = 1.0
 var _healing_time_remaining: float = 0.0
+var _healing_pulse_remaining: float = 0.0
+var _melee_weapon_visibility: float = 0.0
+var _melee_weapon_attack_start_rotation: float = 0.0
+var _melee_weapon_return_remaining: float = 0.0
+var _melee_weapon_return_start_position: Vector2 = Vector2.ZERO
+var _melee_weapon_return_start_rotation: float = 0.0
+var _enemy_outline_material: ShaderMaterial
+var _melee_weapon_outline_material: ShaderMaterial
+var _melee_weapon_trails: Array[Sprite2D] = []
+var _fantian_seal_immobilized_remaining: float = 0.0
+var _fantian_seal_immobilized_position: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
@@ -122,10 +209,13 @@ func _ready() -> void:
 	current_health = maxi(max_health, 1)
 	_update_elite_identity()
 	attack_warning_label.hide()
+	immobilized_status_label.hide()
 	_melee_cooldown_remaining = _get_recovery_duration()
 	_autonomous_time_remaining = maxf(autonomous_turn_interval, 0.2)
 	_healing_time_remaining = maxf(healing_interval, 0.2)
 	z_index = 12 if is_flying else 4
+	_configure_sprite_animation()
+	_configure_melee_weapon()
 	queue_redraw()
 
 
@@ -138,16 +228,27 @@ func _physics_process(delta: float) -> void:
 	if _autonomous_time_remaining <= 0.0:
 		_autonomous_direction *= -1.0
 		_autonomous_time_remaining = maxf(autonomous_turn_interval, 0.2)
-	velocity = Vector2(
-		_autonomous_direction * autonomous_lateral_speed,
-		-maxf(cruise_speed, 1.0)
-	) + _knockback_velocity
-	move_and_slide()
-	_constrain_to_road()
-	_knockback_velocity = _knockback_velocity.move_toward(
-		Vector2.ZERO,
-		maxf(_knockback_recovery, 1.0) * delta
-	)
+	_update_fantian_seal_immobilization(delta)
+	if is_fantian_seal_immobilized():
+		velocity = Vector2.ZERO
+		_knockback_velocity = Vector2.ZERO
+		global_position = _fantian_seal_immobilized_position
+	else:
+		var lateral_velocity := (
+			_autonomous_direction * autonomous_lateral_speed
+		)
+		if archetype == EnemyArchetype.BOMBER:
+			lateral_velocity += _get_bomber_tracking_velocity(player)
+		velocity = Vector2(
+			lateral_velocity,
+			-maxf(cruise_speed, 1.0)
+		) + _knockback_velocity
+		move_and_slide()
+		_constrain_to_road()
+		_knockback_velocity = _knockback_velocity.move_toward(
+			Vector2.ZERO,
+			maxf(_knockback_recovery, 1.0) * delta
+		)
 
 	var target := _get_combat_target()
 	var distance_to_target := (
@@ -163,6 +264,7 @@ func _physics_process(delta: float) -> void:
 		_update_melee_attack(delta, distance_to_target, target)
 	if archetype == EnemyArchetype.HEALER:
 		_update_healing(delta)
+		_update_healing_pulse(delta)
 
 	if global_position.y > player.global_position.y + despawn_behind_distance:
 		queue_free()
@@ -176,11 +278,21 @@ func _physics_process(delta: float) -> void:
 	if _attack_flash_remaining > 0.0:
 		_attack_flash_remaining = maxf(_attack_flash_remaining - delta, 0.0)
 		queue_redraw()
+	if (
+		archetype == EnemyArchetype.BOMBER
+		and _get_bomber_warning_progress() > 0.0
+	):
+		queue_redraw()
+	_update_sprite_feedback()
+	_update_melee_weapon_presentation(delta)
 
 
 func _draw() -> void:
+	if not _combat_active:
+		return
 	_draw_threat_indicator()
 
+	var has_authored_sprite := is_instance_valid(enemy_sprite)
 	var body_color := _get_elite_identity_color() if is_elite else Color("d94b55")
 	if archetype == EnemyArchetype.BOMBER:
 		body_color = Color("ff6438")
@@ -194,20 +306,7 @@ func _draw() -> void:
 		)
 	if _hit_flash_remaining > 0.0:
 		body_color = Color("fff2a8")
-	if is_elite:
-		var elite_color := _get_elite_identity_color()
-		draw_circle(Vector2.ZERO, 28.0, Color(elite_color, 0.2))
-		draw_arc(
-			Vector2.ZERO,
-			27.0,
-			0.0,
-			TAU,
-			40,
-			Color(elite_color, 0.96),
-			3.0,
-			true
-		)
-	if is_flying:
+	if is_flying and not has_authored_sprite:
 		var flap := 4.0 + sin(_indicator_time * 9.0) * 5.0
 		draw_colored_polygon(
 			PackedVector2Array([
@@ -225,26 +324,35 @@ func _draw() -> void:
 			]),
 			Color(0.72, 0.86, 1.0, 0.82)
 		)
-	draw_circle(Vector2.ZERO, 22.0, Color(0.2, 0.02, 0.03, 0.8))
-	draw_circle(Vector2.ZERO, 17.0, body_color)
-	draw_line(Vector2(-10.0, -4.0), Vector2(10.0, -4.0), Color.WHITE, 3.0)
-	draw_line(Vector2.ZERO, Vector2(0.0, 9.0), Color("57141a"), 3.0)
+	if not has_authored_sprite:
+		draw_circle(Vector2.ZERO, 22.0, Color(0.2, 0.02, 0.03, 0.8))
+		draw_circle(Vector2.ZERO, 17.0, body_color)
+		draw_line(
+			Vector2(-10.0, -4.0),
+			Vector2(10.0, -4.0),
+			Color.WHITE,
+			3.0
+		)
+		draw_line(Vector2.ZERO, Vector2(0.0, 9.0), Color("57141a"), 3.0)
 	if uses_ranged_attack:
 		draw_arc(Vector2.ZERO, 25.0, 0.0, TAU, 28, Color("84dcff"), 3.0)
-	if archetype == EnemyArchetype.BOMBER:
+	if archetype == EnemyArchetype.BOMBER and not has_authored_sprite:
 		draw_circle(Vector2.ZERO, 8.0, Color("fff18a"))
 	elif archetype == EnemyArchetype.HEALER:
-		draw_line(Vector2(-8.0, 0.0), Vector2(8.0, 0.0), Color.WHITE, 4.0)
-		draw_line(Vector2(0.0, -8.0), Vector2(0.0, 8.0), Color.WHITE, 4.0)
-		draw_arc(
-			Vector2.ZERO,
-			_get_local_healing_radius(),
-			0.0,
-			TAU,
-			56,
-			Color(0.35, 1.0, 0.62, 0.24),
-			2.0
-		)
+		if not has_authored_sprite:
+			draw_line(
+				Vector2(-8.0, 0.0),
+				Vector2(8.0, 0.0),
+				Color.WHITE,
+				4.0
+			)
+			draw_line(
+				Vector2(0.0, -8.0),
+				Vector2(0.0, 8.0),
+				Color.WHITE,
+				4.0
+			)
+		_draw_healing_pulse()
 
 	var health_ratio := (
 		float(current_health) / float(maxi(max_health, 1))
@@ -254,7 +362,7 @@ func _draw() -> void:
 		Rect2(-22.0, -34.0, 44.0 * health_ratio, 5.0),
 		Color("6aff86")
 	)
-	if _attack_flash_remaining > 0.0:
+	if _attack_flash_remaining > 0.0 and not _uses_melee_weapon():
 		var local_attack_range := _get_local_melee_range()
 		var flash_progress := 1.0 - (
 			_attack_flash_remaining / ATTACK_FLASH_DURATION
@@ -293,6 +401,428 @@ func _draw() -> void:
 		)
 
 
+func _configure_sprite_animation() -> void:
+	if not is_instance_valid(enemy_sprite):
+		return
+	var sprite_frames := SpriteFrames.new()
+	if sprite_frames.has_animation(&"default"):
+		sprite_frames.remove_animation(&"default")
+	var move_frame_count := (
+		FLY_BOOMER_MOVE_FRAME_COUNT
+		if is_flying and archetype == EnemyArchetype.BOMBER
+		else ENEMY_MOVE_FRAME_COUNT
+	)
+	_add_atlas_animation(
+		sprite_frames,
+		&"move",
+		_get_move_animation_atlas(),
+		move_frame_count,
+		ENEMY_MOVE_ANIMATION_SPEED,
+		true
+	)
+	if archetype == EnemyArchetype.BOMBER:
+		var explosion_atlas := (
+			FLY_BOOMER_BOOM_ATLAS if is_flying else BOOMER_BOOM_ATLAS
+		)
+		_add_atlas_animation(
+			sprite_frames,
+			&"explode",
+			explosion_atlas,
+			BOOMER_BOOM_FRAME_COUNT,
+			BOOMER_BOOM_ANIMATION_SPEED,
+			false
+		)
+	enemy_sprite.sprite_frames = sprite_frames
+	_update_enemy_outline()
+	enemy_sprite.play(&"move")
+	_update_sprite_feedback()
+
+
+func _update_enemy_outline() -> void:
+	if not is_instance_valid(enemy_sprite):
+		return
+	var outline_color := (
+		_get_elite_identity_color() if is_elite else Color.TRANSPARENT
+	)
+	if (
+		archetype == EnemyArchetype.BOMBER
+		and _get_bomber_warning_progress()
+			>= BOMBER_FAST_WARNING_PROGRESS
+	):
+		outline_color = BOMBER_WARNING_OUTLINE_COLOR
+	if outline_color.a <= 0.0:
+		enemy_sprite.material = null
+		return
+	if _enemy_outline_material == null:
+		_enemy_outline_material = ShaderMaterial.new()
+		_enemy_outline_material.shader = ENEMY_OUTLINE_SHADER
+	_enemy_outline_material.set_shader_parameter(
+		&"outline_color",
+		outline_color
+	)
+	enemy_sprite.material = _enemy_outline_material
+
+
+func _configure_melee_weapon() -> void:
+	if not is_instance_valid(melee_weapon):
+		return
+	if not _uses_melee_weapon():
+		melee_weapon.hide()
+		_hide_melee_weapon_trails()
+		_melee_weapon_visibility = 0.0
+		return
+	melee_weapon.texture = (
+		ELITE_MELEE_WEAPON_TEXTURE
+		if is_elite
+		else NORMAL_MELEE_WEAPON_TEXTURE
+	)
+	if _melee_weapon_outline_material == null:
+		_melee_weapon_outline_material = ShaderMaterial.new()
+		_melee_weapon_outline_material.shader = ENEMY_OUTLINE_SHADER
+	var enemy_world_scale := maxf(
+		absf(global_transform.get_scale().x),
+		0.01
+	)
+	_melee_weapon_outline_material.set_shader_parameter(
+		&"outline_width",
+		MELEE_WEAPON_OUTLINE_WORLD_WIDTH
+			/ (MELEE_WEAPON_SCALE * enemy_world_scale)
+	)
+	melee_weapon.material = _melee_weapon_outline_material
+	_set_melee_weapon_outline(Color.TRANSPARENT)
+	_ensure_melee_weapon_trails()
+	for trail in _melee_weapon_trails:
+		trail.texture = melee_weapon.texture
+	melee_weapon.position = MELEE_WEAPON_HOVER_POSITION
+	melee_weapon.rotation = 0.0
+	melee_weapon.scale = Vector2.ONE * MELEE_WEAPON_SCALE
+	melee_weapon.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	melee_weapon.hide()
+
+
+func _uses_melee_weapon() -> bool:
+	return (
+		archetype != EnemyArchetype.BOMBER
+		and not uses_ranged_attack
+	)
+
+
+func _ensure_melee_weapon_trails() -> void:
+	if not _melee_weapon_trails.is_empty():
+		return
+	for trail_index in MELEE_WEAPON_TRAIL_COUNT:
+		var trail := Sprite2D.new()
+		trail.name = "MeleeWeaponTrail%d" % (trail_index + 1)
+		trail.z_index = melee_weapon.z_index - 1
+		trail.hide()
+		add_child(trail)
+		_melee_weapon_trails.append(trail)
+
+
+func _hide_melee_weapon_trails() -> void:
+	for trail in _melee_weapon_trails:
+		if is_instance_valid(trail):
+			trail.hide()
+
+
+func _set_melee_weapon_outline(color: Color) -> void:
+	if _melee_weapon_outline_material == null:
+		return
+	_melee_weapon_outline_material.set_shader_parameter(
+		&"outline_color",
+		color
+	)
+
+
+func _get_melee_weapon_proximity() -> float:
+	if not _uses_melee_weapon():
+		return 0.0
+	var target := _get_combat_target()
+	if not is_instance_valid(target):
+		return 0.0
+	var attack_range := _get_attack_range()
+	var distance_to_target := global_position.distance_to(
+		target.global_position
+	)
+	return 1.0 - clampf(
+		(distance_to_target - attack_range)
+			/ maxf(threat_indicator_margin, 1.0),
+		0.0,
+		1.0
+	)
+
+
+func _get_melee_weapon_orbit_radius() -> float:
+	var local_tip_length := (
+		MELEE_WEAPON_TIP_OFFSET_PIXELS * MELEE_WEAPON_SCALE
+	)
+	return maxf(
+		_get_local_melee_range() - local_tip_length - 0.5,
+		18.0
+	)
+
+
+func _get_melee_weapon_shake_strength(proximity: float) -> float:
+	return clampf(
+		(proximity - MELEE_WEAPON_SHAKE_START)
+			/ (1.0 - MELEE_WEAPON_SHAKE_START),
+		0.0,
+		1.0
+	)
+
+
+func _update_melee_weapon_trails(
+	attack_rotation: float,
+	attack_progress: float
+) -> void:
+	var trail_strength := minf(
+		clampf(attack_progress / 0.12, 0.0, 1.0),
+		clampf((1.0 - attack_progress) / 0.12, 0.0, 1.0)
+	)
+	var orbit_radius := _get_melee_weapon_orbit_radius()
+	for trail_index in _melee_weapon_trails.size():
+		var trail := _melee_weapon_trails[trail_index]
+		var trail_rotation := (
+			attack_rotation
+			- MELEE_WEAPON_TRAIL_ANGLE_STEP * float(trail_index + 1)
+		)
+		trail.position = (
+			Vector2.UP.rotated(trail_rotation) * orbit_radius
+		)
+		trail.rotation = trail_rotation
+		trail.scale = Vector2.ONE * (
+			MELEE_WEAPON_SCALE
+			* (1.0 - float(trail_index + 1) * 0.04)
+		)
+		trail.modulate = Color(
+			1.0,
+			0.34,
+			0.18,
+			maxf(
+				0.26 - float(trail_index) * 0.055,
+				0.08
+			) * trail_strength
+		)
+		trail.visible = trail_strength > 0.0
+
+
+func _update_melee_weapon_presentation(delta: float) -> void:
+	if not is_instance_valid(melee_weapon):
+		return
+	if not _uses_melee_weapon():
+		melee_weapon.hide()
+		_hide_melee_weapon_trails()
+		_melee_weapon_visibility = 0.0
+		return
+	var proximity := _get_melee_weapon_proximity()
+	var shake_strength := _get_melee_weapon_shake_strength(proximity)
+	var should_show := (
+		proximity > 0.0
+		or _is_attack_winding_up
+		or _melee_weapon_return_remaining > 0.0
+	)
+	_melee_weapon_visibility = move_toward(
+		_melee_weapon_visibility,
+		1.0 if should_show else 0.0,
+		delta / MELEE_WEAPON_SUMMON_DURATION
+	)
+	if _melee_weapon_visibility <= 0.0:
+		melee_weapon.hide()
+		_hide_melee_weapon_trails()
+		_set_melee_weapon_outline(Color.TRANSPARENT)
+		return
+	melee_weapon.show()
+	melee_weapon.modulate = Color(
+		1.0,
+		1.0,
+		1.0,
+		_melee_weapon_visibility
+	)
+
+	if _is_attack_winding_up:
+		_melee_weapon_visibility = 1.0
+		melee_weapon.modulate = Color.WHITE
+		_melee_weapon_return_remaining = 0.0
+		var attack_progress := get_attack_windup_progress()
+		var attack_rotation := (
+			_melee_weapon_attack_start_rotation
+			+ TAU * attack_progress
+		)
+		melee_weapon.position = (
+			Vector2.UP.rotated(attack_rotation)
+			* _get_melee_weapon_orbit_radius()
+		)
+		melee_weapon.rotation = attack_rotation
+		melee_weapon.scale = Vector2.ONE * (
+			MELEE_WEAPON_SCALE
+			* (1.0 + sin(attack_progress * PI) * 0.1)
+		)
+		var outline_pulse := 0.82 + 0.18 * sin(
+			attack_progress * PI
+		)
+		_set_melee_weapon_outline(
+			Color(
+				MELEE_WEAPON_BRIGHT_OUTLINE,
+				outline_pulse
+			)
+		)
+		_update_melee_weapon_trails(
+			attack_rotation,
+			attack_progress
+		)
+		return
+
+	_hide_melee_weapon_trails()
+	var hover_position := (
+		MELEE_WEAPON_HOVER_POSITION
+		+ Vector2(0.0, sin(_indicator_time * 5.0) * 2.5)
+	)
+	var hover_rotation := sin(_indicator_time * 3.5) * 0.045
+	_set_melee_weapon_outline(
+		Color(MELEE_WEAPON_DARK_OUTLINE, shake_strength)
+	)
+	if _melee_weapon_return_remaining > 0.0:
+		_melee_weapon_return_remaining = maxf(
+			_melee_weapon_return_remaining - delta,
+			0.0
+		)
+		var return_progress := 1.0 - (
+			_melee_weapon_return_remaining
+			/ MELEE_WEAPON_RETURN_DURATION
+		)
+		var eased_return := (
+			return_progress
+			* return_progress
+			* (3.0 - 2.0 * return_progress)
+		)
+		melee_weapon.position = (
+			_melee_weapon_return_start_position.lerp(
+				hover_position,
+				eased_return
+			)
+		)
+		melee_weapon.rotation = lerp_angle(
+			_melee_weapon_return_start_rotation,
+			hover_rotation,
+			eased_return
+		)
+		melee_weapon.scale = Vector2.ONE * MELEE_WEAPON_SCALE
+		return
+
+	var shake_offset := Vector2(
+		sin(_indicator_time * 43.0),
+		cos(_indicator_time * 37.0)
+	) * (5.0 * shake_strength)
+	melee_weapon.position = hover_position + shake_offset
+	melee_weapon.rotation = (
+		hover_rotation
+		+ sin(_indicator_time * 57.0) * 0.13 * shake_strength
+	)
+	var summon_scale := (
+		lerpf(0.5, 1.0, _melee_weapon_visibility)
+		+ sin(_melee_weapon_visibility * PI) * 0.22
+	)
+	melee_weapon.scale = (
+		Vector2.ONE * MELEE_WEAPON_SCALE * summon_scale
+	)
+
+
+func _get_move_animation_atlas() -> Texture2D:
+	if is_flying and archetype == EnemyArchetype.BOMBER:
+		return FLY_BOOMER_FLY_ATLAS
+	if is_flying:
+		return ELITE_FLY_ATLAS if is_elite else NORMAL_FLY_ATLAS
+	if is_elite:
+		return ELITE_WALK_ATLAS
+	if archetype == EnemyArchetype.BOMBER:
+		return BOOMER_WALK_ATLAS
+	if archetype == EnemyArchetype.HEALER:
+		return NORMAL_HEAL_WALK_ATLAS
+	return NORMAL_WALK_ATLAS
+
+
+func _add_atlas_animation(
+	sprite_frames: SpriteFrames,
+	animation_name: StringName,
+	atlas: Texture2D,
+	frame_count: int,
+	speed: float,
+	loop: bool
+) -> void:
+	sprite_frames.add_animation(animation_name)
+	sprite_frames.set_animation_speed(animation_name, speed)
+	sprite_frames.set_animation_loop(animation_name, loop)
+	for frame_index in frame_count:
+		var frame_texture := AtlasTexture.new()
+		frame_texture.atlas = atlas
+		frame_texture.region = Rect2(
+			float(frame_index * ENEMY_SPRITE_FRAME_SIZE),
+			0.0,
+			float(ENEMY_SPRITE_FRAME_SIZE),
+			float(ENEMY_SPRITE_FRAME_SIZE)
+		)
+		sprite_frames.add_frame(animation_name, frame_texture)
+
+
+func _update_sprite_feedback() -> void:
+	if not is_instance_valid(enemy_sprite):
+		return
+	_update_enemy_outline()
+	if _hit_flash_remaining > 0.0:
+		enemy_sprite.self_modulate = Color("fff2a8")
+		return
+	if _is_attack_winding_up:
+		var warning_pulse := 0.5 + 0.5 * sin(_indicator_time * 9.0)
+		enemy_sprite.self_modulate = Color.WHITE.lerp(
+			Color("fff0a6"),
+			0.35 + warning_pulse * 0.35
+		)
+		return
+	if archetype == EnemyArchetype.BOMBER:
+		var warning_flash := _get_bomber_warning_flash()
+		if warning_flash > 0.0:
+			enemy_sprite.self_modulate = Color.WHITE.lerp(
+				Color("ff3b24"),
+				warning_flash
+			)
+			return
+	enemy_sprite.self_modulate = Color.WHITE
+
+
+func _get_bomber_warning_progress() -> float:
+	if archetype != EnemyArchetype.BOMBER:
+		return 0.0
+	var target := _get_combat_target()
+	if not is_instance_valid(target):
+		return 0.0
+	var trigger_radius := maxf(explosion_radius, 1.0)
+	var warning_radius := (
+		trigger_radius * BOMBER_WARNING_RANGE_MULTIPLIER
+	)
+	var distance_to_target := global_position.distance_to(
+		target.global_position
+	)
+	return 1.0 - clampf(
+		(distance_to_target - trigger_radius)
+			/ maxf(warning_radius - trigger_radius, 1.0),
+		0.0,
+		1.0
+	)
+
+
+func _get_bomber_warning_flash() -> float:
+	var warning_progress := _get_bomber_warning_progress()
+	if warning_progress <= 0.0:
+		return 0.0
+	var pulse_speed := lerpf(
+		BOMBER_WARNING_SLOW_PULSE_SPEED,
+		BOMBER_WARNING_FAST_PULSE_SPEED,
+		warning_progress
+	)
+	var pulse := 0.5 + 0.5 * sin(_indicator_time * pulse_speed)
+	return pulse * lerpf(0.22, 0.82, warning_progress)
+
+
 func _update_melee_attack(
 	delta: float,
 	distance_to_target: float,
@@ -327,12 +857,30 @@ func _begin_melee_attack() -> void:
 	var target := _get_combat_target()
 	if is_instance_valid(target):
 		_attack_direction = global_position.direction_to(target.global_position)
+	_melee_weapon_attack_start_rotation = (
+		_attack_direction.angle() + PI * 0.5
+	)
+	_melee_weapon_visibility = 1.0
+	_melee_weapon_return_remaining = 0.0
 	attack_warning_label.show()
 	_update_attack_warning_label()
+	_update_sprite_feedback()
 	queue_redraw()
 
 
 func _finish_melee_attack(distance_to_target: float, target: Node2D) -> void:
+	if _uses_melee_weapon() and is_instance_valid(melee_weapon):
+		var final_rotation := (
+			_melee_weapon_attack_start_rotation + TAU
+		)
+		_melee_weapon_return_start_position = (
+			Vector2.UP.rotated(final_rotation)
+			* _get_melee_weapon_orbit_radius()
+		)
+		_melee_weapon_return_start_rotation = final_rotation
+		melee_weapon.position = _melee_weapon_return_start_position
+		melee_weapon.rotation = final_rotation
+		_melee_weapon_return_remaining = MELEE_WEAPON_RETURN_DURATION
 	_is_attack_winding_up = false
 	_attack_windup_remaining = 0.0
 	attack_warning_label.hide()
@@ -343,6 +891,7 @@ func _finish_melee_attack(distance_to_target: float, target: Node2D) -> void:
 		elif target is PlayerController:
 			(target as PlayerController).take_melee_damage(melee_damage, self)
 	_melee_cooldown_remaining = _get_recovery_duration()
+	_update_sprite_feedback()
 	queue_redraw()
 
 
@@ -362,6 +911,8 @@ func _update_attack_warning_label() -> void:
 
 
 func _draw_threat_indicator() -> void:
+	if _uses_melee_weapon():
+		return
 	var visibility := _get_threat_indicator_visibility()
 	if visibility <= 0.0 and not _is_attack_winding_up:
 		return
@@ -482,22 +1033,105 @@ func _get_combat_target() -> Node2D:
 	return closest
 
 
-func _explode(target: Node2D) -> void:
+func _get_bomber_tracking_velocity(target: Node2D) -> float:
+	if not is_instance_valid(target) or bomber_tracking_speed <= 0.0:
+		return 0.0
+	var lateral_offset := target.global_position.x - global_position.x
+	return clampf(
+		lateral_offset,
+		-bomber_tracking_speed,
+		bomber_tracking_speed
+	)
+
+
+func _get_explosion_damage_targets() -> Array[Node2D]:
+	var targets: Array[Node2D] = []
+	if is_instance_valid(player):
+		targets.append(player)
+	for echo_node in get_tree().get_nodes_in_group("player_echoes"):
+		if (
+			echo_node is Node2D
+			and echo_node.has_method("take_enemy_damage")
+			and not targets.has(echo_node as Node2D)
+		):
+			targets.append(echo_node as Node2D)
+	return targets
+
+
+func _explode(_trigger_target: Node2D) -> void:
 	if not _combat_active:
 		return
-	if is_instance_valid(target):
-		if target.has_method("take_enemy_damage"):
-			target.call("take_enemy_damage", explosion_damage, self)
-		elif target is PlayerController:
-			(target as PlayerController).take_melee_damage(explosion_damage, self)
+	for damage_target in _get_explosion_damage_targets():
+		if (
+			global_position.distance_to(damage_target.global_position)
+			> explosion_damage_radius
+		):
+			continue
+		if damage_target.has_method("take_enemy_damage"):
+			damage_target.call(
+				"take_enemy_damage",
+				explosion_damage,
+				self
+			)
+		elif damage_target is PlayerController:
+			(damage_target as PlayerController).take_melee_damage(
+				explosion_damage,
+				self
+			)
 	_combat_active = false
 	collision_layer = 0
 	collision_mask = 0
-	var tween := create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(self, "scale", Vector2.ONE * 2.4, 0.16)
-	tween.tween_property(self, "modulate", Color(1.0, 0.3, 0.05, 0.0), 0.16)
-	tween.chain().tween_callback(queue_free)
+	if (
+		is_instance_valid(enemy_sprite)
+		and enemy_sprite.sprite_frames != null
+		and enemy_sprite.sprite_frames.has_animation(&"explode")
+	):
+		enemy_sprite.self_modulate = Color.WHITE
+		enemy_sprite.play(&"explode")
+		var explosion_duration := (
+			float(BOOMER_BOOM_FRAME_COUNT)
+			/ BOOMER_BOOM_ANIMATION_SPEED
+		)
+		_begin_dissolve_disappearance(explosion_duration)
+		return
+	_begin_dissolve_disappearance()
+
+
+func _begin_dissolve_disappearance(delay: float = 0.0) -> void:
+	_is_attack_winding_up = false
+	attack_warning_label.hide()
+	elite_label.hide()
+	melee_weapon.set_process(false)
+	queue_redraw()
+
+	var dissolve_material := ShaderMaterial.new()
+	dissolve_material.shader = ENEMY_DISSOLVE_SHADER
+	dissolve_material.set_shader_parameter(&"dissolve_amount", 0.0)
+	enemy_sprite.material = dissolve_material
+	melee_weapon.material = dissolve_material
+
+	var dissolve_tween := create_tween()
+	if delay > 0.0:
+		dissolve_tween.tween_interval(delay)
+	dissolve_tween.tween_callback(enemy_sprite.pause)
+	dissolve_tween.tween_method(
+		func(amount: float) -> void:
+			dissolve_material.set_shader_parameter(
+				&"dissolve_amount",
+				amount
+			),
+		0.0,
+		1.0,
+		DEATH_DISSOLVE_DURATION
+	)
+	if is_instance_valid(enemy_shadow):
+		dissolve_tween.parallel().tween_property(
+			enemy_shadow,
+			"modulate:a",
+			0.0,
+			DEATH_DISSOLVE_DURATION
+		)
+	dissolve_tween.tween_callback(queue_free)
 
 
 func _update_healing(delta: float) -> void:
@@ -505,6 +1139,7 @@ func _update_healing(delta: float) -> void:
 	if _healing_time_remaining > 0.0:
 		return
 	_healing_time_remaining = maxf(healing_interval, 0.2)
+	_healing_pulse_remaining = HEALING_PULSE_DURATION
 	for enemy_node in get_tree().get_nodes_in_group("enemies"):
 		if enemy_node is not EnemyController or enemy_node == self:
 			continue
@@ -515,6 +1150,88 @@ func _update_healing(delta: float) -> void:
 		):
 			ally.heal(healing_amount)
 	queue_redraw()
+
+
+func _update_healing_pulse(delta: float) -> void:
+	if _healing_pulse_remaining <= 0.0:
+		return
+	_healing_pulse_remaining = maxf(
+		_healing_pulse_remaining - delta,
+		0.0
+	)
+	queue_redraw()
+
+
+func _draw_healing_pulse() -> void:
+	if _healing_pulse_remaining <= 0.0:
+		return
+	var pulse_progress := 1.0 - clampf(
+		_healing_pulse_remaining / HEALING_PULSE_DURATION,
+		0.0,
+		1.0
+	)
+	var expansion_progress := clampf(
+		pulse_progress / HEALING_PULSE_EXPANSION_FRACTION,
+		0.0,
+		1.0
+	)
+	var eased_expansion := (
+		expansion_progress
+		* expansion_progress
+		* (3.0 - 2.0 * expansion_progress)
+	)
+	var pulse_radius := lerpf(
+		HEALING_PULSE_MINIMUM_RADIUS,
+		_get_local_healing_radius(),
+		eased_expansion
+	)
+	var ring_alpha := lerpf(0.7, 0.3, eased_expansion)
+	var finish_progress := 0.0
+	if pulse_progress > HEALING_PULSE_EXPANSION_FRACTION:
+		finish_progress = clampf(
+			(
+				pulse_progress - HEALING_PULSE_EXPANSION_FRACTION
+			) / (1.0 - HEALING_PULSE_EXPANSION_FRACTION),
+			0.0,
+			1.0
+		)
+		var soft_highlight := sin(finish_progress * PI)
+		ring_alpha = (
+			lerpf(0.3, 0.0, finish_progress)
+			+ soft_highlight * 0.14
+		)
+		draw_circle(
+			Vector2.ZERO,
+			pulse_radius,
+			Color(
+				0.3,
+				1.0,
+				0.58,
+				(1.0 - finish_progress) * 0.025
+					+ soft_highlight * 0.018
+			)
+		)
+	var pulse_color := Color(0.32, 1.0, 0.6, ring_alpha)
+	draw_arc(
+		Vector2.ZERO,
+		pulse_radius,
+		0.0,
+		TAU,
+		64,
+		Color(pulse_color, ring_alpha * 0.24),
+		10.0,
+		true
+	)
+	draw_arc(
+		Vector2.ZERO,
+		pulse_radius,
+		0.0,
+		TAU,
+		64,
+		pulse_color,
+		3.0,
+		true
+	)
 
 
 func _get_local_healing_radius() -> float:
@@ -529,30 +1246,53 @@ func heal(amount: int) -> void:
 	queue_redraw()
 
 
-## Applies one progression-gated aerial combat package.
+## Applies one progression-gated aerial combat package. Ground-only healers
+## reject this package and retain their Qi Refining combat tier.
 func configure_flying(
 	enemy_realm_index: int,
 	ranged: bool,
 	lateral_speed_value: float
 ) -> void:
+	if archetype == EnemyArchetype.HEALER:
+		is_flying = false
+		uses_ranged_attack = false
+		autonomous_lateral_speed = 0.0
+		combat_realm_index = 0
+		if is_node_ready():
+			z_index = 4
+			_configure_sprite_animation()
+			_configure_melee_weapon()
+			queue_redraw()
+		return
 	is_flying = true
 	combat_realm_index = maxi(enemy_realm_index, 1)
 	uses_ranged_attack = ranged
 	autonomous_lateral_speed = maxf(lateral_speed_value, 0.0)
 	if is_node_ready():
 		z_index = 12
+		_configure_sprite_animation()
+		_configure_melee_weapon()
 		queue_redraw()
 
 
-## Selects a normal, self-destruct, or healing role.
+## Selects a normal, self-destruct, or healing role. Healing is restricted to
+## ordinary ground enemies; elite requests fall back to melee.
 func configure_archetype(new_archetype: EnemyArchetype) -> void:
-	archetype = new_archetype
-	if archetype == EnemyArchetype.BOMBER:
-		max_health = maxi(1, roundi(float(max_health) * 0.38))
-	elif archetype == EnemyArchetype.HEALER and is_elite:
-		healing_radius *= 1.65
+	archetype = (
+		EnemyArchetype.MELEE
+		if is_elite and new_archetype == EnemyArchetype.HEALER
+		else new_archetype
+	)
+	if archetype == EnemyArchetype.HEALER:
+		is_flying = false
+		uses_ranged_attack = false
+		autonomous_lateral_speed = 0.0
+		combat_realm_index = 0
 	if is_node_ready():
 		current_health = max_health
+		z_index = 12 if is_flying else 4
+		_configure_sprite_animation()
+		_configure_melee_weapon()
 		queue_redraw()
 
 
@@ -620,6 +1360,8 @@ func configure_elite(
 ) -> void:
 	_ordinary_health_equivalent = maxi(max_health, 1)
 	is_elite = true
+	if archetype == EnemyArchetype.HEALER:
+		archetype = EnemyArchetype.MELEE
 	elite_reward_type = clampi(
 		reward_type,
 		EliteRewardType.WEAPON,
@@ -634,6 +1376,8 @@ func configure_elite(
 	if is_node_ready():
 		current_health = max_health
 		_update_elite_identity()
+		_configure_sprite_animation()
+		_configure_melee_weapon()
 		queue_redraw()
 
 
@@ -641,7 +1385,7 @@ func is_elite_enemy() -> bool:
 	return is_elite
 
 
-## Returns the reward category advertised by this elite's label and ring color.
+## Returns the reward category advertised by this elite's label and outline.
 func get_elite_reward_type() -> EliteRewardType:
 	return elite_reward_type
 
@@ -700,6 +1444,68 @@ func get_knockback_velocity() -> Vector2:
 	return _knockback_velocity
 
 
+## Anchors a surviving enemy to one absolute world position. The effect only
+## blocks movement; attacks and archetype abilities continue updating.
+func apply_fantian_seal_immobilize(duration: float = 0.3) -> void:
+	if not _combat_active or duration <= 0.0:
+		return
+	_fantian_seal_immobilized_remaining = maxf(
+		_fantian_seal_immobilized_remaining,
+		duration
+	)
+	_fantian_seal_immobilized_position = global_position
+	_knockback_velocity = Vector2.ZERO
+	velocity = Vector2.ZERO
+	_update_fantian_seal_immobilized_status()
+
+
+func is_fantian_seal_immobilized() -> bool:
+	return (
+		_combat_active
+		and _fantian_seal_immobilized_remaining > 0.0
+	)
+
+
+func get_fantian_seal_immobilized_remaining() -> float:
+	return _fantian_seal_immobilized_remaining
+
+
+func _update_fantian_seal_immobilization(delta: float) -> void:
+	if _fantian_seal_immobilized_remaining <= 0.0:
+		return
+	_fantian_seal_immobilized_remaining = maxf(
+		_fantian_seal_immobilized_remaining - delta,
+		0.0
+	)
+	_update_fantian_seal_immobilized_status()
+
+
+func _update_fantian_seal_immobilized_status() -> void:
+	if not is_instance_valid(immobilized_status_label):
+		return
+	var is_active := is_fantian_seal_immobilized()
+	immobilized_status_label.visible = is_active
+	if not is_active:
+		immobilized_status_label.scale = Vector2.ONE
+		return
+	immobilized_status_label.text = "定身 %.1fs" % (
+		ceilf(_fantian_seal_immobilized_remaining * 10.0) / 10.0
+	)
+	var pulse := (
+		0.5
+		+ 0.5
+			* sin(
+				_fantian_seal_immobilized_remaining
+					* IMMOBILIZED_STATUS_PULSE_SPEED
+			)
+	)
+	immobilized_status_label.scale = Vector2.ONE * lerpf(
+		0.96,
+		1.04,
+		pulse
+	)
+
+
 ## Applies player damage exactly once per hit and removes the enemy after its
 ## health reaches zero. Critical metadata changes presentation only.
 func take_melee_damage(amount: int, is_critical: bool = false) -> void:
@@ -709,21 +1515,19 @@ func take_melee_damage(amount: int, is_critical: bool = false) -> void:
 		_spawn_critical_hit_vfx(amount)
 	current_health = maxi(current_health - amount, 0)
 	_hit_flash_remaining = 0.2 if is_critical else 0.12
+	_update_sprite_feedback()
 	queue_redraw()
 	if current_health > 0:
 		return
 	var defeat_position := global_position
 	var defeat_velocity := velocity
 	_combat_active = false
+	_fantian_seal_immobilized_remaining = 0.0
+	immobilized_status_label.hide()
 	collision_layer = 0
 	collision_mask = 0
 	defeated.emit(defeat_position, defeat_velocity)
-
-	var tween := create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(self, "scale", Vector2.ONE * 1.4, 0.18)
-	tween.tween_property(self, "modulate:a", 0.0, 0.18)
-	tween.chain().tween_callback(queue_free)
+	_begin_dissolve_disappearance()
 
 
 func _spawn_critical_hit_vfx(amount: int) -> void:
@@ -753,8 +1557,15 @@ func set_combat_enabled(enabled: bool) -> void:
 	_combat_active = enabled and current_health > 0
 	if not _combat_active:
 		velocity = Vector2.ZERO
+		_fantian_seal_immobilized_remaining = 0.0
 		_is_attack_winding_up = false
 		_attack_windup_remaining = 0.0
+		_melee_weapon_visibility = 0.0
+		_melee_weapon_return_remaining = 0.0
 		if is_node_ready():
 			attack_warning_label.hide()
+			immobilized_status_label.hide()
+			melee_weapon.hide()
+			_hide_melee_weapon_trails()
+			_set_melee_weapon_outline(Color.TRANSPARENT)
 		queue_redraw()

@@ -1,0 +1,286 @@
+{
+  "source": "image_asset\\fly_yuanying\\ChatGPT Image 2026年7月25日 19_09_55.png",
+  "order": "left-to-right, top-to-bottom",
+  "frame_count": 9,
+  "frame_size": [
+    544,
+    544
+  ],
+  "head_anchor": [
+    272,
+    121
+  ],
+  "target_head_to_bottom": 264,
+  "frames": [
+    {
+      "source_cell": [
+        0,
+        0
+      ],
+      "source_bbox": [
+        53,
+        7,
+        364,
+        399
+      ],
+      "source_head_anchor": [
+        206.0,
+        104.0
+      ],
+      "output": "nascent_soul_fly_00.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.8949152542372881,
+      "paste_offset": [
+        88,
+        28
+      ]
+    },
+    {
+      "source_cell": [
+        0,
+        1
+      ],
+      "source_bbox": [
+        37,
+        8,
+        362,
+        399
+      ],
+      "source_head_anchor": [
+        202.0,
+        112.0
+      ],
+      "output": "nascent_soul_fly_01.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9198606271777003,
+      "paste_offset": [
+        86,
+        18
+      ]
+    },
+    {
+      "source_cell": [
+        0,
+        2
+      ],
+      "source_bbox": [
+        17,
+        6,
+        386,
+        400
+      ],
+      "source_head_anchor": [
+        199.0,
+        115.0
+      ],
+      "output": "nascent_soul_fly_02.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9263157894736842,
+      "paste_offset": [
+        88,
+        14
+      ]
+    },
+    {
+      "source_cell": [
+        1,
+        0
+      ],
+      "source_bbox": [
+        24,
+        5,
+        395,
+        398
+      ],
+      "source_head_anchor": [
+        206.0,
+        110.0
+      ],
+      "output": "nascent_soul_fly_03.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9166666666666666,
+      "paste_offset": [
+        83,
+        20
+      ]
+    },
+    {
+      "source_cell": [
+        1,
+        1
+      ],
+      "source_bbox": [
+        17,
+        6,
+        389,
+        403
+      ],
+      "source_head_anchor": [
+        202.0,
+        111.0
+      ],
+      "output": "nascent_soul_fly_04.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9041095890410958,
+      "paste_offset": [
+        89,
+        21
+      ]
+    },
+    {
+      "source_cell": [
+        1,
+        2
+      ],
+      "source_bbox": [
+        25,
+        7,
+        368,
+        405
+      ],
+      "source_head_anchor": [
+        199.0,
+        112.0
+      ],
+      "output": "nascent_soul_fly_05.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9010238907849829,
+      "paste_offset": [
+        93,
+        20
+      ]
+    },
+    {
+      "source_cell": [
+        2,
+        0
+      ],
+      "source_bbox": [
+        30,
+        3,
+        367,
+        399
+      ],
+      "source_head_anchor": [
+        206.0,
+        110.0
+      ],
+      "output": "nascent_soul_fly_06.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9134948096885813,
+      "paste_offset": [
+        84,
+        21
+      ]
+    },
+    {
+      "source_cell": [
+        2,
+        1
+      ],
+      "source_bbox": [
+        21,
+        6,
+        366,
+        404
+      ],
+      "source_head_anchor": [
+        202.0,
+        111.0
+      ],
+      "output": "nascent_soul_fly_07.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9010238907849829,
+      "paste_offset": [
+        90,
+        21
+      ]
+    },
+    {
+      "source_cell": [
+        2,
+        2
+      ],
+      "source_bbox": [
+        14,
+        4,
+        388,
+        405
+      ],
+      "source_head_anchor": [
+        199.0,
+        111.0
+      ],
+      "output": "nascent_soul_fly_08.png",
+      "output_size": [
+        544,
+        544
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.8979591836734694,
+      "paste_offset": [
+        93,
+        21
+      ]
+    }
+  ]
+}

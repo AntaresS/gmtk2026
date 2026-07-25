@@ -162,10 +162,9 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 @export_category("Enemy Variants")
 ## Chance for an ordinary spawn to become a low-health self-destruct enemy.
 @export_range(0.0, 1.0, 0.01) var bomber_spawn_chance: float = 0.12
-## Chance for an ordinary spawn to heal nearby enemies periodically.
+## Chance for an ordinary ground spawn to heal nearby enemies periodically.
+## Healers never receive elite or flying packages.
 @export_range(0.0, 1.0, 0.01) var healer_spawn_chance: float = 0.10
-## Chance for an elite spawn to become a healer with a larger aura.
-@export_range(0.0, 1.0, 0.01) var elite_healer_spawn_chance: float = 0.16
 ## Flying-variant chance after its realm/layer threshold is unlocked.
 @export_range(0.0, 1.0, 0.01) var flying_spawn_chance: float = 0.38
 ## Ranged flying-variant chance from Golden Core layer one onward.
@@ -721,15 +720,18 @@ func _record_elite_reward_spawn(reward_type: int) -> void:
 
 
 func _configure_enemy_variant(enemy: EnemyController, elite: bool) -> void:
-	if elite:
-		if _rng.randf() <= elite_healer_spawn_chance:
-			enemy.configure_archetype(EnemyController.EnemyArchetype.HEALER)
-	else:
+	if not elite:
 		var role_roll := _rng.randf()
 		if role_roll <= bomber_spawn_chance:
 			enemy.configure_archetype(EnemyController.EnemyArchetype.BOMBER)
 		elif role_roll <= bomber_spawn_chance + healer_spawn_chance:
 			enemy.configure_archetype(EnemyController.EnemyArchetype.HEALER)
+
+	# Healers are deliberately ordinary ground support enemies. Returning
+	# before the flight rolls prevents every aerial package from being stacked
+	# onto them as progression advances.
+	if enemy.archetype == EnemyController.EnemyArchetype.HEALER:
+		return
 
 	if (
 		_cultivation_level >= 28

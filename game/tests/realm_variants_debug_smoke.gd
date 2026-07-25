@@ -91,7 +91,6 @@ func _run() -> void:
 	spawner.fast_autonomous_spawn_chance = 1.0
 	spawner.bomber_spawn_chance = 0.0
 	spawner.healer_spawn_chance = 0.0
-	spawner.elite_healer_spawn_chance = 0.0
 	root.add_child(spawner)
 	var before_unlock := _enemy(player)
 	spawner.set_cultivation_level(11)
@@ -137,25 +136,55 @@ func _run() -> void:
 
 	var bomber := _enemy(player, 100)
 	bomber.configure_archetype(EnemyController.EnemyArchetype.BOMBER)
+	var enemy_shadow := bomber.get_node("EnemyShadow") as PlayerShadow
+	var player_shadow := player.get_node("PlayerShadow") as PlayerShadow
+	var flying_bomber := _enemy(player, 100)
+	flying_bomber.configure_archetype(EnemyController.EnemyArchetype.BOMBER)
+	flying_bomber.configure_flying(2, false, 0.0)
+	var dissolve_enemy := _enemy(player, 1)
+	dissolve_enemy.take_melee_damage(1)
+	await _wait_physics_frames(2)
+	var dissolve_material := (
+		dissolve_enemy.enemy_sprite.material as ShaderMaterial
+	)
 	var healer := _enemy(player, 30)
 	healer.configure_archetype(EnemyController.EnemyArchetype.HEALER)
 	var ally := _enemy(player, 30)
 	ally.take_melee_damage(10)
 	healer.global_position = ally.global_position
 	healer.call("_update_healing", healer.healing_interval)
-	var elite_healer := _enemy(player, 30)
-	elite_healer.configure_elite(2.0, 1.2, 1.2)
-	var normal_heal_radius := elite_healer.healing_radius
-	elite_healer.configure_archetype(EnemyController.EnemyArchetype.HEALER)
+	healer.configure_flying(3, true, spawner.fast_autonomous_speed)
+	var rejected_elite_healer := _enemy(player, 30)
+	rejected_elite_healer.configure_elite(2.0, 1.2, 1.2)
+	rejected_elite_healer.configure_archetype(
+		EnemyController.EnemyArchetype.HEALER
+	)
 	_check(
-		bomber.max_health == 38
+		bomber.max_health == 100
+		and enemy_shadow != null
+		and enemy_shadow.base_size.x < player_shadow.base_size.x
+		and enemy_shadow.base_size.y < player_shadow.base_size.y
+		and flying_bomber.enemy_sprite.sprite_frames.get_frame_count(&"move")
+			== 9
+		and flying_bomber.enemy_sprite.sprite_frames.get_frame_count(&"explode")
+			== 9
+		and dissolve_material != null
+		and dissolve_material.shader.resource_path
+			== "res://game/shaders/enemy_dissolve.gdshader"
 		and ally.current_health > 20
-		and elite_healer.healing_radius > normal_heal_radius,
-		"Bomber thin health or normal/elite healing behavior is wrong."
+		and not healer.is_flying
+		and healer.archetype == EnemyController.EnemyArchetype.HEALER
+		and rejected_elite_healer.archetype
+			== EnemyController.EnemyArchetype.MELEE,
+		"Bomber health or ground-only ordinary healing behavior is wrong."
 	)
 
 	resources.demote_to_realm(2, 1)
 	await _wait_physics_frames(2)
+	_check(
+		player.character_sprite.animation == &"golden_core_fly",
+		"Golden Core did not select its realm-specific flying animation."
+	)
 	_check(
 		player.activate_golden_core_echoes()
 		and player.get_active_echo_count() == 2,

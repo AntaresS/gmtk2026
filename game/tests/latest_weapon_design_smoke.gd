@@ -127,7 +127,8 @@ func _run() -> void:
 			dao_level_ten_range
 		)
 		and is_equal_approx(
-			dao_player.get_dao_orbit_radius(9) + 12.0,
+			dao_player.get_dao_orbit_radius(9)
+				+ dao_player.get_dao_weapon_tip_length(),
 			dao_level_ten_range
 		),
 		"Dao Lv.10 range, orbit, collision, and preview radius diverged."

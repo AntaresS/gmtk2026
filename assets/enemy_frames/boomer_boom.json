@@ -1,0 +1,176 @@
+{
+  "frame_count": 9,
+  "frame_size": [
+    544,
+    544
+  ],
+  "alignment": "head",
+  "alignment_anchor": [
+    272,
+    121
+  ],
+  "frames": [
+    {
+      "source_bbox": [
+        0,
+        0,
+        272,
+        418
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9134948096885813,
+      "paste_offset": [
+        82,
+        3
+      ],
+      "registration": "fixed from first explosion frame"
+    },
+    {
+      "source_bbox": [
+        132,
+        98,
+        273,
+        373
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9134948096885813,
+      "paste_offset": [
+        82,
+        3
+      ],
+      "registration": "fixed from first explosion frame"
+    },
+    {
+      "source_bbox": [
+        90,
+        0,
+        418,
+        418
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9134948096885813,
+      "paste_offset": [
+        82,
+        3
+      ],
+      "registration": "fixed from first explosion frame"
+    },
+    {
+      "source_bbox": [
+        55,
+        0,
+        357,
+        418
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9134948096885813,
+      "paste_offset": [
+        82,
+        3
+      ],
+      "registration": "fixed from first explosion frame"
+    },
+    {
+      "source_bbox": [
+        4,
+        0,
+        408,
+        401
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9134948096885813,
+      "paste_offset": [
+        82,
+        3
+      ],
+      "registration": "fixed from first explosion frame"
+    },
+    {
+      "source_bbox": [
+        2,
+        0,
+        412,
+        410
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9134948096885813,
+      "paste_offset": [
+        82,
+        3
+      ],
+      "registration": "fixed from first explosion frame"
+    },
+    {
+      "source_bbox": [
+        34,
+        0,
+        386,
+        388
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9134948096885813,
+      "paste_offset": [
+        82,
+        3
+      ],
+      "registration": "fixed from first explosion frame"
+    },
+    {
+      "source_bbox": [
+        48,
+        40,
+        363,
+        385
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9134948096885813,
+      "paste_offset": [
+        82,
+        3
+      ],
+      "registration": "fixed from first explosion frame"
+    },
+    {
+      "source_bbox": [
+        34,
+        91,
+        375,
+        389
+      ],
+      "output_head_anchor": [
+        272,
+        121
+      ],
+      "scale": 0.9134948096885813,
+      "paste_offset": [
+        82,
+        3
+      ],
+      "registration": "fixed from first explosion frame"
+    }
+  ]
+}
