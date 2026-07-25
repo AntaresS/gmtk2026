@@ -495,17 +495,18 @@ func _on_combat_stats_changed(
 		return
 	var lines: Array[String] = [
 		"[b]角色属性[/b]",
-		"基础  %s · 全局伤害 +%.1f · %s伤害 %d" % [
+		"基础  %s · 全局伤害 +%.1f / +%s · %s伤害 %d" % [
 			(
 				_resources.get_realm_display_text()
 				if _resources != null
 				else "境界 Lv.%d" % global_stats.overall_cultivation_level
 			),
 			global_stats.global_damage_bonus,
+			_format_percent(global_stats.overall_level_damage_ratio),
 			weapon_stats.display_name,
 			_player.get_current_weapon_damage()
-				if _player != null
-				else weapon_stats.resolved_damage,
+			if _player != null
+			else weapon_stats.resolved_damage,
 		],
 		"总览  暴击 %s / %s · 攻速 %s" % [
 			_format_percent(global_stats.critical_chance, false),

@@ -1,13 +1,12 @@
-[gd_resource type="Resource" script_class="RealmProgressionConfig" load_steps=6 format=3]
+[gd_resource type="Resource" script_class="RealmProgressionConfig" format=3 uid="uid://13x3u5xxpqtx"]
 
-[ext_resource type="Script" path="res://game/scripts/gameplay/realm_progression_config.gd" id="1_config"]
-[ext_resource type="Script" path="res://game/scripts/gameplay/realm_definition.gd" id="2_realm"]
+[ext_resource type="Script" uid="uid://c6wpxascsa0u0" path="res://game/scripts/gameplay/realm_progression_config.gd" id="1_config"]
+[ext_resource type="Script" uid="uid://dqv81xw8x53x0" path="res://game/scripts/gameplay/realm_definition.gd" id="2_realm"]
 
 [sub_resource type="Resource" id="QiRefining"]
 script = ExtResource("2_realm")
 realm_id = &"qi_refining"
 display_name = "练气"
-layer_count = 9
 tribulation_strike_count = 3
 tribulation_warning_duration_multiplier = 3.0
 
@@ -15,10 +14,8 @@ tribulation_warning_duration_multiplier = 3.0
 script = ExtResource("2_realm")
 realm_id = &"foundation"
 display_name = "筑基"
-layer_count = 9
 locomotion_mode = 1
 qi_shield_enabled = true
-shield_damage_per_qi = 1.0
 flight_height = 52.0
 character_scale_multiplier = 1.3
 tribulation_strike_count = 6
@@ -28,10 +25,8 @@ tribulation_warning_duration_multiplier = 2.25
 script = ExtResource("2_realm")
 realm_id = &"golden_core"
 display_name = "金丹"
-layer_count = 9
 locomotion_mode = 2
 qi_shield_enabled = true
-shield_damage_per_qi = 1.0
 flight_height = 76.0
 character_scale_multiplier = 1.45
 tribulation_strike_count = 12
@@ -41,19 +36,15 @@ tribulation_warning_duration_multiplier = 1.05
 script = ExtResource("2_realm")
 realm_id = &"nascent_soul"
 display_name = "元婴"
-layer_count = 9
 locomotion_mode = 2
 qi_shield_enabled = true
-shield_damage_per_qi = 1.0
 spirit_projection_enabled = true
 flight_height = 96.0
 character_scale_multiplier = 1.55
-spirit_damage_multiplier = 2.0
 spirit_fallback_realm_index = 2
 spirit_fallback_layer = 9
 fatal_breakthrough = true
 tribulation_strike_count = 1
-tribulation_warning_duration_multiplier = 1.0
 
 [resource]
 script = ExtResource("1_config")

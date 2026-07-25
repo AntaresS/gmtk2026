@@ -347,8 +347,10 @@ func _run() -> void:
 	)
 	_check(
 		is_equal_approx(enemy_spawner.elite_spawn_chance, 0.20)
-		and is_equal_approx(enemy_spawner.weapon_drop_chance, 0.75),
-		"Elite or weapon-drop probability was not substantially increased."
+		and is_equal_approx(enemy_spawner.weapon_reward_elite_ratio, 0.5)
+		and enemy_spawner.reward_choice_separation
+			> enemy_spawner.reward_choice_radius * 2.0,
+		"Elite reward types or non-overlapping choice geometry are misconfigured."
 	)
 
 	var lifespan_before_pause := resources.current_lifespan
@@ -659,6 +661,7 @@ func _run() -> void:
 		"Elapsed time did not increase enemy spawn frequency."
 	)
 	enemy_spawner.elite_spawn_chance = 1.0
+	enemy_spawner.weapon_reward_elite_ratio = 1.0
 	var camera := game.get_node("Camera2D") as Camera2D
 	var spawned_enemy_qi_reward := enemy_spawner.get_enemy_qi_drop_amount(
 		enemy_spawner.get_difficulty_step(),
@@ -688,77 +691,239 @@ func _run() -> void:
 			and spawned_enemy.melee_attack_interval < 1.0,
 			"Elapsed time did not strengthen enemy health, damage, and frequency."
 		)
-		_check(
-			spawned_enemy.is_elite_enemy()
-			and spawned_enemy.max_health > 5
-			and spawned_enemy.melee_attack_range > 55.0
-			and spawned_enemy.elite_label.visible,
-			"Elite enemy lacked its larger health, range, or visible identity."
-		)
-		enemy_spawner.weapon_drop_chance = 1.0
-		var inherited_enemy_velocity := spawned_enemy.velocity
+		if spawned_enemy.is_elite_enemy():
+			_check(
+				spawned_enemy.is_elite_enemy()
+				and spawned_enemy.get_elite_reward_type()
+					== EnemyController.EliteRewardType.WEAPON
+				and spawned_enemy.max_health > 5
+				and spawned_enemy.melee_attack_range > 55.0
+				and spawned_enemy.elite_label.visible
+				and spawned_enemy.elite_label.text == "武器精英",
+				"Elite enemy lacked its larger health, range, or visible identity."
+			)
+			enemy_spawner.set(
+				"_elapsed_run_time",
+				enemy_spawner.difficulty_step_seconds * 8.0
+			)
+			spawned_enemy.take_melee_damage(999)
+			await _wait_process_frames(2)
+			var saw_enemy_qi_drop := false
+			for drop_node in enemy_spawner.get_children():
+				if drop_node is QiPickup:
+					var qi_drop := drop_node as QiPickup
+					saw_enemy_qi_drop = (
+						qi_drop.get_qi_value()
+						== spawned_enemy_qi_reward
+					)
+			_check(saw_enemy_qi_drop, "Defeated enemy did not drop configured qi.")
+
+			var weapon_choice: EliteRewardChoice
+			for reward_group in get_nodes_in_group("elite_reward_choices"):
+				if (
+					reward_group is EliteRewardChoice
+					and reward_group.reward_kind
+						== EliteRewardChoice.RewardKind.WEAPON
+				):
+					weapon_choice = reward_group as EliteRewardChoice
+					break
+			_check(
+				weapon_choice != null,
+				"Weapon elite did not create a paired weapon choice."
+			)
+			var weapon_options: Array[Node2D] = (
+				weapon_choice.get_options()
+				if weapon_choice != null
+				else []
+			)
+			_check(
+				weapon_options.size() == 2
+				and weapon_options[0] is WeaponPickup
+				and weapon_options[1] is WeaponPickup
+				and (weapon_options[0] as WeaponPickup).weapon_data
+					!= (weapon_options[1] as WeaponPickup).weapon_data
+				and (weapon_options[0] as WeaponPickup).inherited_velocity
+					.is_zero_approx()
+				and (weapon_options[1] as WeaponPickup).inherited_velocity
+					.is_zero_approx()
+				and is_equal_approx(
+					weapon_options[0].global_position.distance_to(
+						weapon_options[1].global_position
+					),
+					enemy_spawner.reward_choice_separation
+				)
+				and is_equal_approx(
+					weapon_choice.get_pair_link_span(),
+					enemy_spawner.reward_choice_separation
+				)
+				and weapon_choice.global_position.y
+					<= player.global_position.y
+						- enemy_spawner.reward_minimum_forward_distance,
+				"Weapon rewards were not distinct, paired, separated, and reachable."
+			)
+			var drifting_choice_position := weapon_choice.global_position
+			await _wait_physics_frames(4)
+			_check(
+				weapon_choice.global_position.y < drifting_choice_position.y
+				and is_equal_approx(
+					weapon_options[0].position.distance_to(
+						weapon_options[1].position
+					),
+					enemy_spawner.reward_choice_separation
+				),
+				"Reward choice did not drift forward while preserving pair geometry."
+			)
+
+			var fragment_elite := preload(
+				"res://game/scenes/gameplay/enemy.tscn"
+			).instantiate() as EnemyController
+			fragment_elite.player = player
+			fragment_elite.configure_elite(
+				2.0,
+				1.2,
+				1.2,
+				EnemyController.EliteRewardType.POWER_FRAGMENT
+			)
+			enemy_spawner.add_child(fragment_elite)
+			fragment_elite.global_position = spawned_enemy.global_position
+			enemy_spawner.call(
+				"_on_enemy_defeated",
+				fragment_elite.global_position,
+				Vector2(500.0, 0.0),
+				fragment_elite,
+				spawned_enemy_qi_reward
+			)
+			await _wait_process_frames(2)
+
+			var fragment_choice: EliteRewardChoice
+			for reward_group in get_nodes_in_group("elite_reward_choices"):
+				if (
+					reward_group is EliteRewardChoice
+					and reward_group.reward_kind
+						== EliteRewardChoice.RewardKind.POWER_FRAGMENT
+				):
+					fragment_choice = reward_group as EliteRewardChoice
+					break
+			var fragment_options: Array[Node2D] = (
+				fragment_choice.get_options()
+				if fragment_choice != null
+				else []
+			)
+			_check(
+				fragment_choice != null
+				and fragment_options.size() == 2
+				and fragment_options[0] is WeaponPowerFragment
+				and fragment_options[1] is WeaponPowerFragment
+				and (fragment_options[0] as WeaponPowerFragment).upgrade_type
+					!= (fragment_options[1] as WeaponPowerFragment).upgrade_type
+				and (fragment_options[0] as WeaponPowerFragment).pickup_radius
+					< 96.0
+				and is_equal_approx(
+					fragment_choice.get_pair_link_span(),
+					enemy_spawner.reward_choice_separation
+				)
+				and weapon_choice.global_position.distance_to(
+					fragment_choice.global_position
+				) >= enemy_spawner.reward_group_minimum_spacing,
+				"Fragment elite rewards were not distinct or safely separated."
+			)
+
+			var choice_player := preload(
+				"res://game/scenes/gameplay/player.tscn"
+			).instantiate() as PlayerController
+			get_root().add_child(choice_player)
+			player.set_movement_enabled(false)
+			weapon_choice.configure_motion(
+				choice_player,
+				enemy_spawner.reward_vertical_drift_speed,
+				Callable(enemy_spawner, "_clamp_reward_group_x")
+			)
+			fragment_choice.configure_motion(
+				choice_player,
+				enemy_spawner.reward_vertical_drift_speed,
+				Callable(enemy_spawner, "_clamp_reward_group_x")
+			)
+			for option in weapon_options:
+				var weapon_option := option as WeaponPickup
+				weapon_option.configure(
+					weapon_option.weapon_data,
+					weapon_option.weapon_damage,
+					Vector2.ZERO,
+					choice_player
+				)
+			var choice_inventory_before := (
+				choice_player.get_equipment_inventory_entries().size()
+			)
+			choice_player.global_position = weapon_options[0].global_position
+			await _wait_physics_frames(4)
+			_check(
+				(weapon_options[0] as WeaponPickup).is_choice_focused()
+				and weapon_options[0].scale.x > weapon_options[1].scale.x
+				and weapon_options[1].modulate.a < 0.6,
+				"Focused weapon was not enlarged while its counterpart dimmed."
+			)
+			choice_player.global_position = (
+				weapon_choice.global_position + Vector2(0.0, 220.0)
+			)
+			await _wait_physics_frames(4)
+			_check(
+				not (weapon_options[0] as WeaponPickup).is_choice_focused()
+				and weapon_options[0].modulate.is_equal_approx(Color.WHITE)
+				and weapon_options[1].modulate.is_equal_approx(Color.WHITE),
+				"Backing away did not restore both reward visuals."
+			)
+			choice_player.global_position = weapon_options[0].global_position
+			await _wait_physics_frames(75)
+			_check(
+				choice_player.get_equipment_inventory_entries().size()
+					== choice_inventory_before + 1
+				and (
+					not is_instance_valid(weapon_options[0])
+					or weapon_options[0].is_queued_for_deletion()
+				)
+				and (
+					not is_instance_valid(weapon_options[1])
+					or weapon_options[1].is_queued_for_deletion()
+				),
+				"Committing one weapon did not grant one reward and remove both."
+			)
+			for option in fragment_options:
+				var fragment_option := option as WeaponPowerFragment
+				fragment_option.configure(
+					choice_player,
+					Vector2.ZERO,
+					fragment_option.upgrade_type
+				)
+			choice_player.global_position = fragment_options[0].global_position
+			await _wait_physics_frames(4)
+			_check(
+				(fragment_options[0] as WeaponPowerFragment).is_choice_focused()
+				and fragment_options[0].scale.x > fragment_options[1].scale.x
+				and fragment_options[1].modulate.a < 0.6,
+				"Focused fragment was not enlarged while its counterpart dimmed."
+			)
+			choice_player.global_position = (
+				fragment_choice.global_position + Vector2(0.0, 220.0)
+			)
+			await _wait_physics_frames(4)
+			_check(
+				not (
+					fragment_options[0] as WeaponPowerFragment
+				).is_choice_focused()
+				and fragment_options[0].modulate.is_equal_approx(Color.WHITE)
+				and fragment_options[1].modulate.is_equal_approx(Color.WHITE),
+				"Backing away did not restore both fragment reward visuals."
+			)
+			choice_player.queue_free()
+			player.set_movement_enabled(true)
+			if is_instance_valid(fragment_elite):
+				fragment_elite.queue_free()
+			if is_instance_valid(fragment_choice):
+				fragment_choice.queue_free()
 		enemy_spawner.set(
 			"_elapsed_run_time",
-			enemy_spawner.difficulty_step_seconds * 8.0
+			enemy_spawner.difficulty_step_seconds * 2.0
 		)
-		spawned_enemy.take_melee_damage(999)
-		await _wait_process_frames(2)
-		var saw_enemy_qi_drop := false
-		var saw_weapon_drop := false
-		var weapon_power_fragment_count := 0
-		var saw_weapon_power_fragment := false
-		for drop_node in enemy_spawner.get_children():
-			if drop_node is QiPickup:
-				var qi_drop := drop_node as QiPickup
-				saw_enemy_qi_drop = (
-					qi_drop.get_qi_value()
-					== spawned_enemy_qi_reward
-				)
-			elif drop_node is WeaponPickup:
-				var weapon_drop := drop_node as WeaponPickup
-				saw_weapon_drop = (
-					weapon_drop.inherited_velocity
-						.is_equal_approx(inherited_enemy_velocity)
-					and weapon_drop.weapon_data
-						in enemy_spawner.weapon_drop_pool
-					and weapon_drop.description_label.text.begins_with(
-						weapon_drop.weapon_data.display_name
-					)
-					and weapon_drop.description_label.text.contains(
-						"圈内同步1秒"
-					)
-					and weapon_drop.weapon_damage >= 2
-				)
-			elif drop_node is WeaponPowerFragment:
-				var dropped_power_fragment := drop_node as WeaponPowerFragment
-				weapon_power_fragment_count += 1
-				saw_weapon_power_fragment = (
-					dropped_power_fragment.power_amount == 1
-					and is_equal_approx(
-						dropped_power_fragment.channel_duration,
-						1.0
-					)
-					and dropped_power_fragment.pickup_radius >= 90.0
-					and dropped_power_fragment.upgrade_type >= 0
-					and dropped_power_fragment.upgrade_type
-						< UniversalUpgradeTypes.COUNT
-					and dropped_power_fragment.description_label.text.contains(
-						"强化碎片"
-					)
-				)
-		_check(saw_enemy_qi_drop, "Defeated enemy did not drop configured qi.")
-		_check(
-			saw_weapon_drop,
-			"Weapon drop did not inherit enemy velocity or show its label."
-		)
-		_check(
-			saw_weapon_power_fragment and weapon_power_fragment_count == 1,
-			"Elite enemy did not drop exactly one universal-upgrade fragment."
-		)
-	enemy_spawner.set(
-		"_elapsed_run_time",
-		enemy_spawner.difficulty_step_seconds * 2.0
-	)
 	await _wait_process_frames(12)
 	enemy_spawner.elite_spawn_chance = 0.0
 
@@ -1172,10 +1337,14 @@ func _run() -> void:
 			0.0
 		)
 		and is_equal_approx(
+			player.get_global_combat_stats().overall_level_damage_ratio,
+			player.combat_config.global_damage_ratio_per_overall_level
+		)
+		and is_equal_approx(
 			player.get_current_attack_range(),
 			level_one_sword_range
 		),
-		"Small-level cultivation incorrectly changed non-Palm weapon stats."
+		"Small-level cultivation did not preserve rounded ratio-scaled stats."
 	)
 	var flying_target := preload(
 		"res://game/scenes/gameplay/enemy.tscn"

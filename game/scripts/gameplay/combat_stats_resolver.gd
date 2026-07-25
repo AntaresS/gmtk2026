@@ -40,6 +40,10 @@ static func resolve_global(
 		float(snapshot.overall_cultivation_level - 1)
 		* maxf(config.global_damage_bonus_per_overall_level, 0.0)
 	)
+	snapshot.overall_level_damage_ratio = (
+		float(snapshot.overall_cultivation_level - 1)
+		* maxf(config.global_damage_ratio_per_overall_level, 0.0)
+	)
 	snapshot.global_damage_bonus = (
 		maxf(config.global_damage_bonus, 0.0)
 		+ snapshot.overall_level_damage_bonus
@@ -173,6 +177,14 @@ static func resolve_weapon(
 	snapshot.resolved_damage = maxi(
 		roundi(
 			(float(snapshot.rolled_damage) + global_damage_bonus)
+				* (
+					1.0
+					+ (
+						maxf(global_stats.overall_level_damage_ratio, 0.0)
+						if global_stats != null
+						else 0.0
+					)
+				)
 				* (1.0 + snapshot.matching_damage_bonus)
 		),
 		1

@@ -9,6 +9,12 @@ enum EnemyArchetype {
 	HEALER,
 }
 
+enum EliteRewardType {
+	NONE,
+	WEAPON,
+	POWER_FRAGMENT,
+}
+
 const ATTACK_FLASH_DURATION: float = 0.28
 const THREAT_RING_DASH_COUNT: int = 18
 const CriticalHitVfxResource = preload(
@@ -89,6 +95,7 @@ const DEFAULT_CRITICAL_HIT_VFX_SCENE: PackedScene = preload(
 
 var current_health: int = 0
 var is_elite: bool = false
+var elite_reward_type: EliteRewardType = EliteRewardType.NONE
 var _ordinary_health_equivalent: int = 0
 var _combat_active: bool = true
 var _melee_cooldown_remaining: float = 0.0
@@ -113,7 +120,7 @@ func _ready() -> void:
 	if _ordinary_health_equivalent <= 0:
 		_ordinary_health_equivalent = maxi(max_health, 1)
 	current_health = maxi(max_health, 1)
-	elite_label.visible = is_elite
+	_update_elite_identity()
 	attack_warning_label.hide()
 	_melee_cooldown_remaining = _get_recovery_duration()
 	_autonomous_time_remaining = maxf(autonomous_turn_interval, 0.2)
@@ -174,7 +181,7 @@ func _physics_process(delta: float) -> void:
 func _draw() -> void:
 	_draw_threat_indicator()
 
-	var body_color := Color("e6a326") if is_elite else Color("d94b55")
+	var body_color := _get_elite_identity_color() if is_elite else Color("d94b55")
 	if archetype == EnemyArchetype.BOMBER:
 		body_color = Color("ff6438")
 	elif archetype == EnemyArchetype.HEALER:
@@ -188,14 +195,15 @@ func _draw() -> void:
 	if _hit_flash_remaining > 0.0:
 		body_color = Color("fff2a8")
 	if is_elite:
-		draw_circle(Vector2.ZERO, 28.0, Color(1.0, 0.68, 0.12, 0.18))
+		var elite_color := _get_elite_identity_color()
+		draw_circle(Vector2.ZERO, 28.0, Color(elite_color, 0.2))
 		draw_arc(
 			Vector2.ZERO,
 			27.0,
 			0.0,
 			TAU,
 			40,
-			Color(1.0, 0.82, 0.28, 0.9),
+			Color(elite_color, 0.96),
 			3.0,
 			true
 		)
@@ -607,10 +615,16 @@ func _constrain_to_road() -> void:
 func configure_elite(
 	health_multiplier: float,
 	attack_range_multiplier: float,
-	visual_scale: float
+	visual_scale: float,
+	reward_type: int = EliteRewardType.WEAPON
 ) -> void:
 	_ordinary_health_equivalent = maxi(max_health, 1)
 	is_elite = true
+	elite_reward_type = clampi(
+		reward_type,
+		EliteRewardType.WEAPON,
+		EliteRewardType.POWER_FRAGMENT
+	)
 	max_health = maxi(
 		roundi(float(max_health) * maxf(health_multiplier, 1.0)),
 		max_health + 1
@@ -619,12 +633,42 @@ func configure_elite(
 	scale = Vector2.ONE * maxf(visual_scale, 1.0)
 	if is_node_ready():
 		current_health = max_health
-		elite_label.show()
+		_update_elite_identity()
 		queue_redraw()
 
 
 func is_elite_enemy() -> bool:
 	return is_elite
+
+
+## Returns the reward category advertised by this elite's label and ring color.
+func get_elite_reward_type() -> EliteRewardType:
+	return elite_reward_type
+
+
+func _update_elite_identity() -> void:
+	if not is_instance_valid(elite_label):
+		return
+	elite_label.visible = is_elite
+	if not is_elite:
+		return
+	elite_label.text = (
+		"武器精英"
+		if elite_reward_type == EliteRewardType.WEAPON
+		else "强化精英"
+	)
+	elite_label.add_theme_color_override(
+		"font_color",
+		_get_elite_identity_color()
+	)
+
+
+func _get_elite_identity_color() -> Color:
+	return (
+		Color("55d8ff")
+		if elite_reward_type == EliteRewardType.WEAPON
+		else Color("d98cff")
+	)
 
 
 ## Returns this enemy's pre-elite maximum health at the same difficulty.

@@ -16,8 +16,8 @@ shape = SubResource("CircleShape2D_enemy")
 
 [node name="EliteLabel" type="Label" parent="."]
 visible = false
-position = Vector2(-32, -58)
-offset_right = 64.0
+position = Vector2(-42, -58)
+offset_right = 84.0
 offset_bottom = 22.0
 theme_override_colors/font_color = Color(1, 0.82, 0.25, 1)
 theme_override_colors/font_outline_color = Color(0.12, 0.04, 0.01, 0.95)

@@ -8,6 +8,8 @@ signal channel_changed(
 	active: bool,
 	cancelled: bool
 )
+signal choice_focus_changed(option: Node2D, focused: bool)
+signal choice_committed(option: Node2D)
 
 ## Flat base damage granted to every existing and future weapon on collection.
 @export_range(1, 100, 1) var power_amount: int = 1
@@ -32,9 +34,13 @@ var _channel_elapsed: float = 0.0
 var _channeling: bool = false
 var _completed: bool = false
 var _visual_phase: float = 0.0
+var _exclusive_choice: bool = false
+var _choice_selected: bool = false
+var _choice_dimmed: bool = false
 
 
-## Assigns the collecting player and preserves the defeated elite's movement.
+## Assigns the collecting player and optional world velocity. Elite choices
+## pass zero velocity so both alternatives remain fixed and readable.
 func configure(
 	player: PlayerController,
 	inherited_velocity: Vector2,
@@ -69,6 +75,8 @@ func _physics_process(delta: float) -> void:
 			_channeling = true
 			_channel_elapsed = 0.0
 			channel_changed.emit(0.0, true, false)
+			if _exclusive_choice:
+				choice_focus_changed.emit(self, true)
 		_channel_elapsed = minf(
 			_channel_elapsed + delta,
 			maxf(channel_duration, 0.01)
@@ -143,6 +151,8 @@ func _cancel_channel() -> void:
 	_channeling = false
 	_channel_elapsed = 0.0
 	channel_changed.emit(0.0, false, true)
+	if _exclusive_choice:
+		choice_focus_changed.emit(self, false)
 
 
 func _complete_channel() -> void:
@@ -150,6 +160,8 @@ func _complete_channel() -> void:
 		return
 	_completed = true
 	_channeling = false
+	if _exclusive_choice:
+		choice_committed.emit(self)
 	channel_changed.emit(1.0, false, false)
 	upgrade_collected.emit(upgrade_type, maxi(power_amount, 1))
 	power_collected.emit(maxi(power_amount, 1))
@@ -160,11 +172,20 @@ func _update_label() -> void:
 	if not is_instance_valid(description_label):
 		return
 	if _channeling:
-		description_label.text = "%s强化碎片\n引导 %.1f / %.1f秒" % [
+		description_label.text = "%s%s强化碎片\n引导 %.1f / %.1f秒" % [
+			"▶ " if _exclusive_choice else "",
 			UniversalUpgradeTypes.get_display_name(upgrade_type),
 			minf(_channel_elapsed, channel_duration),
 			channel_duration,
 		]
+	elif _exclusive_choice and _choice_dimmed:
+		description_label.text = "%s强化碎片\n另一项选择中" % (
+			UniversalUpgradeTypes.get_display_name(upgrade_type)
+		)
+	elif _exclusive_choice:
+		description_label.text = "%s强化碎片\n停留1秒（二选一）" % (
+			UniversalUpgradeTypes.get_display_name(upgrade_type)
+		)
 	else:
 		description_label.text = "%s强化碎片\n靠近并持续停留" % (
 			UniversalUpgradeTypes.get_display_name(upgrade_type)
@@ -177,3 +198,53 @@ func get_channel_progress() -> float:
 		0.0,
 		1.0
 	)
+
+
+## Marks this fragment as one half of a stationary elite-reward choice.
+func enable_exclusive_choice() -> void:
+	_exclusive_choice = true
+	_inherited_velocity = Vector2.ZERO
+	if is_node_ready():
+		description_label.offset_left = -46.0
+		description_label.offset_top = pickup_radius + 7.0
+		description_label.offset_right = 46.0
+		description_label.offset_bottom = pickup_radius + 49.0
+		description_label.add_theme_font_size_override("font_size", 12)
+		_update_label()
+
+
+## Applies the group-owned selected/dimmed presentation. Leaving both options
+## restores their normal size and brightness.
+func set_choice_visual_state(selected: bool, dimmed: bool) -> void:
+	_choice_selected = selected
+	_choice_dimmed = dimmed
+	scale = Vector2.ONE * (
+		1.18
+		if selected
+		else (0.9 if dimmed else 1.0)
+	)
+	modulate = (
+		Color(0.38, 0.42, 0.5, 0.48)
+		if dimmed
+		else Color.WHITE
+	)
+	_update_label()
+	queue_redraw()
+
+
+## Removes an unchosen option without granting its upgrade.
+func dismiss_choice() -> void:
+	if _completed:
+		return
+	_completed = true
+	_channeling = false
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(self, "scale", Vector2.ONE * 0.72, 0.15)
+	tween.tween_property(self, "modulate:a", 0.0, 0.15)
+	tween.chain().tween_callback(queue_free)
+
+
+## Reports whether this option currently owns its group's visible focus.
+func is_choice_focused() -> bool:
+	return _choice_selected and _channeling

@@ -9,6 +9,10 @@ extends Resource
 ## after level one. The resolver adds this player-global growth before any
 ## matching 精/气/神 weapon multiplier.
 @export_range(0.0, 1000.0, 0.1) var global_damage_bonus_per_overall_level: float = 1.0
+## Multiplicative damage ratio granted to every weapon for each completed
+## overall cultivation level after level one. A value of 0.01 grants one
+## percent per completed level and scales flat run upgrades fairly.
+@export_range(0.0, 1.0, 0.005) var global_damage_ratio_per_overall_level: float = 0.01
 
 @export_category("Critical Hits")
 ## Player critical-hit chance before global cultivation rewards. Values are

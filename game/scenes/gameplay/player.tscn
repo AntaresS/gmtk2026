@@ -1,58 +1,45 @@
-[gd_scene load_steps=46 format=3]
+[gd_scene format=3 uid="uid://dhwwmgs6upxg4"]
 
-[ext_resource type="Script" path="res://game/scripts/gameplay/player.gd" id="1_script"]
-[ext_resource type="Resource" path="res://game/resources/player_combat_config.tres" id="11_combat_config"]
-[ext_resource type="Texture2D" path="res://assets/chara_fly_frames/chara_fly_00.png" id="2_frame_00"]
-[ext_resource type="Texture2D" path="res://assets/chara_fly_frames/chara_fly_01.png" id="3_frame_01"]
-[ext_resource type="Texture2D" path="res://assets/chara_fly_frames/chara_fly_02.png" id="4_frame_02"]
-[ext_resource type="Texture2D" path="res://assets/chara_fly_frames/chara_fly_03.png" id="5_frame_03"]
-[ext_resource type="Texture2D" path="res://assets/chara_fly_frames/chara_fly_04.png" id="6_frame_04"]
-[ext_resource type="Texture2D" path="res://assets/chara_fly_frames/chara_fly_05.png" id="7_frame_05"]
-[ext_resource type="Texture2D" path="res://assets/chara_fly_frames/chara_fly_06.png" id="8_frame_06"]
-[ext_resource type="Texture2D" path="res://assets/chara_fly_frames/chara_fly_07.png" id="9_frame_07"]
-[ext_resource type="Texture2D" path="res://assets/chara_fly_frames/chara_fly_08.png" id="10_frame_08"]
-[ext_resource type="Script" path="res://game/scripts/gameplay/player_shadow.gd" id="12_shadow"]
-[ext_resource type="Script" path="res://game/scripts/gameplay/realm_ability_controller.gd" id="13_realm_abilities"]
-[ext_resource type="Texture2D" path="res://assets/chara_walk_frames/chara_walk_00.png" id="14_walk_00"]
-[ext_resource type="Texture2D" path="res://assets/chara_walk_frames/chara_walk_01.png" id="15_walk_01"]
-[ext_resource type="Texture2D" path="res://assets/chara_walk_frames/chara_walk_02.png" id="16_walk_02"]
-[ext_resource type="Texture2D" path="res://assets/chara_walk_frames/chara_walk_03.png" id="17_walk_03"]
-[ext_resource type="Texture2D" path="res://assets/chara_walk_frames/chara_walk_04.png" id="18_walk_04"]
-[ext_resource type="Texture2D" path="res://assets/chara_walk_frames/chara_walk_05.png" id="19_walk_05"]
-[ext_resource type="Texture2D" path="res://assets/chara_walk_frames/chara_walk_06.png" id="20_walk_06"]
-[ext_resource type="Texture2D" path="res://assets/chara_walk_frames/chara_walk_07.png" id="21_walk_07"]
-[ext_resource type="Texture2D" path="res://assets/chara_walk_frames/chara_walk_08.png" id="22_walk_08"]
-[ext_resource type="Texture2D" path="res://assets/chara_qi_walk_frames/walk_0_00.png" id="23_qi_walk_00"]
-[ext_resource type="Texture2D" path="res://assets/chara_qi_walk_frames/walk_0_01.png" id="24_qi_walk_01"]
-[ext_resource type="Texture2D" path="res://assets/chara_qi_walk_frames/walk_0_02.png" id="25_qi_walk_02"]
-[ext_resource type="Texture2D" path="res://assets/chara_qi_walk_frames/walk_0_03.png" id="26_qi_walk_03"]
-[ext_resource type="Texture2D" path="res://assets/chara_qi_walk_frames/walk_0_04.png" id="27_qi_walk_04"]
-[ext_resource type="Texture2D" path="res://assets/chara_qi_walk_frames/walk_0_05.png" id="28_qi_walk_05"]
-[ext_resource type="Texture2D" path="res://assets/chara_qi_walk_frames/walk_0_06.png" id="29_qi_walk_06"]
-[ext_resource type="Texture2D" path="res://assets/chara_qi_walk_frames/walk_0_07.png" id="30_qi_walk_07"]
-[ext_resource type="Texture2D" path="res://assets/chara_qi_walk_frames/walk_0_08.png" id="31_qi_walk_08"]
-[ext_resource type="Script" path="res://game/scripts/gameplay/golden_bell_controller.gd" id="32_golden_bell"]
-[ext_resource type="Texture2D" path="res://image_asset/flip/frames/flip_00.png" id="33_flip_00"]
-[ext_resource type="Texture2D" path="res://image_asset/flip/frames/flip_01.png" id="34_flip_01"]
-[ext_resource type="Texture2D" path="res://image_asset/flip/frames/flip_02.png" id="35_flip_02"]
-[ext_resource type="Texture2D" path="res://image_asset/flip/frames/flip_03.png" id="36_flip_03"]
-[ext_resource type="Texture2D" path="res://image_asset/flip/frames/flip_04.png" id="37_flip_04"]
-[ext_resource type="Texture2D" path="res://image_asset/flip/frames/flip_05.png" id="38_flip_05"]
-[ext_resource type="Texture2D" path="res://image_asset/flip/frames/flip_06.png" id="39_flip_06"]
-[ext_resource type="Texture2D" path="res://image_asset/flip/frames/flip_07.png" id="40_flip_07"]
-[ext_resource type="Texture2D" path="res://image_asset/flip/frames/flip_08.png" id="41_flip_08"]
-
-[sub_resource type="CircleShape2D" id="CircleShape2D_player"]
-radius = 20.0
-
-[sub_resource type="CircleShape2D" id="CircleShape2D_attack"]
-radius = 72.0
-
-[sub_resource type="CircleShape2D" id="CircleShape2D_attraction"]
-radius = 72.0
-
-[sub_resource type="CircleShape2D" id="CircleShape2D_golden_bell"]
-radius = 33.0
+[ext_resource type="Script" uid="uid://cxqu38el5b7w" path="res://game/scripts/gameplay/player.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://brftjo6engm8l" path="res://assets/chara_fly_frames/chara_fly_00.png" id="2_frame_00"]
+[ext_resource type="Texture2D" uid="uid://bmaat4h7uf5xf" path="res://assets/chara_fly_frames/chara_fly_01.png" id="3_frame_01"]
+[ext_resource type="Texture2D" uid="uid://uc55jthjl58o" path="res://assets/chara_fly_frames/chara_fly_02.png" id="4_frame_02"]
+[ext_resource type="Texture2D" uid="uid://bmltijil251n0" path="res://assets/chara_fly_frames/chara_fly_03.png" id="5_frame_03"]
+[ext_resource type="Texture2D" uid="uid://bu0rmyft37dgv" path="res://assets/chara_fly_frames/chara_fly_04.png" id="6_frame_04"]
+[ext_resource type="Texture2D" uid="uid://bh3apc5f5bhyl" path="res://assets/chara_fly_frames/chara_fly_05.png" id="7_frame_05"]
+[ext_resource type="Texture2D" uid="uid://cdsfjerupqfn6" path="res://assets/chara_fly_frames/chara_fly_06.png" id="8_frame_06"]
+[ext_resource type="Texture2D" uid="uid://dls2vwh14uibn" path="res://assets/chara_fly_frames/chara_fly_07.png" id="9_frame_07"]
+[ext_resource type="Texture2D" uid="uid://kqelnpb401mp" path="res://assets/chara_fly_frames/chara_fly_08.png" id="10_frame_08"]
+[ext_resource type="Script" uid="uid://brxnupf50ivsp" path="res://game/scripts/gameplay/player_shadow.gd" id="12_shadow"]
+[ext_resource type="Script" uid="uid://c3y6hrl6middw" path="res://game/scripts/gameplay/realm_ability_controller.gd" id="13_realm_abilities"]
+[ext_resource type="Texture2D" uid="uid://4jg46vhpn756" path="res://assets/chara_walk_frames/chara_walk_00.png" id="14_walk_00"]
+[ext_resource type="Texture2D" uid="uid://3uktxdj0ipyu" path="res://assets/chara_walk_frames/chara_walk_01.png" id="15_walk_01"]
+[ext_resource type="Texture2D" uid="uid://bxmr25bou74nm" path="res://assets/chara_walk_frames/chara_walk_02.png" id="16_walk_02"]
+[ext_resource type="Texture2D" uid="uid://deti3acnfy8e8" path="res://assets/chara_walk_frames/chara_walk_03.png" id="17_walk_03"]
+[ext_resource type="Texture2D" uid="uid://1hibaqxad8ur" path="res://assets/chara_walk_frames/chara_walk_04.png" id="18_walk_04"]
+[ext_resource type="Texture2D" uid="uid://cmytdvy1xv6nw" path="res://assets/chara_walk_frames/chara_walk_05.png" id="19_walk_05"]
+[ext_resource type="Texture2D" uid="uid://bgcaysraa2do3" path="res://assets/chara_walk_frames/chara_walk_06.png" id="20_walk_06"]
+[ext_resource type="Texture2D" uid="uid://domgrhskqpi2y" path="res://assets/chara_walk_frames/chara_walk_07.png" id="21_walk_07"]
+[ext_resource type="Texture2D" uid="uid://dsl7lqugrd5jy" path="res://assets/chara_walk_frames/chara_walk_08.png" id="22_walk_08"]
+[ext_resource type="Texture2D" uid="uid://c4bgj43j8bot1" path="res://assets/chara_qi_walk_frames/walk_0_00.png" id="23_qi_walk_00"]
+[ext_resource type="Texture2D" uid="uid://cb2dp35kultbh" path="res://assets/chara_qi_walk_frames/walk_0_01.png" id="24_qi_walk_01"]
+[ext_resource type="Texture2D" uid="uid://chsi8jgajepia" path="res://assets/chara_qi_walk_frames/walk_0_02.png" id="25_qi_walk_02"]
+[ext_resource type="Texture2D" uid="uid://b4x3gromyb6mq" path="res://assets/chara_qi_walk_frames/walk_0_03.png" id="26_qi_walk_03"]
+[ext_resource type="Texture2D" uid="uid://l5b4o2am4uie" path="res://assets/chara_qi_walk_frames/walk_0_04.png" id="27_qi_walk_04"]
+[ext_resource type="Texture2D" uid="uid://dnmlgf047mtdw" path="res://assets/chara_qi_walk_frames/walk_0_05.png" id="28_qi_walk_05"]
+[ext_resource type="Texture2D" uid="uid://x5ik3co1ynrj" path="res://assets/chara_qi_walk_frames/walk_0_06.png" id="29_qi_walk_06"]
+[ext_resource type="Texture2D" uid="uid://dik0k8hubu3sd" path="res://assets/chara_qi_walk_frames/walk_0_07.png" id="30_qi_walk_07"]
+[ext_resource type="Texture2D" uid="uid://d3i2hawv0pn8a" path="res://assets/chara_qi_walk_frames/walk_0_08.png" id="31_qi_walk_08"]
+[ext_resource type="Script" uid="uid://858svwyqe4xt" path="res://game/scripts/gameplay/golden_bell_controller.gd" id="32_golden_bell"]
+[ext_resource type="Texture2D" uid="uid://bb81umbvlek45" path="res://image_asset/flip/frames/flip_00.png" id="33_flip_00"]
+[ext_resource type="Texture2D" uid="uid://cl0vwuucujy35" path="res://image_asset/flip/frames/flip_01.png" id="34_flip_01"]
+[ext_resource type="Texture2D" uid="uid://v0xq23pe4trs" path="res://image_asset/flip/frames/flip_02.png" id="35_flip_02"]
+[ext_resource type="Texture2D" uid="uid://c7mlg1uwraax7" path="res://image_asset/flip/frames/flip_03.png" id="36_flip_03"]
+[ext_resource type="Texture2D" uid="uid://c7ubmdrrut6vm" path="res://image_asset/flip/frames/flip_04.png" id="37_flip_04"]
+[ext_resource type="Texture2D" uid="uid://b57ehu6dperes" path="res://image_asset/flip/frames/flip_05.png" id="38_flip_05"]
+[ext_resource type="Texture2D" uid="uid://dofqj5b2rtf7h" path="res://image_asset/flip/frames/flip_06.png" id="39_flip_06"]
+[ext_resource type="Texture2D" uid="uid://bsgcfumpobs4u" path="res://image_asset/flip/frames/flip_07.png" id="40_flip_07"]
+[ext_resource type="Texture2D" uid="uid://bfd1dwjodyf81" path="res://image_asset/flip/frames/flip_08.png" id="41_flip_08"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_character"]
 animations = [{
@@ -84,7 +71,7 @@ animations = [{
 "duration": 1.0,
 "texture": ExtResource("41_flip_08")
 }],
-"loop": false,
+"loop": 0,
 "name": &"flip",
 "speed": 15.0
 }, {
@@ -116,7 +103,7 @@ animations = [{
 "duration": 1.0,
 "texture": ExtResource("10_frame_08")
 }],
-"loop": true,
+"loop": 1,
 "name": &"fly",
 "speed": 8.333333
 }, {
@@ -148,7 +135,7 @@ animations = [{
 "duration": 1.0,
 "texture": ExtResource("31_qi_walk_08")
 }],
-"loop": true,
+"loop": 1,
 "name": &"qi_walk",
 "speed": 8.333333
 }, {
@@ -180,63 +167,73 @@ animations = [{
 "duration": 1.0,
 "texture": ExtResource("22_walk_08")
 }],
-"loop": true,
+"loop": 1,
 "name": &"walk",
 "speed": 8.333333
 }]
 
-[node name="Player" type="CharacterBody2D"]
-collision_layer = 1
+[sub_resource type="CircleShape2D" id="CircleShape2D_golden_bell"]
+radius = 33.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_player"]
+radius = 20.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_attack"]
+radius = 72.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_attraction"]
+radius = 72.0
+
+[node name="Player" type="CharacterBody2D" unique_id=1206118976]
 collision_mask = 0
 script = ExtResource("1_script")
-combat_config = ExtResource("11_combat_config")
 
-[node name="PlayerShadow" type="Node2D" parent="."]
+[node name="PlayerShadow" type="Node2D" parent="." unique_id=1182174195]
 z_index = -2
 position = Vector2(0, 30)
 script = ExtResource("12_shadow")
 
-[node name="CharacterSprite" type="AnimatedSprite2D" parent="."]
+[node name="CharacterSprite" type="AnimatedSprite2D" parent="." unique_id=1859822539]
+scale = Vector2(0.22, 0.22)
 sprite_frames = SubResource("SpriteFrames_character")
 animation = &"fly"
 autoplay = "qi_walk"
-scale = Vector2(0.22, 0.22)
 
-[node name="SpiritSprite" type="AnimatedSprite2D" parent="."]
+[node name="SpiritSprite" type="AnimatedSprite2D" parent="." unique_id=1440965290]
 visible = false
-z_index = 2
 modulate = Color(0.48, 0.86, 1, 0.46)
+z_index = 2
+scale = Vector2(0.17, 0.17)
 sprite_frames = SubResource("SpriteFrames_character")
 animation = &"fly"
 autoplay = "fly"
-scale = Vector2(0.17, 0.17)
 
-[node name="RealmAbilities" type="Node" parent="." node_paths=PackedStringArray("character_sprite", "player_shadow", "spirit_sprite")]
+[node name="RealmAbilities" type="Node" parent="." unique_id=1314996068 node_paths=PackedStringArray("character_sprite", "player_shadow", "spirit_sprite")]
 script = ExtResource("13_realm_abilities")
 character_sprite = NodePath("../CharacterSprite")
 player_shadow = NodePath("../PlayerShadow")
 spirit_sprite = NodePath("../SpiritSprite")
 
-[node name="GoldenBell" type="Node2D" parent="."]
+[node name="GoldenBell" type="Node2D" parent="." unique_id=778538742]
 z_index = 6
 script = ExtResource("32_golden_bell")
 
-[node name="ImpactArea" type="Area2D" parent="GoldenBell"]
+[node name="ImpactArea" type="Area2D" parent="GoldenBell" unique_id=1822301667]
 collision_layer = 0
 collision_mask = 8
-monitoring = true
 monitorable = false
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="GoldenBell/ImpactArea"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="GoldenBell/ImpactArea" unique_id=669054711]
 shape = SubResource("CircleShape2D_golden_bell")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1673772724]
 shape = SubResource("CircleShape2D_player")
 
-[node name="DamageTakenLabel" type="Label" parent="."]
+[node name="DamageTakenLabel" type="Label" parent="." unique_id=1139618906]
 visible = false
 z_index = 20
-position = Vector2(-52, -70)
+offset_left = -52.0
+offset_top = -70.0
 offset_right = 104.0
 offset_bottom = 32.0
 theme_override_colors/font_color = Color(1, 0.26, 0.16, 1)
@@ -246,20 +243,18 @@ theme_override_font_sizes/font_size = 24
 text = "-3.0 寿元"
 horizontal_alignment = 1
 
-[node name="AttackArea" type="Area2D" parent="."]
+[node name="AttackArea" type="Area2D" parent="." unique_id=1764565832]
 collision_layer = 0
 collision_mask = 8
-monitoring = true
 monitorable = false
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackArea"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackArea" unique_id=229649188]
 shape = SubResource("CircleShape2D_attack")
 
-[node name="AttractionArea" type="Area2D" parent="."]
+[node name="AttractionArea" type="Area2D" parent="." unique_id=747395240]
 collision_layer = 0
 collision_mask = 2
-monitoring = true
 monitorable = false
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="AttractionArea"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="AttractionArea" unique_id=1956436526]
 shape = SubResource("CircleShape2D_attraction")

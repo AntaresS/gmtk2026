@@ -13,8 +13,10 @@ const CultivationTypesResource = preload(
 
 ## Current overall Qi cultivation level used by global damage growth.
 var overall_cultivation_level: int = 1
-## Portion of global damage granted by completed overall cultivation levels.
+## Flat global damage granted by completed overall cultivation levels.
 var overall_level_damage_bonus: float = 0.0
+## Multiplicative global damage ratio from completed overall cultivation levels.
+var overall_level_damage_ratio: float = 0.0
 ## Flat damage added to every weapon before affinity multipliers.
 var global_damage_bonus: float = 0.0
 ## Final player critical-hit chance after global cultivation rewards.

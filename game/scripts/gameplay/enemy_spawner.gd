@@ -7,6 +7,9 @@ signal universal_upgrade_collected(upgrade_type: int, amount: int)
 const WeaponDataResource = preload(
 	"res://game/scripts/gameplay/weapon_data.gd"
 )
+const EliteRewardChoiceResource = preload(
+	"res://game/scripts/gameplay/elite_reward_choice.gd"
+)
 const DAO_DATA: WeaponDataResource = preload("res://game/resources/weapon/dao.tres")
 const FLYING_SWORD_DATA: WeaponDataResource = preload(
 	"res://game/resources/weapon/flying_sword.tres"
@@ -33,11 +36,11 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 @export var qi_pickup_scene: PackedScene = preload(
 	"res://game/scenes/gameplay/qi_pickup.tscn"
 )
-## Weapon pickup optionally created when an elite enemy is defeated.
+## Weapon pickup used twice for every defeated weapon-rewarding elite.
 @export var weapon_pickup_scene: PackedScene = preload(
 	"res://game/scenes/gameplay/weapon_pickup.tscn"
 )
-## Random global-upgrade fragment created once for every defeated elite enemy.
+## Global-upgrade fragment used twice for every defeated fragment-rewarding elite.
 @export var weapon_power_fragment_scene: PackedScene = preload(
 	"res://game/scenes/gameplay/weapon_power_fragment.tscn"
 )
@@ -92,6 +95,9 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 @export_range(1.1, 4.0, 0.1) var elite_attack_range_multiplier: float = 1.6
 ## Visual and collision scale applied to elite enemy bodies.
 @export_range(1.0, 2.0, 0.05) var elite_visual_scale: float = 1.25
+## Portion of elite spawns that advertise and grant a weapon choice. Remaining
+## elites advertise and grant a universal power-fragment choice.
+@export_range(0.0, 1.0, 0.05) var weapon_reward_elite_ratio: float = 0.5
 
 @export_category("Enemy Variants")
 ## Chance for an ordinary spawn to become a low-health self-destruct enemy.
@@ -145,7 +151,7 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 ## enemy-type multipliers. The default adds one Qi every two steps after rounding.
 @export_range(0.0, 20.0, 0.05) var qi_drop_increase_per_difficulty_step: float = 0.5
 ## Qi multiplier for elite enemies. This deliberately compensates only part of
-## their triple health because elites also grant one universal fragment.
+## their triple health because elites also grant one exclusive reward choice.
 @export_range(0.0, 5.0, 0.05) var elite_qi_drop_multiplier: float = 1.5
 ## Qi multiplier for enemies spawned while Trial Hell is active. It stacks with
 ## elite and rear-pursuer multipliers and rewards the route's added danger.
@@ -154,9 +160,6 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 @export_range(0.0, 5.0, 0.05) var rear_qi_drop_multiplier: float = 1.15
 ## Hard upper bound for one enemy's Qi reward after every modifier.
 @export_range(1, 5000, 1) var maximum_enemy_qi_drop: int = 200
-## Probability from zero to one that a defeated elite also drops one definition
-## selected evenly from weapon_drop_pool. Ordinary enemies never drop weapons.
-@export_range(0.0, 1.0, 0.05) var weapon_drop_chance: float = 0.75
 ## Designer-managed definitions eligible for enemy drops. Invalid or null
 ## entries are ignored; damage, identity, and combat tuning belong to each
 ## shared WeaponData resource rather than this spawner.
@@ -168,6 +171,26 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 	THUNDER_HAMMER_DATA,
 	FANTIAN_SEAL_DATA,
 ]
+## Center-to-center separation in world pixels between the two reward options.
+## This must remain larger than twice reward_choice_radius so focus areas never
+## overlap and both choices remain distinct.
+@export_range(80.0, 240.0, 2.0) var reward_choice_separation: float = 96.0
+## Channel radius in world pixels for each elite reward option. The paired
+## default is smaller than the former single-drop circles.
+@export_range(24.0, 80.0, 1.0) var reward_choice_radius: float = 38.0
+## Minimum world-space distance between the centers of active reward pairs.
+## New pairs are moved farther ahead until this clearance is available.
+@export_range(100.0, 400.0, 5.0) var reward_group_minimum_spacing: float = 180.0
+## Minimum distance in world pixels that a reward pair is placed ahead of the
+## player. This makes rewards from enemies defeated behind the player reachable.
+@export_range(0.0, 300.0, 5.0) var reward_minimum_forward_distance: float = 80.0
+## Clearance in world pixels retained between either reward circle and the
+## generated road edge after accounting for the pair's full horizontal extent.
+@export_range(0.0, 80.0, 1.0) var reward_road_edge_clearance: float = 8.0
+## Default forward speed in world pixels per second for every unselected reward
+## pair. All pairs temporarily match the player's vertical speed during a
+## channel, then return to this shared speed without inheriting lateral motion.
+@export_range(40.0, 400.0, 5.0) var reward_vertical_drift_speed: float = 140.0
 
 var road_half_width: float = 200.0
 var _spawn_time_remaining: float = 0.0
@@ -231,6 +254,7 @@ func set_route_center_x(value: float) -> void:
 	_route_center_x = value
 	_remove_enemies_outside_active_route()
 	_refresh_enemy_road_constraints()
+	_reposition_reward_groups_to_active_route()
 
 
 ## Enables normal spawning or freezes all enemies when the run ends.
@@ -350,10 +374,16 @@ func _spawn_enemy(from_behind: bool = false) -> void:
 	_apply_current_difficulty(enemy)
 	var elite := _rng.randf() <= clampf(elite_spawn_chance, 0.0, 1.0)
 	if elite:
+		var reward_type := (
+			EnemyController.EliteRewardType.WEAPON
+			if _rng.randf() <= clampf(weapon_reward_elite_ratio, 0.0, 1.0)
+			else EnemyController.EliteRewardType.POWER_FRAGMENT
+		)
 		enemy.configure_elite(
 			elite_health_multiplier,
 			elite_attack_range_multiplier,
-			elite_visual_scale
+			elite_visual_scale,
+			reward_type
 		)
 	_configure_enemy_variant(enemy, elite)
 	var qi_reward := get_enemy_qi_drop_amount(
@@ -493,7 +523,7 @@ func get_enemy_qi_drop_amount(
 
 func _on_enemy_defeated(
 	drop_position: Vector2,
-	inherited_velocity: Vector2,
+	_inherited_velocity: Vector2,
 	defeated_enemy: EnemyController,
 	qi_reward: int
 ) -> void:
@@ -502,12 +532,11 @@ func _on_enemy_defeated(
 		is_instance_valid(defeated_enemy)
 		and defeated_enemy.is_elite_enemy()
 	):
-		_drop_weapon_power_fragment(
-			drop_position,
-			inherited_velocity
-		)
-		if _rng.randf() <= clampf(weapon_drop_chance, 0.0, 1.0):
-			_drop_weapon(drop_position, inherited_velocity)
+		match defeated_enemy.get_elite_reward_type():
+			EnemyController.EliteRewardType.WEAPON:
+				_drop_weapon_choice(drop_position)
+			EnemyController.EliteRewardType.POWER_FRAGMENT:
+				_drop_weapon_power_fragment_choice(drop_position)
 
 
 func _drop_qi(drop_position: Vector2, qi_reward: int) -> void:
@@ -523,63 +552,203 @@ func _drop_qi(drop_position: Vector2, qi_reward: int) -> void:
 	qi_pickup.qi_collected.connect(_on_dropped_qi_collected)
 
 
-func _drop_weapon(
-	drop_position: Vector2,
-	inherited_velocity: Vector2
-) -> void:
-	if weapon_pickup_scene == null:
-		return
-	var weapon_pickup := weapon_pickup_scene.instantiate() as WeaponPickup
-	if weapon_pickup == null:
-		push_error(
-			"EnemySpawner weapon_pickup_scene must instantiate WeaponPickup."
-		)
-		return
+func _get_available_weapons() -> Array[WeaponDataResource]:
 	var available_weapons: Array[WeaponDataResource] = []
 	for weapon_data in weapon_drop_pool:
 		if weapon_data != null and weapon_data.is_valid_definition():
 			available_weapons.append(weapon_data)
 	if available_weapons.is_empty():
 		push_warning("EnemySpawner weapon_drop_pool has no valid WeaponData.")
-		weapon_pickup.queue_free()
+	return available_weapons
+
+
+func _drop_weapon_choice(drop_position: Vector2) -> void:
+	if weapon_pickup_scene == null:
 		return
-	var weapon_data := available_weapons[
-		_rng.randi_range(0, available_weapons.size() - 1)
-	]
-	weapon_pickup.configure(
-		weapon_data,
-		weapon_data.roll_damage(_rng),
-		inherited_velocity,
-		player
+	var available_weapons := _get_available_weapons()
+	if available_weapons.is_empty():
+		return
+	var first_index := _rng.randi_range(0, available_weapons.size() - 1)
+	var first_weapon := available_weapons[first_index]
+	var second_weapon := first_weapon
+	if available_weapons.size() > 1:
+		available_weapons.remove_at(first_index)
+		second_weapon = available_weapons[
+			_rng.randi_range(0, available_weapons.size() - 1)
+		]
+	var choice_group := _create_reward_choice_group(
+		drop_position,
+		EliteRewardChoiceResource.RewardKind.WEAPON
 	)
-	call_deferred("add_child", weapon_pickup)
-	weapon_pickup.global_position = drop_position
+	if choice_group == null:
+		return
+	var choices: Array[WeaponDataResource] = [first_weapon, second_weapon]
+	for choice_index in choices.size():
+		var weapon_pickup := weapon_pickup_scene.instantiate() as WeaponPickup
+		if weapon_pickup == null:
+			push_error(
+				"EnemySpawner weapon_pickup_scene must instantiate WeaponPickup."
+			)
+			continue
+		var weapon_data := choices[choice_index]
+		weapon_pickup.channel_radius = _get_safe_reward_choice_radius()
+		weapon_pickup.configure(
+			weapon_data,
+			weapon_data.roll_damage(_rng),
+			Vector2.ZERO,
+			player
+		)
+		choice_group.add_option(
+			weapon_pickup,
+			Vector2(
+				_get_reward_choice_offset(choice_index),
+				0.0
+			)
+		)
 
 
-func _drop_weapon_power_fragment(
-	drop_position: Vector2,
-	inherited_velocity: Vector2
-) -> void:
+func _drop_weapon_power_fragment_choice(drop_position: Vector2) -> void:
 	if weapon_power_fragment_scene == null:
 		return
-	var fragment := (
-		weapon_power_fragment_scene.instantiate()
-		as WeaponPowerFragment
-	)
-	if fragment == null:
-		push_error(
-			"EnemySpawner weapon_power_fragment_scene must instantiate "
-			+ "WeaponPowerFragment."
+	var first_type := _rng.randi_range(0, UniversalUpgradeTypes.COUNT - 1)
+	var second_type := first_type
+	if UniversalUpgradeTypes.COUNT > 1:
+		second_type = _rng.randi_range(
+			0,
+			UniversalUpgradeTypes.COUNT - 2
 		)
-		return
-	fragment.configure(
-		player,
-		inherited_velocity,
-		_rng.randi_range(0, UniversalUpgradeTypes.COUNT - 1)
+		if second_type >= first_type:
+			second_type += 1
+	var choice_group := _create_reward_choice_group(
+		drop_position,
+		EliteRewardChoiceResource.RewardKind.POWER_FRAGMENT
 	)
-	add_child(fragment)
-	fragment.global_position = drop_position
-	fragment.upgrade_collected.connect(_on_universal_upgrade_collected)
+	if choice_group == null:
+		return
+	var upgrade_types: Array[int] = [first_type, second_type]
+	for choice_index in upgrade_types.size():
+		var fragment := (
+			weapon_power_fragment_scene.instantiate()
+			as WeaponPowerFragment
+		)
+		if fragment == null:
+			push_error(
+				"EnemySpawner weapon_power_fragment_scene must instantiate "
+				+ "WeaponPowerFragment."
+			)
+			continue
+		fragment.pickup_radius = _get_safe_reward_choice_radius()
+		fragment.configure(
+			player,
+			Vector2.ZERO,
+			upgrade_types[choice_index]
+		)
+		fragment.upgrade_collected.connect(_on_universal_upgrade_collected)
+		choice_group.add_option(
+			fragment,
+			Vector2(
+				_get_reward_choice_offset(choice_index),
+				0.0
+			)
+		)
+
+
+func _create_reward_choice_group(
+	drop_position: Vector2,
+	reward_kind: int
+) -> EliteRewardChoice:
+	var choice_group := EliteRewardChoiceResource.new()
+	choice_group.reward_kind = reward_kind
+	choice_group.configure_motion(
+		player,
+		reward_vertical_drift_speed,
+		Callable(self, "_clamp_reward_group_x")
+	)
+	var reward_position := _find_reward_choice_position(drop_position)
+	add_child(choice_group)
+	choice_group.global_position = reward_position
+	return choice_group
+
+
+func _find_reward_choice_position(drop_position: Vector2) -> Vector2:
+	var base_y := drop_position.y
+	if is_instance_valid(player):
+		base_y = minf(
+			base_y,
+			player.global_position.y
+				- maxf(reward_minimum_forward_distance, 0.0)
+		)
+	var row_spacing := maxf(reward_group_minimum_spacing, 100.0)
+	for row in 64:
+		var candidate_y := base_y - float(row) * row_spacing
+		var candidate := Vector2(
+			_clamp_reward_group_x(drop_position.x, candidate_y),
+			candidate_y
+		)
+		if _is_reward_group_position_clear(candidate):
+			return candidate
+	var fallback_y := base_y - 64.0 * row_spacing
+	return Vector2(
+		_clamp_reward_group_x(drop_position.x, fallback_y),
+		fallback_y
+	)
+
+
+func _is_reward_group_position_clear(candidate: Vector2) -> bool:
+	var minimum_spacing := maxf(reward_group_minimum_spacing, 100.0)
+	for group_node in get_tree().get_nodes_in_group("elite_reward_choices"):
+		if (
+			group_node is Node2D
+			and group_node != null
+			and not group_node.is_queued_for_deletion()
+			and candidate.distance_to(group_node.global_position)
+				< minimum_spacing
+		):
+			return false
+	return true
+
+
+func _get_safe_reward_choice_radius() -> float:
+	return minf(
+		maxf(reward_choice_radius, 24.0),
+		maxf(reward_choice_separation * 0.5 - 8.0, 24.0)
+	)
+
+
+func _get_reward_choice_offset(choice_index: int) -> float:
+	var direction := -1.0 if choice_index == 0 else 1.0
+	return direction * maxf(reward_choice_separation, 80.0) * 0.5
+
+
+func _clamp_reward_group_x(desired_x: float, world_y: float) -> float:
+	var pair_extent := (
+		maxf(reward_choice_separation, 80.0) * 0.5
+		+ _get_safe_reward_choice_radius()
+		+ maxf(reward_road_edge_clearance, 0.0)
+	)
+	var usable_center_half_width := maxf(
+		_get_road_half_width_at(world_y) - pair_extent,
+		0.0
+	)
+	return clampf(
+		desired_x,
+		_route_center_x - usable_center_half_width,
+		_route_center_x + usable_center_half_width
+	)
+
+
+func _reposition_reward_groups_to_active_route() -> void:
+	for group_node in get_tree().get_nodes_in_group("elite_reward_choices"):
+		if (
+			group_node is Node2D
+			and is_ancestor_of(group_node)
+			and not group_node.is_queued_for_deletion()
+		):
+			var reward_group := group_node as Node2D
+			reward_group.global_position.x = _clamp_reward_group_x(
+				reward_group.global_position.x,
+				reward_group.global_position.y
+			)
 
 
 func _on_dropped_qi_collected(amount: int) -> void:

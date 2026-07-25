@@ -33,6 +33,12 @@ const QIANKUN_RING_DATA: WeaponData = preload(
 const GOLDEN_BELL_DATA: WeaponData = preload(
 	"res://game/resources/weapon/golden_bell.tres"
 )
+const THUNDER_HAMMER_DATA: WeaponData = preload(
+	"res://game/resources/weapon/thunder_hammer.tres"
+)
+const FANTIAN_SEAL_DATA: WeaponData = preload(
+	"res://game/resources/weapon/fantian_seal.tres"
+)
 
 var _failures: Array[String] = []
 var _fragment_completions: int = 0
@@ -120,6 +126,9 @@ func _run() -> void:
 		and initial_global_stats.overall_cultivation_level == 1
 		and is_zero_approx(
 			initial_global_stats.overall_level_damage_bonus
+		)
+		and is_zero_approx(
+			initial_global_stats.overall_level_damage_ratio
 		)
 		and not initial_global_stats.jing_bonuses.has_any_bonus()
 		and not initial_global_stats.qi_bonuses.has_any_bonus()
@@ -539,8 +548,11 @@ func _run() -> void:
 		DAO_DATA,
 		FLYING_SWORD_DATA,
 		QIANKUN_RING_DATA,
+		GOLDEN_BELL_DATA,
+		THUNDER_HAMMER_DATA,
+		FANTIAN_SEAL_DATA,
 	]
-	var expected_damage_after_overall: Array[int] = [10, 13, 13, 13]
+	var expected_damage_after_overall: Array[int] = [10, 13, 13, 13, 13, 10, 10]
 	for weapon_index in weapon_definitions.size():
 		var resolved_weapon := CombatStatsResolverResource.resolve_weapon(
 			weapon_definitions[weapon_index],
@@ -555,6 +567,27 @@ func _run() -> void:
 				weapon_definitions[weapon_index].display_name
 			)
 		)
+		var ratio_scaled_weapon := CombatStatsResolverResource.resolve_weapon(
+			weapon_definitions[weapon_index],
+			100,
+			resources,
+			overall_global_stats
+		)
+		var damage_without_overall_ratio := roundi(
+			100.0 * (1.0 + ratio_scaled_weapon.matching_damage_bonus)
+		)
+		_check(
+			ratio_scaled_weapon.resolved_damage > damage_without_overall_ratio,
+			"Overall-level ratio did not scale %s." % (
+				weapon_definitions[weapon_index].display_name
+			)
+		)
+	var ratio_probe := CombatStatsResolverResource.resolve_weapon(
+		PALM_DATA,
+		100,
+		resources,
+		overall_global_stats
+	)
 	var stats_panel_text := hud.player_stats_label.text
 	_check(
 		resources.cultivation_level == 2
@@ -563,11 +596,31 @@ func _run() -> void:
 			overall_global_stats.overall_level_damage_bonus,
 			player.combat_config.global_damage_bonus_per_overall_level
 		)
+		and is_equal_approx(
+			overall_global_stats.overall_level_damage_ratio,
+			player.combat_config.global_damage_ratio_per_overall_level
+		)
 		and is_equal_approx(overall_global_stats.global_damage_bonus, 0.0)
+		and ratio_probe.resolved_damage == 101
 		and damage_before_overall == 13
 		and player.get_current_weapon_damage() == 13
 		and _combat_stats_updates > stats_updates_before_overall,
-		"Overall cultivation incorrectly changed non-Palm global damage."
+		(
+			"Overall cultivation ratio mismatch: level=%d ratio=%.3f/%.3f probe=%d "
+			+ "flat_level=%.2f/%.2f flat=%.2f before=%d after=%d updates=%d/%d."
+		) % [
+			overall_global_stats.overall_cultivation_level,
+			overall_global_stats.overall_level_damage_ratio,
+			player.combat_config.global_damage_ratio_per_overall_level,
+			ratio_probe.resolved_damage,
+			overall_global_stats.overall_level_damage_bonus,
+			player.combat_config.global_damage_bonus_per_overall_level,
+			overall_global_stats.global_damage_bonus,
+			damage_before_overall,
+			player.get_current_weapon_damage(),
+			_combat_stats_updates,
+			stats_updates_before_overall,
+		]
 	)
 	_check(
 		is_equal_approx(
