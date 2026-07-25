@@ -5,6 +5,7 @@ const ENEMY_SCENE := preload("res://game/scenes/gameplay/enemy.tscn")
 const WEAPON_PICKUP_SCENE := preload(
 	"res://game/scenes/gameplay/weapon_pickup.tscn"
 )
+const DAO_DATA := preload("res://game/resources/weapon/dao.tres")
 const FLYING_SWORD_DATA := preload(
 	"res://game/resources/weapon/flying_sword.tres"
 )
@@ -98,6 +99,58 @@ func _run() -> void:
 			== UniversalUpgradeTypes.COUNT,
 		"Universal fragment state is not exposed for a future debug panel."
 	)
+	var dao_player := PLAYER_SCENE.instantiate() as PlayerController
+	root.add_child(dao_player)
+	dao_player.set_movement_enabled(false)
+	dao_player.collect_weapon(DAO_DATA, DAO_DATA.minimum_damage)
+	_check(
+		dao_player.select_weapon_slot(0),
+		"Dao could not be selected for level-progression validation."
+	)
+	var dao_level_one_damage := dao_player.get_current_weapon_damage()
+	for _level in 9:
+		dao_player.collect_weapon(DAO_DATA, DAO_DATA.minimum_damage)
+	var dao_level_ten_range := (
+		DAO_DATA.attack_range
+		+ DAO_DATA.attack_range_increase_per_level * 9.0
+	)
+	_check(
+		dao_player.get_current_delivery_count() == 10
+		and is_equal_approx(
+			dao_player.get_current_attack_range(),
+			dao_level_ten_range
+		)
+		and dao_player.get_current_weapon_damage() == dao_level_one_damage
+		and dao_player.attack_shape.shape is CircleShape2D
+		and is_equal_approx(
+			(dao_player.attack_shape.shape as CircleShape2D).radius,
+			dao_level_ten_range
+		)
+		and is_equal_approx(
+			dao_player.get_dao_orbit_radius(9) + 12.0,
+			dao_level_ten_range
+		),
+		"Dao Lv.10 range, orbit, collision, and preview radius diverged."
+	)
+	dao_player.collect_weapon(DAO_DATA, DAO_DATA.minimum_damage)
+	var dao_level_eleven_damage := roundi(
+		float(dao_level_one_damage)
+			* (1.0 + DAO_DATA.damage_ratio_per_level_above_range_cap)
+	)
+	_check(
+		dao_player.get_current_delivery_count() == 11
+		and is_equal_approx(
+			dao_player.get_current_attack_range(),
+			dao_level_ten_range
+		)
+		and is_equal_approx(
+			dao_player.get_dao_orbit_radius(10),
+			dao_player.get_dao_orbit_radius(9)
+		)
+		and dao_player.get_current_weapon_damage() == dao_level_eleven_damage,
+		"Dao Lv.11 expanded past its cap or missed its +10% damage conversion."
+	)
+	dao_player.queue_free()
 	var ring_player := PLAYER_SCENE.instantiate() as PlayerController
 	root.add_child(ring_player)
 	ring_player.global_position = Vector2(7000.0, 7000.0)
@@ -189,7 +242,7 @@ func _run() -> void:
 	var pickup := WEAPON_PICKUP_SCENE.instantiate() as WeaponPickup
 	pickup.configure(FLYING_SWORD_DATA, 6, Vector2.ZERO, player)
 	root.add_child(pickup)
-	pickup.global_position = player.global_position
+	pickup.global_position = player.get_reward_interaction_position()
 	await _wait_physics_frames(30)
 	_check(
 		player.get_weapon_name() != "飞剑"

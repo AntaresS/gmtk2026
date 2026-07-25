@@ -67,7 +67,9 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var player_inside := (
-		global_position.distance_to(_player.global_position)
+		global_position.distance_to(
+			_player.get_reward_interaction_position()
+		)
 		<= maxf(pickup_radius, 1.0)
 	)
 	if player_inside:

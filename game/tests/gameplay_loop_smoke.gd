@@ -346,12 +346,100 @@ func _run() -> void:
 		"Enemy Qi progression did not apply step, type, and cap modifiers."
 	)
 	_check(
-		is_equal_approx(enemy_spawner.elite_spawn_chance, 0.20)
+		is_equal_approx(enemy_spawner.initial_elite_spawn_chance, 0.06)
+		and is_equal_approx(enemy_spawner.elite_spawn_chance, 0.10)
+		and is_equal_approx(
+			enemy_spawner.trial_initial_elite_spawn_chance,
+			0.08
+		)
+		and is_equal_approx(enemy_spawner.trial_elite_spawn_chance, 0.12)
+		and is_equal_approx(
+			enemy_spawner.minimum_elite_spawn_interval,
+			6.0
+		)
+		and is_equal_approx(
+			enemy_spawner.trial_minimum_elite_spawn_interval,
+			4.0
+		)
 		and is_equal_approx(enemy_spawner.weapon_reward_elite_ratio, 0.5)
+		and is_equal_approx(
+			enemy_spawner.first_weapon_elite_guarantee_seconds,
+			15.0
+		)
+		and is_equal_approx(
+			enemy_spawner.first_fragment_elite_guarantee_seconds,
+			25.0
+		)
 		and enemy_spawner.reward_choice_separation
-			> enemy_spawner.reward_choice_radius * 2.0,
-		"Elite reward types or non-overlapping choice geometry are misconfigured."
+			> enemy_spawner.reward_choice_radius * 2.0
+		and is_equal_approx(
+			enemy_spawner.reward_offscreen_despawn_margin,
+			200.0
+		)
+		and is_equal_approx(
+			enemy_spawner.reward_choice_lifetime_seconds,
+			30.0
+		),
+		"Elite curve, cooldown, reward types, or cleanup are misconfigured."
 	)
+	enemy_spawner.set("_elapsed_run_time", 0.0)
+	enemy_spawner.set_cultivation_level(1)
+	_check(
+		is_equal_approx(
+			enemy_spawner.get_current_elite_spawn_chance(),
+			0.06
+		),
+		"Normal-road elite chance did not start at six percent."
+	)
+	enemy_spawner.set(
+		"_elapsed_run_time",
+		enemy_spawner.elite_ramp_duration_seconds
+	)
+	enemy_spawner.set_cultivation_level(
+		enemy_spawner.elite_ramp_cultivation_levels + 1
+	)
+	_check(
+		is_equal_approx(
+			enemy_spawner.get_current_elite_spawn_chance(),
+			0.10
+		)
+		and enemy_spawner.call(
+			"_get_elite_cap_for_band",
+			EnemySpawner.EliteRoadWidthBand.VERY_NARROW
+		) == 2
+		and enemy_spawner.call(
+			"_get_elite_cap_for_band",
+			EnemySpawner.EliteRoadWidthBand.NARROW
+		) == 3
+		and enemy_spawner.call(
+			"_get_elite_cap_for_band",
+			EnemySpawner.EliteRoadWidthBand.STANDARD
+		) == 4,
+		"Normal-road elite curve or width caps did not mature correctly."
+	)
+	enemy_spawner.set_trial_hell_active(true)
+	_check(
+		is_equal_approx(
+			enemy_spawner.get_current_elite_spawn_chance(),
+			0.12
+		)
+		and enemy_spawner.call(
+			"_get_elite_cap_for_band",
+			EnemySpawner.EliteRoadWidthBand.VERY_NARROW
+		) == 3
+		and enemy_spawner.call(
+			"_get_elite_cap_for_band",
+			EnemySpawner.EliteRoadWidthBand.NARROW
+		) == 4
+		and enemy_spawner.call(
+			"_get_elite_cap_for_band",
+			EnemySpawner.EliteRoadWidthBand.STANDARD
+		) == 6,
+		"Trial Hell elite curve or width caps did not mature correctly."
+	)
+	enemy_spawner.set_trial_hell_active(false)
+	enemy_spawner.set("_elapsed_run_time", 0.0)
+	enemy_spawner.set_cultivation_level(1)
 
 	var lifespan_before_pause := resources.current_lifespan
 	pause_menu.call("pause_game")
@@ -616,6 +704,56 @@ func _run() -> void:
 	for existing_enemy in get_nodes_in_group("enemies"):
 		existing_enemy.queue_free()
 	await _wait_process_frames(2)
+	enemy_spawner.initial_elite_spawn_chance = 0.0
+	enemy_spawner.elite_spawn_chance = 0.0
+	enemy_spawner.set("_weapon_reward_elite_spawned", false)
+	enemy_spawner.set("_fragment_reward_elite_spawned", false)
+	enemy_spawner.set("_elapsed_run_time", 14.99)
+	enemy_spawner.call("_spawn_due_elite_guarantees")
+	_check(
+		get_nodes_in_group("enemies").is_empty(),
+		"An elite guarantee triggered before its configured time mark."
+	)
+	enemy_spawner.set("_elapsed_run_time", 15.0)
+	enemy_spawner.call("_spawn_due_elite_guarantees")
+	await _wait_process_frames(1)
+	var guaranteed_elites := get_nodes_in_group("enemies")
+	_check(
+		guaranteed_elites.size() == 1
+		and (guaranteed_elites[0] as EnemyController).get_elite_reward_type()
+			== EnemyController.EliteRewardType.WEAPON,
+		"Missing early weapon elite was not forced at fifteen seconds."
+	)
+	enemy_spawner.set("_elapsed_run_time", 24.99)
+	enemy_spawner.call("_spawn_due_elite_guarantees")
+	_check(
+		get_nodes_in_group("enemies").size() == 1,
+		"Fragment elite guarantee triggered before twenty-five seconds."
+	)
+	enemy_spawner.set("_elapsed_run_time", 25.0)
+	enemy_spawner.call("_spawn_due_elite_guarantees")
+	await _wait_process_frames(1)
+	guaranteed_elites = get_nodes_in_group("enemies")
+	var guaranteed_weapon_elites := 0
+	var guaranteed_fragment_elites := 0
+	for guaranteed_enemy in guaranteed_elites:
+		var elite_enemy := guaranteed_enemy as EnemyController
+		match elite_enemy.get_elite_reward_type():
+			EnemyController.EliteRewardType.WEAPON:
+				guaranteed_weapon_elites += 1
+			EnemyController.EliteRewardType.POWER_FRAGMENT:
+				guaranteed_fragment_elites += 1
+	var guarantee_snapshot := enemy_spawner.get_debug_snapshot()
+	_check(
+		guaranteed_weapon_elites == 1
+		and guaranteed_fragment_elites == 1
+		and bool(guarantee_snapshot["weapon_reward_elite_spawned"])
+		and bool(guarantee_snapshot["fragment_reward_elite_spawned"]),
+		"First-run elite guarantees did not produce exactly one required type."
+	)
+	for guaranteed_enemy in guaranteed_elites:
+		guaranteed_enemy.queue_free()
+	await _wait_process_frames(2)
 	enemy_spawner.set("_elapsed_run_time", 0.0)
 	enemy_spawner.set_cultivation_level(5)
 	_check(
@@ -660,8 +798,11 @@ func _run() -> void:
 			< enemy_spawner.spawn_interval,
 		"Elapsed time did not increase enemy spawn frequency."
 	)
+	enemy_spawner.initial_elite_spawn_chance = 1.0
 	enemy_spawner.elite_spawn_chance = 1.0
+	enemy_spawner.set("_elite_spawn_time_remaining", 0.0)
 	enemy_spawner.weapon_reward_elite_ratio = 1.0
+	enemy_spawner.reward_offscreen_despawn_margin = 1000.0
 	var camera := game.get_node("Camera2D") as Camera2D
 	var spawned_enemy_qi_reward := enemy_spawner.get_enemy_qi_drop_amount(
 		enemy_spawner.get_difficulty_step(),
@@ -731,11 +872,9 @@ func _run() -> void:
 				weapon_choice != null,
 				"Weapon elite did not create a paired weapon choice."
 			)
-			var weapon_options: Array[Node2D] = (
-				weapon_choice.get_options()
-				if weapon_choice != null
-				else []
-			)
+			var weapon_options: Array[Node2D] = []
+			if weapon_choice != null:
+				weapon_options = weapon_choice.get_options()
 			_check(
 				weapon_options.size() == 2
 				and weapon_options[0] is WeaponPickup
@@ -804,11 +943,9 @@ func _run() -> void:
 				):
 					fragment_choice = reward_group as EliteRewardChoice
 					break
-			var fragment_options: Array[Node2D] = (
-				fragment_choice.get_options()
-				if fragment_choice != null
-				else []
-			)
+			var fragment_options: Array[Node2D] = []
+			if fragment_choice != null:
+				fragment_options = fragment_choice.get_options()
 			_check(
 				fragment_choice != null
 				and fragment_options.size() == 2
@@ -854,13 +991,24 @@ func _run() -> void:
 			var choice_inventory_before := (
 				choice_player.get_equipment_inventory_entries().size()
 			)
-			choice_player.global_position = weapon_options[0].global_position
+			var reward_test_flight_elevation := 80.0
+			choice_player.call(
+				"_on_flight_elevation_changed",
+				reward_test_flight_elevation
+			)
+			choice_player.global_position = (
+				weapon_options[0].global_position
+				+ Vector2.DOWN * reward_test_flight_elevation
+			)
 			await _wait_physics_frames(4)
 			_check(
 				(weapon_options[0] as WeaponPickup).is_choice_focused()
 				and weapon_options[0].scale.x > weapon_options[1].scale.x
 				and weapon_options[1].modulate.a < 0.6,
-				"Focused weapon was not enlarged while its counterpart dimmed."
+				(
+					"Airborne body did not focus its weapon while enlarging it "
+					+ "and dimming its counterpart."
+				)
 			)
 			choice_player.global_position = (
 				weapon_choice.global_position + Vector2(0.0, 220.0)
@@ -872,7 +1020,10 @@ func _run() -> void:
 				and weapon_options[1].modulate.is_equal_approx(Color.WHITE),
 				"Backing away did not restore both reward visuals."
 			)
-			choice_player.global_position = weapon_options[0].global_position
+			choice_player.global_position = (
+				weapon_options[0].global_position
+				+ Vector2.DOWN * reward_test_flight_elevation
+			)
 			await _wait_physics_frames(75)
 			_check(
 				choice_player.get_equipment_inventory_entries().size()
@@ -894,13 +1045,19 @@ func _run() -> void:
 					Vector2.ZERO,
 					fragment_option.upgrade_type
 				)
-			choice_player.global_position = fragment_options[0].global_position
+			choice_player.global_position = (
+				fragment_options[0].global_position
+				+ Vector2.DOWN * reward_test_flight_elevation
+			)
 			await _wait_physics_frames(4)
 			_check(
 				(fragment_options[0] as WeaponPowerFragment).is_choice_focused()
 				and fragment_options[0].scale.x > fragment_options[1].scale.x
 				and fragment_options[1].modulate.a < 0.6,
-				"Focused fragment was not enlarged while its counterpart dimmed."
+				(
+					"Airborne body did not focus its fragment while enlarging "
+					+ "it and dimming its counterpart."
+				)
 			)
 			choice_player.global_position = (
 				fragment_choice.global_position + Vector2(0.0, 220.0)
@@ -925,7 +1082,46 @@ func _run() -> void:
 			enemy_spawner.difficulty_step_seconds * 2.0
 		)
 	await _wait_process_frames(12)
+	enemy_spawner.initial_elite_spawn_chance = 0.0
 	enemy_spawner.elite_spawn_chance = 0.0
+	enemy_spawner.reward_offscreen_despawn_margin = 200.0
+
+	var timed_reward_choice := EliteRewardChoice.new()
+	timed_reward_choice.configure_lifecycle(camera, 1000000.0, 0.01)
+	root.add_child(timed_reward_choice)
+	timed_reward_choice.add_option(Node2D.new(), Vector2(-48.0, 0.0))
+	timed_reward_choice.add_option(Node2D.new(), Vector2(48.0, 0.0))
+	_check(
+		timed_reward_choice.get_remaining_lifetime_seconds() > 0.0,
+		"Reward-choice lifetime did not initialize."
+	)
+	await _wait_process_frames(2)
+	_check(
+		not is_instance_valid(timed_reward_choice)
+			or timed_reward_choice.is_queued_for_deletion(),
+		"Unclaimed reward choice did not expire after its lifetime."
+	)
+
+	var offscreen_reward_choice := EliteRewardChoice.new()
+	offscreen_reward_choice.configure_lifecycle(camera, 10.0, 0.0)
+	root.add_child(offscreen_reward_choice)
+	offscreen_reward_choice.add_option(Node2D.new(), Vector2(-48.0, 0.0))
+	offscreen_reward_choice.add_option(Node2D.new(), Vector2(48.0, 0.0))
+	var camera_half_width := (
+		get_root().get_viewport().get_visible_rect().size.x
+		/ maxf(absf(camera.zoom.x), 0.01)
+		* 0.5
+	)
+	offscreen_reward_choice.global_position = (
+		camera.global_position
+		+ Vector2.RIGHT * (camera_half_width + 11.0)
+	)
+	await _wait_process_frames(2)
+	_check(
+		not is_instance_valid(offscreen_reward_choice)
+			or offscreen_reward_choice.is_queued_for_deletion(),
+		"Reward choice beyond the configured camera margin did not vanish."
+	)
 
 	enemy_spawner.call("_spawn_enemy", true)
 	await _wait_physics_frames(2)

@@ -75,6 +75,17 @@ var cultivation_type: int = -1
 ## attack/detection circle. Enable for area attacks such as Dao.
 @export var aoe_bonus_scales_attack_range: bool = false
 
+@export_category("Weapon Level Progression")
+## Flat attack-radius growth in world pixels for each duplicate level after
+## Lv.1, up to attack_range_level_cap. Zero disables level-based range growth.
+@export_range(0.0, 80.0, 1.0) var attack_range_increase_per_level: float = 0.0
+## Highest displayed weapon level allowed to increase attack radius. Duplicate
+## levels above this cap can instead use damage_ratio_per_level_above_range_cap.
+@export_range(1, 100, 1) var attack_range_level_cap: int = 1
+## Additive damage ratio granted by every displayed weapon level above the
+## range cap. A value of 0.10 grants +10% per excess duplicate level.
+@export_range(0.0, 1.0, 0.01) var damage_ratio_per_level_above_range_cap: float = 0.0
+
 
 ## Returns one normalized inclusive damage roll without mutating this shared
 ## definition.

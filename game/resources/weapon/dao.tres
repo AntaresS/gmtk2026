@@ -15,3 +15,6 @@ maximum_damage = 9
 attack_range = 94.0
 attack_interval = 0.5
 aoe_bonus_scales_attack_range = true
+attack_range_increase_per_level = 18.0
+attack_range_level_cap = 10
+damage_ratio_per_level_above_range_cap = 0.1

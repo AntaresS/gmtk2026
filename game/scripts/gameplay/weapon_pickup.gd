@@ -228,7 +228,9 @@ func _update_channel(delta: float) -> void:
 	if _collected or not is_instance_valid(_owner_player):
 		return
 	var inside := (
-		global_position.distance_to(_owner_player.global_position)
+		global_position.distance_to(
+			_owner_player.get_reward_interaction_position()
+		)
 		<= maxf(channel_radius, 1.0)
 	)
 	if not inside:

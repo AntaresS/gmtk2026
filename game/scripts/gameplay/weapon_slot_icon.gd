@@ -42,7 +42,7 @@ func configure(
 	locked = is_locked
 	new_unselected = is_new_unselected
 	tooltip_text = (
-		"%s  ×%d" % [weapon_data.display_name, quantity]
+		"%s  Lv.%d" % [weapon_data.display_name, quantity]
 		if weapon_data != null
 		else "尚未获得"
 	)

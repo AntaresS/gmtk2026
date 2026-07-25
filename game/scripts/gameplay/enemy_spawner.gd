@@ -4,6 +4,13 @@ extends Node2D
 signal qi_collected(amount: int)
 signal universal_upgrade_collected(upgrade_type: int, amount: int)
 
+enum EliteRoadWidthBand {
+	VERY_NARROW,
+	NARROW,
+	STANDARD,
+	WIDE,
+}
+
 const WeaponDataResource = preload(
 	"res://game/scripts/gameplay/weapon_data.gd"
 )
@@ -87,8 +94,55 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 @export_range(1.0, 15.0, 0.1) var minimum_rear_spawn_interval: float = 2.5
 
 @export_category("Elite Enemies")
-## Probability from zero to one that any new enemy becomes an elite variant.
-@export_range(0.0, 1.0, 0.01) var elite_spawn_chance: float = 0.20
+## Normal-road elite probability at the start of a run. It eases toward
+## elite_spawn_chance as time and cultivation progress.
+@export_range(0.0, 1.0, 0.01) var initial_elite_spawn_chance: float = 0.06
+## Normal-road elite probability after the progression curve reaches its cap.
+@export_range(0.0, 1.0, 0.01) var elite_spawn_chance: float = 0.10
+## Trial Hell elite probability at the start of a run.
+@export_range(0.0, 1.0, 0.01) var trial_initial_elite_spawn_chance: float = 0.08
+## Trial Hell elite probability after the progression curve reaches its cap.
+@export_range(0.0, 1.0, 0.01) var trial_elite_spawn_chance: float = 0.12
+## Unpaused seconds required for the time half of the elite curve to mature.
+@export_range(60.0, 900.0, 10.0) var elite_ramp_duration_seconds: float = 360.0
+## Cultivation levels above one required for the level half of the elite curve
+## to mature.
+@export_range(1, 81, 1) var elite_ramp_cultivation_levels: int = 35
+## Minimum seconds between non-guaranteed elite spawns on a normal road.
+@export_range(0.0, 30.0, 0.5) var minimum_elite_spawn_interval: float = 6.0
+## Minimum seconds between non-guaranteed elite spawns in Trial Hell.
+@export_range(0.0, 30.0, 0.5) var trial_minimum_elite_spawn_interval: float = 4.0
+## Maximum elite share of the current total-enemy cap on a normal road. This
+## population cap is combined with the road-width cap below.
+@export_range(0.01, 1.0, 0.01) var normal_elite_population_ratio: float = 0.12
+## Maximum elite share of the current total-enemy cap in Trial Hell.
+@export_range(0.01, 1.0, 0.01) var trial_elite_population_ratio: float = 0.18
+## Half-width in world pixels at or below which a road is very narrow.
+@export_range(60.0, 300.0, 5.0) var elite_very_narrow_half_width: float = 140.0
+## Half-width in world pixels at or below which a road is narrow.
+@export_range(80.0, 400.0, 5.0) var elite_narrow_half_width: float = 180.0
+## Half-width in world pixels at or below which a road is standard. Larger
+## roads use the wide-road elite cap.
+@export_range(100.0, 600.0, 5.0) var elite_standard_half_width: float = 240.0
+## Half-width hysteresis in world pixels that prevents repeated elite-cap
+## changes when a generated road hovers near a width threshold.
+@export_range(0.0, 50.0, 1.0) var elite_road_width_hysteresis: float = 10.0
+## Maximum active elites on a very narrow normal road.
+@export_range(1, 20, 1) var normal_very_narrow_elite_cap: int = 2
+## Maximum active elites on a narrow normal road.
+@export_range(1, 20, 1) var normal_narrow_elite_cap: int = 3
+## Maximum active elites on a standard normal road.
+@export_range(1, 20, 1) var normal_standard_elite_cap: int = 4
+## Maximum active elites on a wide normal road.
+@export_range(1, 20, 1) var normal_wide_elite_cap: int = 5
+## Maximum active elites on a very narrow Trial Hell road.
+@export_range(1, 30, 1) var trial_very_narrow_elite_cap: int = 3
+## Maximum active elites on a narrow Trial Hell road.
+@export_range(1, 30, 1) var trial_narrow_elite_cap: int = 4
+## Maximum active elites on a standard Trial Hell road.
+@export_range(1, 30, 1) var trial_standard_elite_cap: int = 6
+## Maximum active elites on a wide Trial Hell road.
+@export_range(1, 30, 1) var trial_wide_elite_cap: int = 7
 ## Health multiplier applied after elapsed-time difficulty scaling.
 @export_range(1.1, 10.0, 0.1) var elite_health_multiplier: float = 3.0
 ## Melee-range multiplier applied to elite enemies.
@@ -98,6 +152,12 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 ## Portion of elite spawns that advertise and grant a weapon choice. Remaining
 ## elites advertise and grant a universal power-fragment choice.
 @export_range(0.0, 1.0, 0.05) var weapon_reward_elite_ratio: float = 0.5
+## Unpaused run time in seconds by which at least one weapon-rewarding elite
+## must have spawned. Crossing this mark creates one immediately if needed.
+@export_range(1.0, 120.0, 1.0) var first_weapon_elite_guarantee_seconds: float = 15.0
+## Unpaused run time in seconds by which at least one fragment-rewarding elite
+## must have spawned. Crossing this mark creates one immediately if needed.
+@export_range(1.0, 120.0, 1.0) var first_fragment_elite_guarantee_seconds: float = 25.0
 
 @export_category("Enemy Variants")
 ## Chance for an ordinary spawn to become a low-health self-destruct enemy.
@@ -191,6 +251,12 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 ## pair. All pairs temporarily match the player's vertical speed during a
 ## channel, then return to this shared speed without inheriting lateral motion.
 @export_range(40.0, 400.0, 5.0) var reward_vertical_drift_speed: float = 140.0
+## Extra world pixels beyond each camera edge allowed before an unclaimed
+## reward-choice group's center is removed.
+@export_range(0.0, 1000.0, 10.0) var reward_offscreen_despawn_margin: float = 200.0
+## Maximum unpaused seconds an unclaimed reward-choice group remains alive.
+## Set to zero to disable lifetime cleanup while retaining offscreen cleanup.
+@export_range(0.0, 180.0, 1.0) var reward_choice_lifetime_seconds: float = 30.0
 
 var road_half_width: float = 200.0
 var _spawn_time_remaining: float = 0.0
@@ -202,12 +268,22 @@ var _elapsed_run_time: float = 0.0
 var _cultivation_level: int = 1
 var _trial_hell_active: bool = false
 var _road_half_width_resolver: Callable
+var _weapon_reward_elite_spawned: bool = false
+var _fragment_reward_elite_spawned: bool = false
+var _elite_spawn_time_remaining: float = 0.0
+var _forward_elite_road_band: int = -1
+var _rear_elite_road_band: int = -1
 
 
 func _ready() -> void:
 	_rng.randomize()
 	_elapsed_run_time = 0.0
 	_cultivation_level = 1
+	_weapon_reward_elite_spawned = false
+	_fragment_reward_elite_spawned = false
+	_elite_spawn_time_remaining = 0.0
+	_forward_elite_road_band = -1
+	_rear_elite_road_band = -1
 	_spawn_time_remaining = maxf(initial_spawn_delay, 0.0)
 	_rear_spawn_time_remaining = maxf(rear_initial_spawn_delay, 0.0)
 
@@ -223,6 +299,10 @@ func _physics_process(delta: float) -> void:
 	_elapsed_run_time += delta
 	_spawn_time_remaining -= delta
 	_rear_spawn_time_remaining -= delta
+	_elite_spawn_time_remaining = maxf(
+		_elite_spawn_time_remaining - delta,
+		0.0
+	)
 	if (
 		_spawn_time_remaining <= 0.0
 		and get_active_enemy_count() < get_current_max_active_enemies()
@@ -235,6 +315,7 @@ func _physics_process(delta: float) -> void:
 	):
 		_rear_spawn_time_remaining = get_current_spawn_interval(true)
 		_spawn_enemy(true)
+	_spawn_due_elite_guarantees()
 
 
 ## Synchronizes enemy placement with the generated road.
@@ -271,6 +352,18 @@ func get_active_enemy_count() -> int:
 	return get_tree().get_nodes_in_group("enemies").size()
 
 
+## Returns the number of living elite enemies sharing this spawner's scene tree.
+func get_active_elite_count() -> int:
+	var active_elites := 0
+	for enemy_node in get_tree().get_nodes_in_group("enemies"):
+		if (
+			enemy_node is EnemyController
+			and (enemy_node as EnemyController).is_elite_enemy()
+		):
+			active_elites += 1
+	return active_elites
+
+
 ## Synchronizes ordinary enemy scaling with the player's current cultivation.
 func set_cultivation_level(level: int) -> void:
 	_cultivation_level = maxi(level, 1)
@@ -301,10 +394,21 @@ func get_debug_snapshot() -> Dictionary:
 		"difficulty_step": get_difficulty_step(),
 		"active_enemies": get_active_enemy_count(),
 		"maximum_enemies": get_current_max_active_enemies(),
+		"active_elites": get_active_elite_count(),
+		"elite_spawn_chance": get_current_elite_spawn_chance(),
+		"elite_spawn_cooldown": _elite_spawn_time_remaining,
+		"forward_elite_cap": get_current_elite_cap(
+			_get_spawn_y(false)
+		),
+		"rear_elite_cap": get_current_elite_cap(
+			_get_spawn_y(true)
+		),
 		"forward_spawn_interval": get_current_spawn_interval(false),
 		"rear_spawn_interval": get_current_spawn_interval(true),
 		"trial_hell_active": _trial_hell_active,
 		"route_center_x": _route_center_x,
+		"weapon_reward_elite_spawned": _weapon_reward_elite_spawned,
+		"fragment_reward_elite_spawned": _fragment_reward_elite_spawned,
 	}
 
 
@@ -363,7 +467,168 @@ func get_current_spawn_interval(from_behind: bool) -> float:
 	)
 
 
-func _spawn_enemy(from_behind: bool = false) -> void:
+## Returns the smoothly ramped elite probability for the active route.
+func get_current_elite_spawn_chance() -> float:
+	var time_progress := clampf(
+		_elapsed_run_time / maxf(elite_ramp_duration_seconds, 1.0),
+		0.0,
+		1.0
+	)
+	var cultivation_progress := clampf(
+		float(maxi(_cultivation_level - 1, 0))
+			/ float(maxi(elite_ramp_cultivation_levels, 1)),
+		0.0,
+		1.0
+	)
+	var progress := smoothstep(
+		0.0,
+		1.0,
+		(time_progress + cultivation_progress) * 0.5
+	)
+	var start_chance := (
+		trial_initial_elite_spawn_chance
+		if _trial_hell_active
+		else initial_elite_spawn_chance
+	)
+	var end_chance := (
+		trial_elite_spawn_chance
+		if _trial_hell_active
+		else elite_spawn_chance
+	)
+	return clampf(
+		lerpf(start_chance, end_chance, progress),
+		0.0,
+		1.0
+	)
+
+
+## Returns the current global elite cooldown for the active route.
+func get_current_minimum_elite_spawn_interval() -> float:
+	return maxf(
+		trial_minimum_elite_spawn_interval
+			if _trial_hell_active
+			else minimum_elite_spawn_interval,
+		0.0
+	)
+
+
+## Returns the dynamic active-elite cap at one world Y. The lower of the
+## road-width cap and the current total-population ratio cap wins.
+func get_current_elite_cap(world_y: float) -> int:
+	var road_band := _get_nominal_elite_road_band(
+		_get_road_half_width_at(world_y)
+	)
+	return _get_elite_cap_for_band(road_band)
+
+
+func _get_elite_cap_for_band(road_band: int) -> int:
+	var width_cap := 1
+	if _trial_hell_active:
+		match road_band:
+			EliteRoadWidthBand.VERY_NARROW:
+				width_cap = trial_very_narrow_elite_cap
+			EliteRoadWidthBand.NARROW:
+				width_cap = trial_narrow_elite_cap
+			EliteRoadWidthBand.STANDARD:
+				width_cap = trial_standard_elite_cap
+			_:
+				width_cap = trial_wide_elite_cap
+	else:
+		match road_band:
+			EliteRoadWidthBand.VERY_NARROW:
+				width_cap = normal_very_narrow_elite_cap
+			EliteRoadWidthBand.NARROW:
+				width_cap = normal_narrow_elite_cap
+			EliteRoadWidthBand.STANDARD:
+				width_cap = normal_standard_elite_cap
+			_:
+				width_cap = normal_wide_elite_cap
+	var population_ratio := (
+		trial_elite_population_ratio
+		if _trial_hell_active
+		else normal_elite_population_ratio
+	)
+	var population_cap := maxi(
+		ceili(
+			float(get_current_max_active_enemies())
+				* clampf(population_ratio, 0.01, 1.0)
+		),
+		1
+	)
+	return mini(maxi(width_cap, 1), population_cap)
+
+
+func _get_nominal_elite_road_band(half_width: float) -> int:
+	if half_width <= elite_very_narrow_half_width:
+		return EliteRoadWidthBand.VERY_NARROW
+	if half_width <= elite_narrow_half_width:
+		return EliteRoadWidthBand.NARROW
+	if half_width <= elite_standard_half_width:
+		return EliteRoadWidthBand.STANDARD
+	return EliteRoadWidthBand.WIDE
+
+
+func _resolve_elite_road_band(
+	half_width: float,
+	from_behind: bool
+) -> int:
+	var current_band := (
+		_rear_elite_road_band
+		if from_behind
+		else _forward_elite_road_band
+	)
+	var candidate := _get_nominal_elite_road_band(half_width)
+	var hysteresis := maxf(elite_road_width_hysteresis, 0.0)
+	if current_band >= 0 and candidate != current_band and hysteresis > 0.0:
+		var boundary := elite_very_narrow_half_width
+		if mini(candidate, current_band) == EliteRoadWidthBand.NARROW:
+			boundary = elite_narrow_half_width
+		elif mini(candidate, current_band) == EliteRoadWidthBand.STANDARD:
+			boundary = elite_standard_half_width
+		if candidate > current_band and half_width <= boundary + hysteresis:
+			candidate = current_band
+		elif candidate < current_band and half_width >= boundary - hysteresis:
+			candidate = current_band
+	if from_behind:
+		_rear_elite_road_band = candidate
+	else:
+		_forward_elite_road_band = candidate
+	return candidate
+
+
+func _can_spawn_random_elite(spawn_y: float, from_behind: bool) -> bool:
+	if _elite_spawn_time_remaining > 0.0:
+		return false
+	var road_band := _resolve_elite_road_band(
+		_get_road_half_width_at(spawn_y),
+		from_behind
+	)
+	if get_active_elite_count() >= _get_elite_cap_for_band(road_band):
+		return false
+	return _rng.randf() <= get_current_elite_spawn_chance()
+
+
+func _get_spawn_y(from_behind: bool) -> float:
+	var viewport_height := get_viewport_rect().size.y
+	var vertical_zoom := maxf(camera.zoom.y, 0.01)
+	var half_visible_height := viewport_height / vertical_zoom * 0.5
+	if from_behind:
+		return (
+			camera.global_position.y
+			+ half_visible_height
+			+ rear_spawn_margin
+		)
+	return (
+		camera.global_position.y
+		- half_visible_height
+		- spawn_ahead_margin
+	)
+
+
+func _spawn_enemy(
+	from_behind: bool = false,
+	forced_elite_reward_type: int = EnemyController.EliteRewardType.NONE
+) -> void:
 	if enemy_scene == null:
 		return
 	var enemy := enemy_scene.instantiate() as EnemyController
@@ -372,18 +637,35 @@ func _spawn_enemy(from_behind: bool = false) -> void:
 		return
 	enemy.player = player
 	_apply_current_difficulty(enemy)
-	var elite := _rng.randf() <= clampf(elite_spawn_chance, 0.0, 1.0)
+	var has_forced_elite_reward := (
+		forced_elite_reward_type == EnemyController.EliteRewardType.WEAPON
+		or forced_elite_reward_type
+			== EnemyController.EliteRewardType.POWER_FRAGMENT
+	)
+	var spawn_y := _get_spawn_y(from_behind)
+	var elite := (
+		has_forced_elite_reward
+		or _can_spawn_random_elite(spawn_y, from_behind)
+	)
 	if elite:
 		var reward_type := (
-			EnemyController.EliteRewardType.WEAPON
-			if _rng.randf() <= clampf(weapon_reward_elite_ratio, 0.0, 1.0)
-			else EnemyController.EliteRewardType.POWER_FRAGMENT
+			forced_elite_reward_type
+			if has_forced_elite_reward
+			else (
+				EnemyController.EliteRewardType.WEAPON
+				if _rng.randf() <= clampf(weapon_reward_elite_ratio, 0.0, 1.0)
+				else EnemyController.EliteRewardType.POWER_FRAGMENT
+			)
 		)
 		enemy.configure_elite(
 			elite_health_multiplier,
 			elite_attack_range_multiplier,
 			elite_visual_scale,
 			reward_type
+		)
+		_record_elite_reward_spawn(reward_type)
+		_elite_spawn_time_remaining = (
+			get_current_minimum_elite_spawn_interval()
 		)
 	_configure_enemy_variant(enemy, elite)
 	var qi_reward := get_enemy_qi_drop_amount(
@@ -396,16 +678,7 @@ func _spawn_enemy(from_behind: bool = false) -> void:
 		_on_enemy_defeated.bind(enemy, qi_reward)
 	)
 
-	var viewport_height := get_viewport_rect().size.y
-	var vertical_zoom := maxf(camera.zoom.y, 0.01)
-	var half_visible_height := viewport_height / vertical_zoom * 0.5
-	var spawn_y := (
-		camera.global_position.y - half_visible_height - spawn_ahead_margin
-	)
 	if from_behind:
-		spawn_y = (
-			camera.global_position.y + half_visible_height + rear_spawn_margin
-		)
 		enemy.cruise_speed = maxf(rear_enemy_forward_speed, 1.0)
 	var usable_half_width := maxf(
 		_get_road_half_width_at(spawn_y) - road_edge_clearance,
@@ -422,6 +695,29 @@ func _spawn_enemy(from_behind: bool = false) -> void:
 		road_edge_clearance
 	)
 	add_child(enemy)
+
+
+func _spawn_due_elite_guarantees() -> void:
+	if (
+		not _weapon_reward_elite_spawned
+		and _elapsed_run_time
+			>= maxf(first_weapon_elite_guarantee_seconds, 1.0)
+	):
+		_spawn_enemy(false, EnemyController.EliteRewardType.WEAPON)
+	if (
+		not _fragment_reward_elite_spawned
+		and _elapsed_run_time
+			>= maxf(first_fragment_elite_guarantee_seconds, 1.0)
+	):
+		_spawn_enemy(false, EnemyController.EliteRewardType.POWER_FRAGMENT)
+
+
+func _record_elite_reward_spawn(reward_type: int) -> void:
+	match reward_type:
+		EnemyController.EliteRewardType.WEAPON:
+			_weapon_reward_elite_spawned = true
+		EnemyController.EliteRewardType.POWER_FRAGMENT:
+			_fragment_reward_elite_spawned = true
 
 
 func _configure_enemy_variant(enemy: EnemyController, elite: bool) -> void:
@@ -663,6 +959,11 @@ func _create_reward_choice_group(
 		player,
 		reward_vertical_drift_speed,
 		Callable(self, "_clamp_reward_group_x")
+	)
+	choice_group.configure_lifecycle(
+		camera,
+		reward_offscreen_despawn_margin,
+		reward_choice_lifetime_seconds
 	)
 	var reward_position := _find_reward_choice_position(drop_position)
 	add_child(choice_group)

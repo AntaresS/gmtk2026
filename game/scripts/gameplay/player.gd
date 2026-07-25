@@ -667,6 +667,14 @@ func set_movement_enabled(enabled: bool) -> void:
 		_cancel_special_projectile_sequence()
 
 
+## Returns the visible body's world-space center for reward interactions. Flight
+## raises CharacterSprite above the ground-root collision body after 筑基.
+func get_reward_interaction_position() -> Vector2:
+	if is_instance_valid(character_sprite):
+		return character_sprite.global_position
+	return global_position
+
+
 ## Receives direct damage and reports its cultivation-adjusted amount to the
 ## run resource owner. Known nearby sources receive 精 close-range mitigation;
 ## source-less hazards preserve their authored damage.
@@ -1044,15 +1052,29 @@ func get_current_weapon_data() -> WeaponDataResource:
 	return _get_current_weapon_data()
 
 
-## Every collected Dao copy occupies one persistent concentric orbit.
+## Every collected Dao level occupies one persistent concentric orbit.
 func get_dao_orbit_count() -> int:
 	return get_current_delivery_count()
 
 
-## Returns a stable radius for one dao path. Existing paths keep their radius
-## when a later fragment adds the next outer path.
+## Returns a stable radius for one Dao path. Lv.2 through the configured range
+## cap place each new path just inside its matching attack boundary; excess
+## levels share the capped outer path instead of expanding beyond the hit area.
 func get_dao_orbit_radius(orbit_index: int) -> float:
-	return 52.0 + float(maxi(orbit_index, 0)) * 12.0
+	if orbit_index <= 0:
+		return 52.0
+	var weapon_data := _get_current_weapon_data()
+	var capped_level := mini(
+		maxi(orbit_index + 1, 1),
+		maxi(weapon_data.attack_range_level_cap, 1)
+	)
+	return maxf(
+		weapon_data.attack_range
+			+ float(capped_level - 1)
+				* maxf(weapon_data.attack_range_increase_per_level, 0.0)
+			- 12.0,
+		62.0
+	)
 
 
 ## Returns the number of projectiles launched by one flying-sword volley.
@@ -2425,14 +2447,7 @@ func _get_current_weapon_data() -> WeaponDataResource:
 
 
 func _get_equipment_damage(equipment: Dictionary) -> int:
-	var weapon_data := equipment["data"] as WeaponDataResource
-	var base_damage := _get_equipment_base_damage(equipment)
-	return CombatStatsResolverResource.resolve_weapon(
-		weapon_data,
-		base_damage,
-		_cultivation_resources,
-		_global_combat_stats
-	).resolved_damage
+	return _resolve_equipment_combat_stats(equipment).resolved_damage
 
 
 func _get_equipment_base_damage(equipment: Dictionary) -> int:
@@ -2440,6 +2455,42 @@ func _get_equipment_base_damage(equipment: Dictionary) -> int:
 	if weapon_data.attack_kind == WeaponDataResource.AttackKind.QIANKUN_RING:
 		return int(equipment["damage"])
 	return int(equipment["damage"]) + _weapon_power_level
+
+
+func _resolve_equipment_combat_stats(
+	equipment: Dictionary
+) -> WeaponCombatStatsResource:
+	var weapon_data := equipment["data"] as WeaponDataResource
+	var snapshot := CombatStatsResolverResource.resolve_weapon(
+		weapon_data,
+		_get_equipment_base_damage(equipment),
+		_cultivation_resources,
+		_global_combat_stats
+	)
+	var weapon_level := maxi(int(equipment.get("quantity", 1)), 1)
+	var range_level_cap := maxi(weapon_data.attack_range_level_cap, 1)
+	var range_growth_levels := mini(weapon_level, range_level_cap) - 1
+	snapshot.attack_range += (
+		float(range_growth_levels)
+		* maxf(weapon_data.attack_range_increase_per_level, 0.0)
+	)
+	var excess_damage_levels := maxi(weapon_level - range_level_cap, 0)
+	if excess_damage_levels > 0:
+		snapshot.resolved_damage = maxi(
+			roundi(
+				float(snapshot.resolved_damage)
+				* (
+					1.0
+					+ float(excess_damage_levels)
+						* maxf(
+							weapon_data.damage_ratio_per_level_above_range_cap,
+							0.0
+						)
+				)
+			),
+			1
+		)
+	return snapshot
 
 
 func _rebuild_combat_stats() -> void:
@@ -2451,12 +2502,7 @@ func _rebuild_combat_stats() -> void:
 		_current_weapon_combat_stats = WeaponCombatStatsResource.new()
 	else:
 		var equipment := _get_current_equipment()
-		_current_weapon_combat_stats = CombatStatsResolverResource.resolve_weapon(
-			equipment["data"] as WeaponDataResource,
-			_get_equipment_base_damage(equipment),
-			_cultivation_resources,
-			_global_combat_stats
-		)
+		_current_weapon_combat_stats = _resolve_equipment_combat_stats(equipment)
 		_current_weapon_combat_stats.delivery_count = maxi(
 			(
 				(equipment["data"] as WeaponDataResource).base_delivery_count

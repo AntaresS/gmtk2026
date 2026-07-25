@@ -17,6 +17,10 @@ var _collecting_player: PlayerController
 var _vertical_drift_speed: float = 140.0
 var _road_x_clamp: Callable
 var _link_phase: float = 0.0
+var _tracking_camera: Camera2D
+var _offscreen_despawn_margin: float = 200.0
+var _maximum_lifetime_seconds: float = 30.0
+var _elapsed_lifetime_seconds: float = 0.0
 
 
 func _ready() -> void:
@@ -24,6 +28,10 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_elapsed_lifetime_seconds += maxf(delta, 0.0)
+	if _has_lifetime_expired() or _is_beyond_camera_margin():
+		queue_free()
+		return
 	if not _initialized:
 		return
 	_link_phase = fmod(_link_phase + maxf(delta, 0.0) * 2.8, TAU)
@@ -156,6 +164,20 @@ func configure_motion(
 	_road_x_clamp = road_x_clamp
 
 
+## Configures cleanup for an unclaimed pair. The group is removed when its
+## center leaves the camera bounds by more than offscreen_margin world pixels,
+## or when lifetime_seconds elapses. A zero lifetime disables only the timer.
+func configure_lifecycle(
+	tracking_camera: Camera2D,
+	offscreen_margin: float,
+	lifetime_seconds: float
+) -> void:
+	_tracking_camera = tracking_camera
+	_offscreen_despawn_margin = maxf(offscreen_margin, 0.0)
+	_maximum_lifetime_seconds = maxf(lifetime_seconds, 0.0)
+	_elapsed_lifetime_seconds = 0.0
+
+
 ## Adds one mutually exclusive reward at a fixed local offset. Reward scripts
 ## publish focus and commitment signals so this owner can coordinate both
 ## visuals and remove the unchosen counterpart.
@@ -211,6 +233,44 @@ func get_player_vertical_velocity() -> float:
 	if not is_instance_valid(_collecting_player):
 		return -maxf(_vertical_drift_speed, 1.0)
 	return minf(_collecting_player.velocity.y, 0.0)
+
+
+## Returns the remaining timer life in seconds, or -1 when timer cleanup is
+## disabled.
+func get_remaining_lifetime_seconds() -> float:
+	if _maximum_lifetime_seconds <= 0.0:
+		return -1.0
+	return maxf(
+		_maximum_lifetime_seconds - _elapsed_lifetime_seconds,
+		0.0
+	)
+
+
+func _has_lifetime_expired() -> bool:
+	return (
+		_maximum_lifetime_seconds > 0.0
+		and _elapsed_lifetime_seconds >= _maximum_lifetime_seconds
+	)
+
+
+func _is_beyond_camera_margin() -> bool:
+	if not is_instance_valid(_tracking_camera):
+		return false
+	var viewport_size := get_viewport_rect().size
+	var camera_zoom := Vector2(
+		maxf(absf(_tracking_camera.zoom.x), 0.01),
+		maxf(absf(_tracking_camera.zoom.y), 0.01)
+	)
+	var half_visible_size := viewport_size / camera_zoom * 0.5
+	var expanded_half_size := (
+		half_visible_size
+		+ Vector2.ONE * _offscreen_despawn_margin
+	)
+	var offset := global_position - _tracking_camera.global_position
+	return (
+		absf(offset.x) > expanded_half_size.x
+		or absf(offset.y) > expanded_half_size.y
+	)
 
 
 func _on_option_focus_changed(option: Node2D, focused: bool) -> void:

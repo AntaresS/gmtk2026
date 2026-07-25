@@ -955,23 +955,6 @@ Recommended comparison matrix:
   system.
 - A death recap distinguishes poor decisions, bad luck, and systemic imbalance.
 
-## Validation Checklist
-
-Run focused tests after each relevant phase:
-
-```sh
-/Users/tuti/.local/bin/godot --headless --path . \
-  --script game/tests/latest_weapon_design_smoke.gd
-
-/Users/tuti/.local/bin/godot --headless --path . \
-  --script game/tests/cultivation_smoke.gd
-
-/Users/tuti/.local/bin/godot --headless --path . \
-  --script game/tests/foundation_smoke.gd
-
-/Users/tuti/.local/bin/godot --headless --path . \
-  --script game/tests/gameplay_loop_smoke.gd
-```
 
 Relevant current audit results:
 
