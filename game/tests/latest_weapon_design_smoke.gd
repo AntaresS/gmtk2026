@@ -106,6 +106,10 @@ func _run() -> void:
 		preload("res://game/resources/weapon/qiankun_ring.tres"),
 		5
 	)
+	_check(
+		ring_player.select_weapon_slot(0),
+		"Universe Ring could not be selected from weapon slot 1."
+	)
 	var fixed_ring_damage := ring_player.get_current_weapon_damage()
 	ring_player.apply_universal_upgrade(
 		UniversalUpgradeTypes.UpgradeType.DAMAGE,
@@ -195,12 +199,22 @@ func _run() -> void:
 	)
 	await _wait_physics_frames(35)
 	_check(
-		player.get_weapon_name() == "飞剑",
-		"Elite weapon was not collected after one uninterrupted second."
+		player.get_weapon_name() != "飞剑"
+		and player.get_equipment_inventory_snapshot().size() == 2,
+		"Elite weapon was not collected without changing the equipped weapon."
+	)
+	_check(
+		player.select_weapon_slot(0)
+		and player.get_weapon_name() == "飞剑",
+		"Flying Sword could not be selected from weapon slot 1."
 	)
 
 	player.collect_weapon(THUNDER_HAMMER_DATA, 2)
 	player.collect_weapon(THUNDER_HAMMER_DATA, 2)
+	_check(
+		player.select_weapon_slot(1),
+		"Thunder Hammer could not be selected from weapon slot 2."
+	)
 	_check(
 		player.get_current_delivery_count() == 2,
 		"Duplicate Thunder Hammer did not add one sequential cloud."
@@ -248,6 +262,10 @@ func _run() -> void:
 
 	player.collect_weapon(FANTIAN_SEAL_DATA, 18)
 	player.collect_weapon(FANTIAN_SEAL_DATA, 18)
+	_check(
+		player.select_weapon_slot(2),
+		"Fantian Seal could not be selected from weapon slot 3."
+	)
 	_check(
 		player.get_current_delivery_count() == 2
 		and is_equal_approx(FANTIAN_SEAL_DATA.attack_interval, 2.25)

@@ -213,6 +213,7 @@ func _run() -> void:
 		"Weapon-power fragment did not strengthen the existing weapon."
 	)
 	upgrade_player.collect_weapon(FLYING_SWORD_DATA, 6)
+	upgrade_player.cycle_equipment()
 	_check(
 		upgrade_player.get_current_weapon_damage() == 7,
 		"Weapon-power bonus did not apply to a future collected weapon."
@@ -1126,12 +1127,23 @@ func _run() -> void:
 		Vector2.ZERO,
 		player
 	)
+	var equipped_before_pickup := player.get_current_weapon_data()
+	var inventory_size_before_pickup := (
+		player.get_equipment_inventory_entries().size()
+	)
 	root.add_child(weapon_pickup)
 	weapon_pickup.global_position = player.global_position
 	await _wait_physics_frames(70)
 	_check(
+		player.get_current_weapon_data() == equipped_before_pickup
+		and player.get_equipment_inventory_entries().size()
+			== inventory_size_before_pickup + 1,
+		"Collected weapon did not enter inventory while preserving equipment."
+	)
+	player.cycle_equipment()
+	_check(
 		player.get_weapon_name() == "飞剑",
-		"Qi Refining did not allow and equip a collected ranged weapon."
+		"Tab-style cycling did not equip the collected ranged weapon."
 	)
 	var level_one_sword_damage := player.get_current_weapon_damage()
 	_check(
@@ -1187,6 +1199,7 @@ func _run() -> void:
 		player.collect_weapon(DAO_DATA, 4),
 		"First dao was not added to the equipment library."
 	)
+	player.cycle_equipment()
 	_check(
 		player.get_dao_orbit_count() == 1
 		and player.get_visible_companion_weapon_count() == 1
@@ -1228,6 +1241,11 @@ func _run() -> void:
 	root.add_child(ring_pickup)
 	ring_pickup.global_position = player.global_position
 	await _wait_physics_frames(70)
+	_check(
+		player.get_weapon_name() == "刀",
+		"Universe Ring pickup unexpectedly changed the equipped weapon."
+	)
+	player.cycle_equipment()
 	var ring_damage := player.get_current_weapon_damage()
 	_check(
 		player.get_weapon_name() == "乾坤圈"
@@ -1516,6 +1534,8 @@ func _run() -> void:
 
 		for source_realm_index in [1, 2]:
 			resources.demote_to_realm(source_realm_index, 9)
+			resources.current_lifespan = 50.0
+			var transition_maximum_before := resources.max_lifespan
 			resources.add_qi(resources.get_current_qi_requirement())
 			await _wait_process_frames(2)
 			var repeat_tribulation := (
@@ -1550,6 +1570,31 @@ func _run() -> void:
 			repeat_tribulation.cancel()
 			game.call("_on_heavenly_tribulation_completed")
 			await _wait_process_frames(2)
+			var expected_transition_maximum := minf(
+				transition_maximum_before
+					+ resources.level_up_maxHP_increase
+					+ resources.breakthrough_max_lifespan_increase,
+				resources.maximum_lifespan_cap
+			)
+			var expected_transition_lifespan := minf(
+				50.0
+					+ expected_transition_maximum
+						* resources.breakthrough_lifespan_restore_ratio,
+				expected_transition_maximum
+			)
+			_check(
+				is_equal_approx(
+					resources.max_lifespan,
+					expected_transition_maximum
+				)
+				and absf(
+					resources.current_lifespan
+						- expected_transition_lifespan
+				) < 0.25
+				and resources.breakthroughs_completed
+					== source_realm_index + 1,
+				"Realm transition did not grant maximum lifespan and restoration."
+			)
 			if source_realm_index == 1:
 				var golden_core_elevation := (
 					player.realm_abilities.get_current_flight_elevation()
@@ -1595,6 +1640,46 @@ func _run() -> void:
 			and not player.realm_abilities.is_spirit_projection_active(),
 			"Taking damage during spirit projection did not fall to Golden Core."
 		)
+		resources.current_lifespan = 50.0
+		var repeated_nascent_soul_maximum_before := resources.max_lifespan
+		resources.add_qi(resources.get_current_qi_requirement())
+		await _wait_process_frames(2)
+		var repeated_nascent_soul_tribulation := (
+			game.get("_active_tribulation") as HeavenlyTribulation
+		)
+		_check(
+			repeated_nascent_soul_tribulation != null,
+			"Re-entering Nascent Soul did not request a tribulation."
+		)
+		if repeated_nascent_soul_tribulation != null:
+			repeated_nascent_soul_tribulation.cancel()
+			game.call("_on_heavenly_tribulation_completed")
+			await _wait_process_frames(2)
+			var expected_repeated_maximum := minf(
+				repeated_nascent_soul_maximum_before
+					+ resources.level_up_maxHP_increase
+					+ resources.breakthrough_max_lifespan_increase,
+				resources.maximum_lifespan_cap
+			)
+			var expected_repeated_lifespan := minf(
+				50.0
+					+ expected_repeated_maximum
+						* resources.breakthrough_lifespan_restore_ratio,
+				expected_repeated_maximum
+			)
+			_check(
+				resources.get_current_realm_index() == 3
+				and resources.breakthroughs_completed == 4
+				and is_equal_approx(
+					resources.max_lifespan,
+					expected_repeated_maximum
+				)
+				and absf(
+					resources.current_lifespan
+						- expected_repeated_lifespan
+				) < 0.25,
+				"Repeat Nascent Soul breakthrough did not grant its lifespan reward."
+			)
 
 		resources.demote_to_realm(3, 9)
 		resources.add_qi(resources.get_current_qi_requirement())

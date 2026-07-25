@@ -216,6 +216,8 @@ var _attack_flash_remaining: float = 0.0
 var _palm_attack_direction: Vector2 = Vector2.UP
 var _damage_flash_remaining: float = 0.0
 var _shield_flash_remaining: float = 0.0
+var _last_shield_blocked_damage: float = 0.0
+var _last_shield_qi_spent: int = 0
 var _last_damage_amount: float = 0.0
 var _character_sprite_rest_position: Vector2 = Vector2.ZERO
 var _character_sprite_rest_modulate: Color = Color.WHITE
@@ -328,6 +330,18 @@ func _input(event: InputEvent) -> void:
 		if handled:
 			get_viewport().set_input_as_handled()
 		return
+	if _movement_enabled and event is InputEventKey:
+		var key_event := event as InputEventKey
+		if key_event.pressed and not key_event.echo:
+			var direct_slot := _get_direct_weapon_slot(key_event)
+			if direct_slot >= 0:
+				select_weapon_slot(direct_slot)
+				get_viewport().set_input_as_handled()
+				return
+			if _is_starting_weapon_key(key_event):
+				select_starting_weapon()
+				get_viewport().set_input_as_handled()
+				return
 	var tab_pressed: bool = (
 		event is InputEventKey
 		and event.pressed
@@ -418,27 +432,7 @@ func _draw() -> void:
 				true
 			)
 	if realm_abilities.is_qi_shield_enabled():
-		var shield_alpha := (
-			0.82 if _shield_flash_remaining > 0.0 else 0.26
-		)
-		var shield_radius := (
-			58.0 + sin(Time.get_ticks_msec() * 0.004) * 3.0
-		)
-		draw_circle(
-			Vector2.ZERO,
-			shield_radius,
-			Color(0.2, 0.78, 1.0, shield_alpha * 0.12)
-		)
-		draw_arc(
-			Vector2.ZERO,
-			shield_radius,
-			0.0,
-			TAU,
-			64,
-			Color(0.42, 0.9, 1.0, shield_alpha),
-			4.0 if _shield_flash_remaining > 0.0 else 2.0,
-			true
-		)
+		_draw_qi_shield()
 
 	_draw_weapon_companions()
 	if _attack_flash_remaining > 0.0:
@@ -549,6 +543,119 @@ func _draw_palm_range(attack_range: float, range_color: Color) -> void:
 	)
 
 
+func _draw_qi_shield() -> void:
+	var center := Vector2(0.0, _character_sprite_rest_position.y)
+	var shield_capacity := get_qi_shield_capacity()
+	var current_qi := (
+		_cultivation_resources.current_qi
+		if _cultivation_resources != null
+		else 0
+	)
+	var required_qi := (
+		_cultivation_resources.get_current_qi_requirement()
+		if _cultivation_resources != null
+		else 1
+	)
+	var qi_ratio := clampf(
+		float(current_qi) / float(maxi(required_qi, 1)),
+		0.0,
+		1.0
+	)
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.004)
+	var shield_radius := 56.0 + pulse * 3.0
+	var has_capacity := shield_capacity > 0.0
+	var base_color := (
+		Color("62e8ff") if has_capacity else Color("7b8795")
+	)
+	draw_circle(
+		center,
+		shield_radius,
+		Color(base_color, 0.035 + qi_ratio * 0.095)
+	)
+	for segment_index in 8:
+		var segment_start := (
+			-PI * 0.5 + float(segment_index) * TAU / 8.0 + 0.05
+		)
+		var segment_end := (
+			-PI * 0.5 + float(segment_index + 1) * TAU / 8.0 - 0.05
+		)
+		var segment_filled := (
+			float(segment_index + 1) / 8.0 <= qi_ratio + 0.001
+		)
+		draw_arc(
+			center,
+			shield_radius,
+			segment_start,
+			segment_end,
+			10,
+			Color(
+				base_color,
+				0.82 if segment_filled and has_capacity else 0.18
+			),
+			4.0 if segment_filled and has_capacity else 2.0,
+			true
+		)
+	draw_arc(
+		center,
+		shield_radius - 7.0,
+		0.0,
+		TAU,
+		56,
+		Color(base_color, 0.2 if has_capacity else 0.08),
+		2.0,
+		true
+	)
+
+	var label_text := (
+		"灵盾 %.0f" % shield_capacity
+		if has_capacity
+		else "灵盾耗尽"
+	)
+	var label_width := 82.0
+	var label_position := center + Vector2(-label_width * 0.5, -78.0)
+	draw_rect(
+		Rect2(label_position, Vector2(label_width, 21.0)),
+		Color(0.015, 0.04, 0.075, 0.82),
+		true
+	)
+	draw_string(
+		ThemeDB.fallback_font,
+		label_position + Vector2(0.0, 16.0),
+		label_text,
+		HORIZONTAL_ALIGNMENT_CENTER,
+		label_width,
+		14,
+		Color(base_color, 1.0 if has_capacity else 0.72)
+	)
+
+	if _shield_flash_remaining <= 0.0:
+		return
+	var flash_ratio := clampf(_shield_flash_remaining / 0.28, 0.0, 1.0)
+	draw_arc(
+		center,
+		shield_radius + (1.0 - flash_ratio) * 22.0,
+		0.0,
+		TAU,
+		64,
+		Color(0.72, 0.98, 1.0, flash_ratio),
+		3.0 + flash_ratio * 4.0,
+		true
+	)
+	var feedback_text := "抵挡 %.0f  ·  -%d 灵气" % [
+		_last_shield_blocked_damage,
+		_last_shield_qi_spent,
+	]
+	draw_string(
+		ThemeDB.fallback_font,
+		center + Vector2(-72.0, -91.0 - (1.0 - flash_ratio) * 12.0),
+		feedback_text,
+		HORIZONTAL_ALIGNMENT_CENTER,
+		144.0,
+		14,
+		Color(0.72, 0.98, 1.0, flash_ratio)
+	)
+
+
 ## Enables or stops player locomotion and combat without resetting run state.
 func set_movement_enabled(enabled: bool) -> void:
 	_movement_enabled = enabled
@@ -608,9 +715,9 @@ func is_damage_feedback_active() -> bool:
 	return _damage_flash_remaining > 0.0
 
 
-## Adds a new weapon type or upgrades an existing type's delivery count.
-## Duplicate pickups always add one copy; their damage roll only replaces the
-## stored roll when it is stronger.
+## Adds a new weapon type or upgrades an existing type's delivery count without
+## changing the currently equipped weapon. Duplicate pickups always add one
+## copy; their damage roll only replaces the stored roll when it is stronger.
 func collect_weapon(
 	weapon_data: WeaponDataResource,
 	damage: int
@@ -624,7 +731,6 @@ func collect_weapon(
 
 	var existing_index := _find_equipment_index(weapon_data.weapon_id)
 	var equipment := _create_equipment(weapon_data, damage)
-	var may_equip := realm_abilities.is_weapon_allowed(weapon_data)
 
 	if existing_index >= 0:
 		var existing_damage := int(_equipment_inventory[existing_index]["damage"])
@@ -634,13 +740,9 @@ func collect_weapon(
 		equipment["damage"] = maxi(existing_damage, damage)
 		equipment["quantity"] = existing_quantity + 1
 		_equipment_inventory[existing_index] = equipment
-		if may_equip:
-			_current_equipment_index = existing_index
 	else:
 		_equipment_inventory.append(equipment)
-		if may_equip:
-			_current_equipment_index = _equipment_inventory.size() - 1
-	if may_equip:
+	if existing_index == _current_equipment_index:
 		_on_current_equipment_changed()
 	else:
 		_publish_equipment()
@@ -824,6 +926,42 @@ func cycle_equipment() -> void:
 		return
 
 
+## Equips one of the six collectible weapon slots in acquisition order.
+## Slot zero maps to keyboard 1; unavailable or empty slots are ignored.
+func select_weapon_slot(slot_index: int) -> bool:
+	if slot_index < 0 or slot_index >= 6:
+		return false
+	var collectible_index := 0
+	for inventory_index in _equipment_inventory.size():
+		var candidate_data := (
+			_equipment_inventory[inventory_index]["data"]
+			as WeaponDataResource
+		)
+		if candidate_data.weapon_id == starting_weapon_data.weapon_id:
+			continue
+		if collectible_index != slot_index:
+			collectible_index += 1
+			continue
+		if not realm_abilities.is_weapon_allowed(candidate_data):
+			return false
+		if _current_equipment_index != inventory_index:
+			_current_equipment_index = inventory_index
+			_on_current_equipment_changed()
+		return true
+	return false
+
+
+## Equips the initial Great Strength Palm entry. Bound to the backtick key.
+func select_starting_weapon() -> bool:
+	var starting_index := _find_equipment_index(starting_weapon_data.weapon_id)
+	if starting_index < 0:
+		return false
+	if _current_equipment_index != starting_index:
+		_current_equipment_index = starting_index
+		_on_current_equipment_changed()
+	return true
+
+
 func get_technique_name() -> String:
 	return (
 		starting_weapon_data.display_name
@@ -995,10 +1133,11 @@ func get_attraction_range() -> float:
 ## Returns lifespan-decay scaling from actual forward speed relative to normal
 ## speed. Boosting raises it, while slowing never reduces baseline decay.
 func get_lifespan_decay_multiplier() -> float:
-	return maxf(
-		current_forward_speed / maxf(base_forward_speed, 1.0),
-		1.0
-	)
+	return 1.0
+	#return maxf(
+		#current_forward_speed / maxf(base_forward_speed, 1.0),
+		#1.0
+	#)
 
 
 func get_equipment_inventory_entries() -> Array[String]:
@@ -1022,6 +1161,28 @@ func get_equipment_inventory_entries() -> Array[String]:
 			]
 		)
 	return entries
+
+
+## Returns read-only inventory snapshots for the HUD. Dictionaries preserve
+## acquisition order and never expose the mutable player-owned entries.
+func get_equipment_inventory_snapshot() -> Array[Dictionary]:
+	var snapshots: Array[Dictionary] = []
+	for index in _equipment_inventory.size():
+		var equipment := _equipment_inventory[index]
+		var weapon_data := equipment["data"] as WeaponDataResource
+		snapshots.append({
+			"data": weapon_data,
+			"inventory_index": index,
+			"quantity": int(equipment.get("quantity", 1)),
+			"damage": _get_equipment_damage(equipment),
+			"available": realm_abilities.is_weapon_allowed(weapon_data),
+		})
+	return snapshots
+
+
+## Returns the player-owned inventory index currently used for attacks.
+func get_current_equipment_index() -> int:
+	return _current_equipment_index
 
 
 ## Temporarily replaces the main-road horizontal clamp while the player is
@@ -1185,6 +1346,108 @@ func get_active_echo_count() -> int:
 
 func get_echo_cooldown_remaining() -> float:
 	return _echo_cooldown_remaining
+
+
+## Returns one presentation-neutral snapshot for the realm's Space-key ability.
+## The HUD may poll this lightweight view without owning cooldown state.
+func get_active_ability_snapshot() -> Dictionary:
+	var realm_snapshot := realm_abilities.get_debug_snapshot()
+	var realm_id := StringName(realm_snapshot.get("realm_id", &""))
+	match realm_id:
+		&"qi_refining":
+			var roll_recovery := get_roll_cooldown_remaining()
+			var roll_duration_safe := maxf(roll_cooldown, 0.01)
+			return {
+				"ability_id": &"roll",
+				"active": is_rolling(),
+				"ready": not is_rolling() and roll_recovery <= 0.0,
+				"cooldown_remaining": roll_recovery,
+				"cooldown_duration": roll_duration_safe,
+				"progress": clampf(
+					1.0 - roll_recovery / roll_duration_safe,
+					0.0,
+					1.0
+				),
+			}
+		&"foundation":
+			var flight_active := bool(
+				realm_snapshot.get("temporary_flight_active", false)
+			)
+			return {
+				"ability_id": &"temporary_flight",
+				"active": flight_active,
+				"ready": not flight_active,
+				"cooldown_remaining": 0.0,
+				"cooldown_duration": 0.0,
+				"progress": float(
+					realm_snapshot.get("temporary_flight_progress", 1.0)
+				),
+				"phase": StringName(
+					realm_snapshot.get(
+						"temporary_flight_phase",
+						&"grounded"
+					)
+				),
+			}
+		&"golden_core":
+			var echo_count := get_active_echo_count()
+			var echo_recovery := get_echo_cooldown_remaining()
+			return {
+				"ability_id": &"golden_core_echoes",
+				"active": echo_count > 0,
+				"ready": echo_count == 0 and echo_recovery <= 0.0,
+				"cooldown_remaining": echo_recovery,
+				"cooldown_duration": maxf(echo_respawn_cooldown, 0.01),
+				"progress": (
+					clampf(
+						1.0
+							- echo_recovery
+							/ maxf(echo_respawn_cooldown, 0.01),
+						0.0,
+						1.0
+					)
+					if echo_count == 0
+					else 1.0
+				),
+				"active_count": echo_count,
+			}
+		&"nascent_soul":
+			var projection_active := (
+				realm_abilities.is_spirit_projection_active()
+			)
+			return {
+				"ability_id": &"spirit_projection",
+				"active": projection_active,
+				"ready": true,
+				"cooldown_remaining": 0.0,
+				"cooldown_duration": 0.0,
+				"progress": 1.0,
+			}
+	return {
+		"ability_id": &"none",
+		"active": false,
+		"ready": false,
+		"cooldown_remaining": 0.0,
+		"cooldown_duration": 0.0,
+		"progress": 0.0,
+	}
+
+
+## Returns the current amount of lifespan damage the Qi shield can absorb.
+func get_qi_shield_capacity() -> float:
+	if (
+		not realm_abilities.is_qi_shield_enabled()
+		or _cultivation_resources == null
+	):
+		return 0.0
+	return (
+		float(_cultivation_resources.current_qi)
+		* realm_abilities.get_qi_shield_damage_per_qi()
+	)
+
+
+func is_qi_shield_feedback_active() -> bool:
+	return _shield_flash_remaining > 0.0
 
 
 ## Overall Qi cultivation continues to expand collectible attraction. The
@@ -2133,6 +2396,26 @@ func _find_equipment_index(equipment_id: StringName) -> int:
 	return -1
 
 
+func _get_direct_weapon_slot(event: InputEventKey) -> int:
+	var key_values: Array[int] = [
+		int(event.physical_keycode),
+		int(event.keycode),
+		event.unicode,
+	]
+	for key_value in key_values:
+		if key_value >= 49 and key_value <= 54:
+			return key_value - 49
+	return -1
+
+
+func _is_starting_weapon_key(event: InputEventKey) -> bool:
+	return (
+		int(event.physical_keycode) == 96
+		or int(event.keycode) == 96
+		or event.unicode == 96
+	)
+
+
 func _get_current_equipment() -> Dictionary:
 	return _equipment_inventory[_current_equipment_index]
 
@@ -2324,6 +2607,8 @@ func _on_qi_shield_absorbed(
 	remaining_damage: float
 ) -> void:
 	_shield_flash_remaining = 0.28
+	_last_shield_blocked_damage = blocked_damage
+	_last_shield_qi_spent = qi_spent
 	queue_redraw()
 	qi_shield_absorbed.emit(blocked_damage, qi_spent, remaining_damage)
 

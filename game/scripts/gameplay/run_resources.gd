@@ -75,8 +75,9 @@ const DEFAULT_REALM_PROGRESSION_CONFIG: RealmProgressionConfig = preload(
 ## Cultivation levels between realm-breakthrough opportunities. With the
 ## default nine, breakthroughs unlock at levels 10, 19, 28, and so on.
 @export_range(1, 100, 1) var breakthrough_level_interval: int = 9
-## Maximum realm breakthroughs and bounded lifespan rewards available in one
-## run. This is the shared cap used by both eligibility and reward granting.
+## Compatibility cap used by the legacy interval helpers and direct reward API.
+## Resource-driven realm transitions may repeat after demotion; their lifespan
+## growth remains bounded by maximum_lifespan_cap instead.
 @export_range(1, 20, 1) var maximum_breakthroughs: int = 3
 ## Permanent maximum-lifespan increase granted by a completed breakthrough.
 ## This additive reward avoids compounding previous realm rewards.
@@ -189,18 +190,23 @@ func restore_lifespan(amount: float) -> void:
 	lifespan_changed.emit(current_lifespan, maximum)
 
 
-## Grants one completed-tribulation reward by additively increasing maximum
-## lifespan, then restoring a configured portion of the new maximum. This
-## resource records completion and enforces the shared realm and lifespan caps.
+## Grants one legacy completed-tribulation reward by additively increasing
+## maximum lifespan, then restoring a configured portion of the new maximum.
+## Direct grants enforce maximum_breakthroughs and maximum_lifespan_cap.
 func grant_breakthrough_reward() -> void:
-	_grant_breakthrough_reward_internal()
-
-
-func _grant_breakthrough_reward_internal() -> void:
 	if (
 		not _run_active
 		or breakthroughs_completed >= maxi(maximum_breakthroughs, 1)
 	):
+		return
+	_apply_breakthrough_reward()
+
+
+## Applies one survived realm-transition reward. Resource-driven realm
+## transitions may repeat after a demotion, so their rewards are bounded by the
+## lifespan cap rather than the legacy number-of-breakthroughs compatibility cap.
+func _apply_breakthrough_reward() -> void:
+	if not _run_active:
 		return
 	breakthroughs_completed += 1
 	max_lifespan = minf(
@@ -413,7 +419,7 @@ func complete_pending_breakthrough() -> bool:
 		max_lifespan + maxf(level_up_maxHP_increase, 0.0),
 		maxf(maximum_lifespan_cap, 0.0)
 	)
-	_grant_breakthrough_reward_internal()
+	_apply_breakthrough_reward()
 	cultivation_level_changed.emit(cultivation_level)
 	_emit_realm_state()
 	breakthrough_pending_changed.emit(false, false)

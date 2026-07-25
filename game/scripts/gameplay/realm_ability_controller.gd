@@ -112,6 +112,14 @@ func is_qi_shield_enabled() -> bool:
 	return _current_realm != null and _current_realm.qi_shield_enabled
 
 
+## Returns lifespan damage absorbed by each point of Qi in the current realm.
+## Zero communicates that the shield is unavailable.
+func get_qi_shield_damage_per_qi() -> float:
+	if not is_qi_shield_enabled():
+		return 0.0
+	return maxf(_current_realm.shield_damage_per_qi, 0.01)
+
+
 ## Starts one configured ascent-hold-descent cycle when the active realm uses
 ## temporary flight. Repeated input while airborne does not reset the cycle.
 func start_temporary_flight() -> bool:
@@ -133,6 +141,35 @@ func is_temporary_flight_active() -> bool:
 
 func get_current_flight_elevation() -> float:
 	return _current_flight_elevation
+
+
+## Returns zero-to-one progress through the temporary flight cycle. Grounded
+## state is fully ready and therefore reports one.
+func get_temporary_flight_cycle_progress() -> float:
+	if (
+		_current_realm == null
+		or _current_realm.locomotion_mode
+			!= RealmDefinition.LocomotionMode.TEMPORARY_FLIGHT
+		or _temporary_flight_phase == TemporaryFlightPhase.GROUNDED
+	):
+		return 1.0
+	var ascent := maxf(
+		_current_realm.temporary_flight_ascent_duration,
+		0.01
+	)
+	var hold := maxf(_current_realm.temporary_flight_hold_duration, 0.0)
+	var descent := maxf(
+		_current_realm.temporary_flight_descent_duration,
+		0.01
+	)
+	var total := ascent + hold + descent
+	var elapsed := _temporary_flight_phase_elapsed
+	match _temporary_flight_phase:
+		TemporaryFlightPhase.HOLDING:
+			elapsed += ascent
+		TemporaryFlightPhase.DESCENDING:
+			elapsed += ascent + hold
+	return clampf(elapsed / maxf(total, 0.01), 0.0, 1.0)
 
 
 ## Returns whether an attacker from the supplied zero-based realm tier can
@@ -217,6 +254,7 @@ func get_debug_snapshot() -> Dictionary:
 			if _current_realm != null
 			else false
 		),
+		"shield_damage_per_qi": get_qi_shield_damage_per_qi(),
 		"flight_height": (
 			_current_realm.flight_height if _current_realm != null else 0.0
 		),
@@ -228,6 +266,9 @@ func get_debug_snapshot() -> Dictionary:
 		),
 		"temporary_flight_active": is_temporary_flight_active(),
 		"temporary_flight_phase": _get_temporary_flight_phase_name(),
+		"temporary_flight_progress": (
+			get_temporary_flight_cycle_progress()
+		),
 		"character_scale_multiplier": (
 			_current_realm.character_scale_multiplier
 			if _current_realm != null

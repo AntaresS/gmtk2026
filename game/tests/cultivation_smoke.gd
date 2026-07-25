@@ -283,6 +283,10 @@ func _run() -> void:
 	)
 
 	_check(player.collect_weapon(DAO_DATA, 10), "Dao could not be equipped.")
+	_check(
+		player.select_weapon_slot(0),
+		"Dao could not be selected from weapon slot 1."
+	)
 	var dao_before_level := player.get_current_weapon_combat_stats()
 	_check(
 		dao_before_level.weapon_id == DAO_DATA.weapon_id
@@ -361,6 +365,10 @@ func _run() -> void:
 		player.collect_weapon(FLYING_SWORD_DATA, 10),
 		"Flying Sword could not be equipped."
 	)
+	_check(
+		player.select_weapon_slot(1),
+		"Flying Sword could not be selected from weapon slot 2."
+	)
 	var flying_before_qi := player.get_current_weapon_combat_stats()
 	_check(
 		is_zero_approx(flying_before_qi.matching_damage_bonus)
@@ -410,6 +418,10 @@ func _run() -> void:
 	_check(
 		player.collect_weapon(QIANKUN_RING_DATA, 10),
 		"Universe Ring could not be equipped."
+	)
+	_check(
+		player.select_weapon_slot(2),
+		"Universe Ring could not be selected from weapon slot 3."
 	)
 	var ring_before_shen := player.get_current_weapon_combat_stats()
 	_check(
@@ -637,6 +649,10 @@ func _run() -> void:
 		player.collect_weapon(FLYING_SWORD_DATA, 9),
 		"Weaker duplicate Flying Sword did not add another projectile."
 	)
+	_check(
+		player.select_weapon_slot(1),
+		"Flying Sword delivery test could not select weapon slot 2."
+	)
 	var volley_target := preload(
 		"res://game/scenes/gameplay/enemy.tscn"
 	).instantiate() as EnemyController
@@ -669,6 +685,10 @@ func _run() -> void:
 	_check(
 		player.collect_weapon(QIANKUN_RING_DATA, 9),
 		"Weaker duplicate Universe Ring did not add another projectile."
+	)
+	_check(
+		player.select_weapon_slot(2),
+		"Universe Ring delivery test could not select weapon slot 3."
 	)
 	var ring_target_a := preload(
 		"res://game/scenes/gameplay/enemy.tscn"
@@ -833,6 +853,10 @@ func _run() -> void:
 		player.collect_weapon(GOLDEN_BELL_DATA, 4)
 		and player.collect_weapon(GOLDEN_BELL_DATA, 3),
 		"Golden Bell pickups did not equip and add a second layer."
+	)
+	_check(
+		player.select_weapon_slot(3),
+		"Golden Bell could not be selected from weapon slot 4."
 	)
 	var golden_bell := player.get_node("GoldenBell") as GoldenBellController
 	var bell_target := preload(
