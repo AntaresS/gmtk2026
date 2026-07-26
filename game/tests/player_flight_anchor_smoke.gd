@@ -1,6 +1,11 @@
 extends SceneTree
 
+const QI_PICKUP_SCENE := preload(
+	"res://game/scenes/gameplay/qi_pickup.tscn"
+)
+
 var _failures: Array[String] = []
+var _collected_qi_amount: int = 0
 
 
 func _initialize() -> void:
@@ -22,6 +27,10 @@ func _wait_process_frames(count: int) -> void:
 func _wait_physics_frames(count: int) -> void:
 	for _frame in count:
 		await physics_frame
+
+
+func _on_qi_collected(amount: int) -> void:
+	_collected_qi_amount += amount
 
 
 func _check_airborne_anchor(
@@ -137,6 +146,30 @@ func _run() -> void:
 		golden_core_elevation,
 		"Golden Core continuous flight"
 	)
+	var qi_pickup := QI_PICKUP_SCENE.instantiate() as QiPickup
+	game.add_child(qi_pickup)
+	qi_pickup.qi_collected.connect(_on_qi_collected)
+	qi_pickup.global_position = (
+		player.global_position + Vector2(0.0, 300.0)
+	)
+	qi_pickup.attract_to_player(player, 1000.0, 1.0)
+	_check(
+		qi_pickup.global_position.is_equal_approx(
+			player.get_reward_interaction_position()
+		)
+		and not qi_pickup.global_position.is_equal_approx(
+			player.global_position
+		),
+		"Airborne Qi attraction targeted the ground root instead of the "
+			+ "visible player."
+	)
+	await _wait_physics_frames(2)
+	_check(
+		_collected_qi_amount == qi_pickup.get_qi_value(),
+		"Qi pulled to the airborne player did not complete collection."
+	)
+	if is_instance_valid(qi_pickup):
+		qi_pickup.queue_free()
 
 	if _failures.is_empty():
 		print("PLAYER FLIGHT ANCHOR TEST PASSED")

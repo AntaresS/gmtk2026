@@ -81,6 +81,12 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 @export_range(0.5, 1.0, 0.01) var attack_interval_multiplier_per_step: float = 0.88
 ## Lower bound, in seconds, for scaled enemy melee intervals.
 @export_range(0.1, 2.0, 0.05) var minimum_enemy_attack_interval: float = 0.35
+## Lower bound, in seconds, for the complete warning-to-warning interval of
+## normal-road ranged enemies after difficulty scaling.
+@export_range(0.2, 4.0, 0.05) var minimum_enemy_ranged_attack_interval: float = 1.25
+## Lower bound, in seconds, for ranged attack intervals in Trial Hell. This
+## independently bounds its attack-frequency multiplier.
+@export_range(0.2, 4.0, 0.05) var trial_minimum_enemy_ranged_attack_interval: float = 1.0
 ## Additional simultaneous enemy slots unlocked per difficulty step.
 @export_range(0, 5, 1) var max_enemies_increase_per_step: int = 1
 ## Hard safety cap for the time-and-level-scaled simultaneous enemy count.
@@ -167,8 +173,38 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 @export_range(0.0, 1.0, 0.01) var healer_spawn_chance: float = 0.10
 ## Flying-variant chance after its realm/layer threshold is unlocked.
 @export_range(0.0, 1.0, 0.01) var flying_spawn_chance: float = 0.38
-## Ranged flying-variant chance from Golden Core layer one onward.
-@export_range(0.0, 1.0, 0.01) var ranged_flying_spawn_chance: float = 0.34
+## Ranged flying chance at Golden Core layer one. It ramps toward
+## ranged_flying_spawn_chance over the rest of Golden Core.
+@export_range(0.0, 1.0, 0.01) var initial_ranged_flying_spawn_chance: float = 0.12
+## Ranged flying chance reached at Golden Core layer nine.
+@export_range(0.0, 1.0, 0.01) var ranged_flying_spawn_chance: float = 0.22
+## Ranged flying chance from Nascent Soul layer one onward.
+@export_range(0.0, 1.0, 0.01) var nascent_ranged_flying_spawn_chance: float = 0.30
+## Overall cultivation level that first unlocks ranged flying enemies.
+@export_range(1, 100, 1) var ranged_unlock_cultivation_level: int = 19
+## Overall cultivation level that switches from the introductory to the
+## established Golden Core active-ranged cap.
+@export_range(1, 100, 1) var ranged_cap_increase_cultivation_level: int = 22
+## Overall cultivation level that begins Nascent Soul ranged tuning.
+@export_range(1, 100, 1) var nascent_ranged_cultivation_level: int = 28
+## Maximum active ranged enemies during introductory Golden Core layers.
+@export_range(1, 12, 1) var golden_initial_ranged_enemy_cap: int = 1
+## Maximum active ranged enemies during established Golden Core layers.
+@export_range(1, 12, 1) var golden_late_ranged_enemy_cap: int = 2
+## Maximum active ranged enemies from Nascent Soul onward.
+@export_range(1, 12, 1) var nascent_ranged_enemy_cap: int = 3
+## Extra active ranged enemies allowed while Trial Hell is active.
+@export_range(0, 8, 1) var trial_ranged_enemy_cap_bonus: int = 1
+## Maximum simultaneous high-salience ranged wind-ups on normal roads.
+@export_range(1, 8, 1) var ranged_windup_cap: int = 1
+## Maximum simultaneous high-salience ranged wind-ups in Trial Hell.
+@export_range(1, 8, 1) var trial_ranged_windup_cap: int = 2
+## Overall cultivation level that unlocks slow autonomous movement for eligible
+## flying elites.
+@export_range(1, 100, 1) var slow_autonomous_unlock_cultivation_level: int = 23
+## Overall cultivation level that unlocks fast autonomous movement for eligible
+## flying enemies.
+@export_range(1, 100, 1) var fast_autonomous_unlock_cultivation_level: int = 28
 ## Slow lateral speed granted to flying elites from Golden Core layer five.
 @export_range(0.0, 500.0, 5.0) var slow_autonomous_speed: float = 80.0
 ## Fast lateral speed available to all flying enemies from Nascent Soul one.
@@ -272,6 +308,7 @@ var _fragment_reward_elite_spawned: bool = false
 var _elite_spawn_time_remaining: float = 0.0
 var _forward_elite_road_band: int = -1
 var _rear_elite_road_band: int = -1
+var _active_ranged_attackers: Dictionary = {}
 
 
 func _ready() -> void:
@@ -283,6 +320,7 @@ func _ready() -> void:
 	_elite_spawn_time_remaining = 0.0
 	_forward_elite_road_band = -1
 	_rear_elite_road_band = -1
+	_active_ranged_attackers.clear()
 	_spawn_time_remaining = maxf(initial_spawn_delay, 0.0)
 	_rear_spawn_time_remaining = maxf(rear_initial_spawn_delay, 0.0)
 
@@ -394,6 +432,11 @@ func get_debug_snapshot() -> Dictionary:
 		"active_enemies": get_active_enemy_count(),
 		"maximum_enemies": get_current_max_active_enemies(),
 		"active_elites": get_active_elite_count(),
+		"active_ranged_enemies": get_active_ranged_enemy_count(),
+		"ranged_enemy_cap": get_current_ranged_enemy_cap(),
+		"ranged_spawn_chance": get_current_ranged_flying_spawn_chance(),
+		"active_ranged_windups": get_active_ranged_windup_count(),
+		"ranged_windup_cap": get_current_ranged_windup_cap(),
 		"elite_spawn_chance": get_current_elite_spawn_chance(),
 		"elite_spawn_cooldown": _elite_spawn_time_remaining,
 		"forward_elite_cap": get_current_elite_cap(
@@ -415,6 +458,128 @@ func get_time_difficulty_step() -> int:
 	return floori(
 		_elapsed_run_time / maxf(difficulty_step_seconds, 1.0)
 	)
+
+
+## Returns the current progression-ramped chance for an eligible enemy to use
+## the ranged package. Active population caps are checked separately.
+func get_current_ranged_flying_spawn_chance() -> float:
+	var unlock_level := maxi(ranged_unlock_cultivation_level, 1)
+	if _cultivation_level < unlock_level:
+		return 0.0
+	var nascent_level := maxi(
+		nascent_ranged_cultivation_level,
+		unlock_level + 1
+	)
+	if _cultivation_level >= nascent_level:
+		return clampf(nascent_ranged_flying_spawn_chance, 0.0, 1.0)
+	var golden_end_level := nascent_level - 1
+	var progress := clampf(
+		float(_cultivation_level - unlock_level)
+			/ float(maxi(golden_end_level - unlock_level, 1)),
+		0.0,
+		1.0
+	)
+	return lerpf(
+		clampf(initial_ranged_flying_spawn_chance, 0.0, 1.0),
+		clampf(ranged_flying_spawn_chance, 0.0, 1.0),
+		progress
+	)
+
+
+## Returns the current active-ranged population cap before a new variant is
+## admitted. Trial Hell adds its explicit designer-tunable bonus.
+func get_current_ranged_enemy_cap() -> int:
+	if _cultivation_level < maxi(ranged_unlock_cultivation_level, 1):
+		return 0
+	var cap := golden_initial_ranged_enemy_cap
+	if _cultivation_level >= maxi(nascent_ranged_cultivation_level, 1):
+		cap = nascent_ranged_enemy_cap
+	elif _cultivation_level >= maxi(
+		ranged_cap_increase_cultivation_level,
+		ranged_unlock_cultivation_level
+	):
+		cap = golden_late_ranged_enemy_cap
+	if _trial_hell_active:
+		cap += maxi(trial_ranged_enemy_cap_bonus, 0)
+	return maxi(cap, 1)
+
+
+## Counts living ranged enemies across the active scene tree.
+func get_active_ranged_enemy_count() -> int:
+	var active_ranged := 0
+	for enemy_node in get_tree().get_nodes_in_group("enemies"):
+		if (
+			enemy_node is EnemyController
+			and (enemy_node as EnemyController).is_combat_active()
+			and (enemy_node as EnemyController).uses_ranged_attack
+		):
+			active_ranged += 1
+	return active_ranged
+
+
+func _can_add_ranged_enemy() -> bool:
+	return (
+		get_current_ranged_enemy_cap() > 0
+		and get_active_ranged_enemy_count() < get_current_ranged_enemy_cap()
+	)
+
+
+## Returns the warning-admission cap for the active route.
+func get_current_ranged_windup_cap() -> int:
+	return maxi(
+		trial_ranged_windup_cap if _trial_hell_active else ranged_windup_cap,
+		1
+	)
+
+
+## Returns the number of ranged enemies currently holding a warning slot.
+func get_active_ranged_windup_count() -> int:
+	_prune_ranged_attackers()
+	return _active_ranged_attackers.size()
+
+
+## Grants one ranged warning slot when the active route has presentation room.
+func try_acquire_ranged_attack_slot(enemy: EnemyController) -> bool:
+	_prune_ranged_attackers()
+	if not is_instance_valid(enemy) or not enemy.is_combat_active():
+		return false
+	var enemy_id := enemy.get_instance_id()
+	if _active_ranged_attackers.has(enemy_id):
+		return true
+	if _active_ranged_attackers.size() >= get_current_ranged_windup_cap():
+		return false
+	_active_ranged_attackers[enemy_id] = weakref(enemy)
+	return true
+
+
+## Releases a warning slot after attack completion, cancellation, or removal.
+func release_ranged_attack_slot(enemy: EnemyController) -> void:
+	if not is_instance_valid(enemy):
+		_prune_ranged_attackers()
+		return
+	_active_ranged_attackers.erase(enemy.get_instance_id())
+
+
+func _prune_ranged_attackers() -> void:
+	var stale_ids: Array[int] = []
+	for enemy_id_variant in _active_ranged_attackers:
+		var enemy_id := int(enemy_id_variant)
+		var enemy_reference := (
+			_active_ranged_attackers[enemy_id] as WeakRef
+		)
+		var enemy := (
+			enemy_reference.get_ref() as EnemyController
+			if enemy_reference != null
+			else null
+		)
+		if (
+			not is_instance_valid(enemy)
+			or not enemy.is_combat_active()
+			or not enemy.is_attack_winding_up()
+		):
+			stale_ids.append(enemy_id)
+	for stale_id in stale_ids:
+		_active_ranged_attackers.erase(stale_id)
 
 
 ## Returns combined time and cultivation difficulty intervals.
@@ -635,6 +800,10 @@ func _spawn_enemy(
 		push_error("EnemySpawner enemy_scene must instantiate EnemyController.")
 		return
 	enemy.player = player
+	enemy.configure_ranged_attack_slots(
+		Callable(self, "try_acquire_ranged_attack_slot"),
+		Callable(self, "release_ranged_attack_slot")
+	)
 	_apply_current_difficulty(enemy)
 	var has_forced_elite_reward := (
 		forced_elite_reward_type == EnemyController.EliteRewardType.WEAPON
@@ -733,22 +902,30 @@ func _configure_enemy_variant(enemy: EnemyController, elite: bool) -> void:
 	if enemy.archetype == EnemyController.EnemyArchetype.HEALER:
 		return
 
-	if (
-		_cultivation_level >= 28
+	var use_fast_autonomous := (
+		_cultivation_level >= fast_autonomous_unlock_cultivation_level
 		and _rng.randf() <= fast_autonomous_spawn_chance
-	):
-		enemy.configure_flying(3, true, fast_autonomous_speed)
-	elif (
-		elite
-		and _cultivation_level >= 23
+	)
+	var use_slow_autonomous := (
+		not use_fast_autonomous
+		and elite
+		and _cultivation_level >= slow_autonomous_unlock_cultivation_level
 		and _rng.randf() <= slow_autonomous_spawn_chance
-	):
-		enemy.configure_flying(2, true, slow_autonomous_speed)
-	elif (
-		_cultivation_level >= 19
-		and _rng.randf() <= ranged_flying_spawn_chance
-	):
-		enemy.configure_flying(2, true, 0.0)
+	)
+	var use_ranged_attack := (
+		_can_add_ranged_enemy()
+		and _rng.randf() <= get_current_ranged_flying_spawn_chance()
+	)
+	if use_fast_autonomous:
+		enemy.configure_flying(3, use_ranged_attack, fast_autonomous_speed)
+	elif use_slow_autonomous:
+		enemy.configure_flying(2, use_ranged_attack, slow_autonomous_speed)
+	elif use_ranged_attack:
+		enemy.configure_flying(
+			3 if _cultivation_level >= nascent_ranged_cultivation_level else 2,
+			true,
+			0.0
+		)
 	elif (
 		(
 			not elite and _cultivation_level >= 12
@@ -765,17 +942,21 @@ func _apply_current_difficulty(enemy: EnemyController) -> void:
 	enemy.melee_damage += (
 		float(difficulty_step) * maxf(damage_increase_per_step, 0.0)
 	)
+	var attack_interval_scale := pow(
+		clampf(
+			attack_interval_multiplier_per_step,
+			0.01,
+			1.0
+		),
+		float(difficulty_step)
+	)
 	enemy.melee_attack_interval = maxf(
-		enemy.melee_attack_interval
-			* pow(
-				clampf(
-					attack_interval_multiplier_per_step,
-					0.01,
-					1.0
-				),
-				float(difficulty_step)
-			),
+		enemy.melee_attack_interval * attack_interval_scale,
 		minimum_enemy_attack_interval
+	)
+	enemy.ranged_attack_interval = maxf(
+		enemy.ranged_attack_interval * attack_interval_scale,
+		minimum_enemy_ranged_attack_interval
 	)
 	if _trial_hell_active:
 		enemy.max_health = maxi(
@@ -789,6 +970,11 @@ func _apply_current_difficulty(enemy: EnemyController) -> void:
 			enemy.melee_attack_interval
 				* trial_attack_interval_multiplier,
 			minimum_enemy_attack_interval * 0.75
+		)
+		enemy.ranged_attack_interval = maxf(
+			enemy.ranged_attack_interval
+				* trial_attack_interval_multiplier,
+			trial_minimum_enemy_ranged_attack_interval
 		)
 
 

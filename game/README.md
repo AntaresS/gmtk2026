@@ -214,14 +214,18 @@ HUD 侧边栏已经从旧精气神显示改为上述碎片系统，会显示持�
 | --- | --- |
 | 筑基 3 | 概率出现带翅膀的飞行普通近战敌人 |
 | 筑基 5 | 概率出现带翅膀的飞行精英敌人 |
-| 金丹 1 | 出现可远程攻击的飞行普通敌人和精英敌人 |
+| 金丹 1 | 开始少量出现可远程攻击的飞行普通敌人和精英敌人 |
 | 金丹 5 | 出现可慢速自主横移的飞行精英敌人 |
 | 元婴 1 | 出现可高速自主位移的飞行普通敌人和精英敌人 |
 
 当前基础概率配置：
 
 - 飞行变体概率约 38%。
-- 飞行敌人转为远程攻击的概率约 34%。
+- 远程飞行敌人概率从金丹 1 的约 12% 平滑增长到金丹 9 的约 22%，
+  元婴后约为 30%。
+- 金丹前期、金丹后期、元婴的场上远程敌人上限分别为 1、2、3；
+  试炼地狱额外允许 1 个。
+- 普通道路同一时间只允许 1 个远程敌人蓄力，试炼地狱允许 2 个。
 - 金丹 5 后精英获得慢速自主位移的概率约 55%，自主速度约 80。
 - 元婴 1 后飞行敌人获得高速自主位移的概率约 72%，自主速度约 220。
 
@@ -230,7 +234,8 @@ HUD 侧边栏已经从旧精气神显示改为上述碎片系统，会显示持�
 - 自爆怪：普通敌人变体，基础出现概率约 12%，生命值与普通敌人相同；会轻微横向追踪玩家，并在接近目标后造成范围自爆。
 - 治疗怪：仅作为普通地面变体出现，概率约 10%，会周期性治疗周围敌人；不会成为精英或飞行单位。
 - 飞行怪：拥有翅膀、独立空中高度和更高渲染表现。
-- 远程飞行怪：在攻击范围内蓄力并进行远程打击。
+- 远程飞行怪：基础攻击范围约 180；蓄力时使用敌人到目标的细连线和
+  玩家身边的小型准星，不再持续绘制覆盖道路的大范围圆。
 - 自主位移怪：除了追踪目标之外，还会横向游走和主动变向。
 
 ### 道路约束与掉落
@@ -329,7 +334,7 @@ HUD 侧边栏已经从旧精气神显示改为上述碎片系统，会显示持�
 
 ## 自动化验证
 
-项目内现有五组无界面验证脚本：
+项目内现有无界面验证脚本包括：
 
 - `tests/foundation_smoke.gd`
 - `tests/gameplay_loop_smoke.gd`
@@ -337,6 +342,7 @@ HUD 侧边栏已经从旧精气神显示改为上述碎片系统，会显示持�
 - `tests/latest_weapon_design_smoke.gd`
 - `tests/realm_variants_debug_smoke.gd`
 - `tests/bomber_behavior_smoke.gd`
+- `tests/ranged_enemy_readability_smoke.gd`
 
 在 `game` 目录中可以使用 Godot 4.7 逐项运行：
 
@@ -347,6 +353,7 @@ godot --headless --path . --script res://tests/cultivation_smoke.gd --log-file .
 godot --headless --path . --script res://tests/latest_weapon_design_smoke.gd --log-file .godot/latest-weapon-design-smoke.log
 godot --headless --path . --script res://tests/realm_variants_debug_smoke.gd --log-file .godot/realm-variants-debug-smoke.log
 godot --headless --path . --script res://tests/bomber_behavior_smoke.gd --log-file .godot/bomber-behavior-smoke.log
+godot --headless --path . --script res://tests/ranged_enemy_readability_smoke.gd --log-file .godot/ranged-enemy-readability-smoke.log
 ```
 
 Windows 下运行无界面测试时，应给每项测试设置独立日志文件和外部超时，避免多个 Godot 进程竞争同一个用户日志；如果测试超时，应先终止该次新启动的无界面进程再继续下一项，不要关闭正在使用的编辑器。

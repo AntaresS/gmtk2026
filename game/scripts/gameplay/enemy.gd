@@ -140,7 +140,21 @@ const FANTIAN_ROOT_RELEASE_DURATION: float = 0.18
 ## Whether this flying enemy attacks at range instead of contact distance.
 @export var uses_ranged_attack: bool = false
 ## Ranged attack radius in world pixels.
-@export_range(80.0, 800.0, 5.0) var ranged_attack_range: float = 260.0
+@export_range(80.0, 800.0, 5.0) var ranged_attack_range: float = 180.0
+## Seconds from one ranged strike to the next, including its warning. The
+## spawner scales this value but enforces a separate ranged minimum.
+@export_range(0.2, 8.0, 0.05) var ranged_attack_interval: float = 1.6
+## Warning time in seconds before a ranged strike resolves against its tracked
+## target. Longer values give a base-speed player more time to evade.
+@export_range(0.2, 3.0, 0.05) var ranged_windup_duration: float = 0.85
+## Portion of the difficulty-scaled melee damage dealt by a ranged strike.
+## Keeping this below one compensates for attacking outside close mitigation.
+@export_range(0.0, 2.0, 0.05) var ranged_damage_multiplier: float = 0.70
+## Radius in world pixels of the compact target reticle shown during a ranged
+## wind-up. This does not change hit detection or attack range.
+@export_range(20.0, 120.0, 1.0) var ranged_target_reticle_radius: float = 52.0
+## Width in world pixels of the ranged enemy-to-target warning tether.
+@export_range(1.0, 8.0, 0.5) var ranged_tether_width: float = 2.0
 ## Lateral autonomous movement speed in pixels per second. Zero stays straight.
 @export_range(0.0, 800.0, 5.0) var autonomous_lateral_speed: float = 0.0
 ## Seconds between left-right autonomous direction changes.
@@ -209,6 +223,9 @@ var _fantian_seal_root_flash_remaining: float = 0.0
 var _fantian_seal_root_release_remaining: float = 0.0
 var _last_fantian_seal_root_volley_id: int = -1
 var _temporary_health_readout_remaining: float = 0.0
+var _ranged_attack_slot_request: Callable
+var _ranged_attack_slot_release: Callable
+var _holds_ranged_attack_slot: bool = false
 
 
 func _ready() -> void:
@@ -227,6 +244,10 @@ func _ready() -> void:
 	_configure_sprite_animation()
 	_configure_melee_weapon()
 	queue_redraw()
+
+
+func _exit_tree() -> void:
+	_release_ranged_attack_slot()
 
 
 func _physics_process(delta: float) -> void:
@@ -870,12 +891,14 @@ func _update_melee_attack(
 		distance_to_target <= _get_attack_range()
 		and _melee_cooldown_remaining <= 0.0
 	):
+		if uses_ranged_attack and not _try_acquire_ranged_attack_slot():
+			return
 		_begin_melee_attack()
 
 
 func _begin_melee_attack() -> void:
 	_is_attack_winding_up = true
-	_attack_windup_remaining = maxf(melee_windup_duration, 0.2)
+	_attack_windup_remaining = _get_windup_duration()
 	var target := _get_combat_target()
 	if is_instance_valid(target):
 		_attack_direction = global_position.direction_to(
@@ -907,13 +930,15 @@ func _finish_melee_attack(distance_to_target: float, target: Node2D) -> void:
 		_melee_weapon_return_remaining = MELEE_WEAPON_RETURN_DURATION
 	_is_attack_winding_up = false
 	_attack_windup_remaining = 0.0
+	_release_ranged_attack_slot()
 	attack_warning_label.hide()
 	_attack_flash_remaining = ATTACK_FLASH_DURATION
 	if distance_to_target <= _get_attack_range() and is_instance_valid(target):
+		var attack_damage := _get_attack_damage()
 		if target.has_method("take_enemy_damage"):
-			target.call("take_enemy_damage", melee_damage, self)
+			target.call("take_enemy_damage", attack_damage, self)
 		elif target is PlayerController:
-			(target as PlayerController).take_melee_damage(melee_damage, self)
+			(target as PlayerController).take_melee_damage(attack_damage, self)
 	_melee_cooldown_remaining = _get_recovery_duration()
 	_update_sprite_feedback()
 	queue_redraw()
@@ -935,6 +960,9 @@ func _update_attack_warning_label() -> void:
 
 
 func _draw_threat_indicator() -> void:
+	if uses_ranged_attack:
+		_draw_ranged_attack_indicator()
+		return
 	if _uses_melee_weapon():
 		return
 	var visibility := _get_threat_indicator_visibility()
@@ -1007,12 +1035,96 @@ func _draw_threat_indicator() -> void:
 	)
 
 
+func _draw_ranged_attack_indicator() -> void:
+	if not _is_attack_winding_up:
+		return
+	var target := _get_combat_target()
+	if not is_instance_valid(target):
+		return
+	var world_scale_x := maxf(absf(global_transform.get_scale().x), 0.01)
+	var target_position := to_local(_get_target_combat_position(target))
+	var reticle_radius := (
+		maxf(ranged_target_reticle_radius, 1.0) / world_scale_x
+	)
+	var tether_width := maxf(ranged_tether_width, 1.0) / world_scale_x
+	var progress := get_attack_windup_progress()
+	var target_in_range := (
+		global_position.distance_to(_get_target_combat_position(target))
+			<= _get_attack_range()
+	)
+	var warning_color := (
+		Color(1.0, lerpf(0.72, 0.18, progress), 0.08, 0.72)
+		if target_in_range
+		else Color(0.42, 0.78, 0.92, 0.46)
+	)
+	var target_direction := target_position.normalized()
+	var tether_start := target_direction * (30.0 / world_scale_x)
+	var tether_end := target_position - target_direction * reticle_radius
+	draw_dashed_line(
+		tether_start,
+		tether_end,
+		warning_color,
+		tether_width,
+		10.0 / world_scale_x,
+		true
+	)
+	draw_arc(
+		target_position,
+		reticle_radius,
+		0.0,
+		TAU,
+		40,
+		Color(warning_color, 0.82),
+		2.5 / world_scale_x,
+		true
+	)
+	draw_arc(
+		target_position,
+		reticle_radius + 5.0 / world_scale_x,
+		-PI * 0.5,
+		-PI * 0.5 + TAU * progress,
+		40,
+		Color(1.0, 0.86, 0.2, 0.95 if target_in_range else 0.42),
+		4.0 / world_scale_x,
+		true
+	)
+	draw_arc(
+		target_position,
+		lerpf(reticle_radius * 1.35, reticle_radius * 0.35, progress),
+		0.0,
+		TAU,
+		32,
+		Color(1.0, 0.94, 0.56, 0.78 if target_in_range else 0.36),
+		2.0 / world_scale_x,
+		true
+	)
+
+
 func _get_recovery_duration() -> float:
 	return maxf(
-		maxf(melee_attack_interval, 0.1)
-			- maxf(melee_windup_duration, 0.2),
+		_get_attack_interval() - _get_windup_duration(),
 		0.1
 	)
+
+
+func _get_attack_interval() -> float:
+	return maxf(
+		ranged_attack_interval if uses_ranged_attack else melee_attack_interval,
+		0.1
+	)
+
+
+func _get_windup_duration() -> float:
+	return maxf(
+		ranged_windup_duration if uses_ranged_attack else melee_windup_duration,
+		0.2
+	)
+
+
+func _get_attack_damage() -> float:
+	if uses_ranged_attack:
+		return melee_damage * maxf(ranged_damage_multiplier, 0.0)
+	return melee_damage
 
 
 func _get_local_melee_range() -> float:
@@ -1142,6 +1254,7 @@ func _explode(_trigger_target: Node2D) -> void:
 
 func _begin_dissolve_disappearance(delay: float = 0.0) -> void:
 	_is_attack_winding_up = false
+	_release_ranged_attack_slot()
 	attack_warning_label.hide()
 	elite_label.hide()
 	melee_weapon.set_process(false)
@@ -1297,6 +1410,7 @@ func configure_flying(
 	lateral_speed_value: float
 ) -> void:
 	if archetype == EnemyArchetype.HEALER:
+		_release_ranged_attack_slot()
 		is_flying = false
 		uses_ranged_attack = false
 		autonomous_lateral_speed = 0.0
@@ -1309,6 +1423,8 @@ func configure_flying(
 		return
 	is_flying = true
 	combat_realm_index = maxi(enemy_realm_index, 1)
+	if not ranged:
+		_release_ranged_attack_slot()
 	uses_ranged_attack = ranged
 	autonomous_lateral_speed = maxf(lateral_speed_value, 0.0)
 	if is_node_ready():
@@ -1339,9 +1455,12 @@ func configure_archetype(new_archetype: EnemyArchetype) -> void:
 		queue_redraw()
 
 
-## Returns whether the player is close enough to see this enemy's exact melee
-## threat boundary.
+## Returns whether this enemy currently exposes a high-salience threat warning.
+## Melee variants use proximity; ranged variants only warn during an admitted
+## wind-up so their passive detection radius never becomes screen clutter.
 func is_threat_indicator_visible() -> bool:
+	if uses_ranged_attack:
+		return _combat_active and _is_attack_winding_up
 	return _combat_active and _get_threat_indicator_visibility() > 0.0
 
 
@@ -1356,10 +1475,40 @@ func get_attack_windup_progress() -> float:
 	if not _is_attack_winding_up:
 		return 0.0
 	return 1.0 - clampf(
-		_attack_windup_remaining / maxf(melee_windup_duration, 0.2),
+		_attack_windup_remaining / _get_windup_duration(),
 		0.0,
 		1.0
 	)
+
+
+## Supplies the EnemySpawner-owned admission callbacks that bound simultaneous
+## high-salience ranged warnings without moving attack state out of this enemy.
+func configure_ranged_attack_slots(
+	request_slot: Callable,
+	release_slot: Callable
+) -> void:
+	_release_ranged_attack_slot()
+	_ranged_attack_slot_request = request_slot
+	_ranged_attack_slot_release = release_slot
+
+
+func _try_acquire_ranged_attack_slot() -> bool:
+	if not uses_ranged_attack or _holds_ranged_attack_slot:
+		return true
+	if not _ranged_attack_slot_request.is_valid():
+		return true
+	_holds_ranged_attack_slot = bool(
+		_ranged_attack_slot_request.call(self)
+	)
+	return _holds_ranged_attack_slot
+
+
+func _release_ranged_attack_slot() -> void:
+	if not _holds_ranged_attack_slot:
+		return
+	_holds_ranged_attack_slot = false
+	if _ranged_attack_slot_release.is_valid():
+		_ranged_attack_slot_release.call(self)
 
 
 ## Keeps this enemy inside a dynamic road whose width is sampled at the
@@ -1796,6 +1945,7 @@ func is_combat_active() -> bool:
 func set_combat_enabled(enabled: bool) -> void:
 	_combat_active = enabled and current_health > 0
 	if not _combat_active:
+		_release_ranged_attack_slot()
 		velocity = Vector2.ZERO
 		_clear_fantian_seal_root_state()
 		_is_attack_winding_up = false

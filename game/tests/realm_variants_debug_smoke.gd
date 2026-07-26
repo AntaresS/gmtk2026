@@ -85,7 +85,9 @@ func _run() -> void:
 	var spawner := EnemySpawner.new()
 	spawner.player = player
 	spawner.flying_spawn_chance = 1.0
+	spawner.initial_ranged_flying_spawn_chance = 1.0
 	spawner.ranged_flying_spawn_chance = 1.0
+	spawner.nascent_ranged_flying_spawn_chance = 1.0
 	spawner.slow_autonomous_spawn_chance = 1.0
 	spawner.fast_autonomous_spawn_chance = 1.0
 	spawner.bomber_spawn_chance = 0.0

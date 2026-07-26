@@ -70,7 +70,7 @@ func attract_to_player(
 	if _collected or not is_instance_valid(player):
 		return
 	global_position = global_position.move_toward(
-		player.global_position,
+		player.get_reward_interaction_position(),
 		maxf(speed, 1.0) * delta
 	)
 
