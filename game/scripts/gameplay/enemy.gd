@@ -2,6 +2,9 @@ class_name EnemyController
 extends CharacterBody2D
 
 signal defeated(drop_position: Vector2, inherited_velocity: Vector2)
+## Reports actual health removed by one player-owned attack. `source_id` is the
+## stable WeaponData identifier, allowing run summaries to rank weapon damage.
+signal damage_recorded(source_id: StringName, amount: int)
 
 enum EnemyArchetype {
 	MELEE,
@@ -85,6 +88,10 @@ const BOMBER_WARNING_OUTLINE_COLOR: Color = Color("ff2020")
 const HEALING_PULSE_DURATION: float = 0.9
 const HEALING_PULSE_EXPANSION_FRACTION: float = 0.72
 const HEALING_PULSE_MINIMUM_RADIUS: float = 14.0
+const HEALING_ICON_COUNT: int = 7
+const HEALING_ICON_STAGGER: float = 0.045
+const HEALING_ICON_FLOAT_DURATION: float = 0.68
+const HEALING_ICON_FLOAT_DISTANCE: float = 46.0
 const MELEE_WEAPON_TIP_OFFSET_PIXELS: float = 720.0
 const MELEE_WEAPON_SCALE: float = 0.04
 const MELEE_WEAPON_SUMMON_DURATION: float = 0.2
@@ -106,7 +113,8 @@ const RANGED_WEAPON_LAUNCH_HIDE_DURATION: float = 0.12
 const RANGED_FULL_CHARGE_HOLD_DURATION: float = 0.1
 const RANGED_WEAPON_OUTLINE_COLOR: Color = Color("d873ff")
 const RANGED_WEAPON_GLOW_COLOR: Color = Color("a43cff")
-const RANGED_AIM_LINE_COLOR: Color = Color("c55cff")
+const RANGED_AIM_LINE_NORMAL_COLOR: Color = Color("d7b8ff")
+const RANGED_AIM_LINE_ELITE_COLOR: Color = Color("ff2738")
 const RANGED_AIM_LINE_MINIMUM_FILL: float = 0.035
 const DEATH_DISSOLVE_DURATION: float = 0.48
 const IMMOBILIZED_STATUS_PULSE_SPEED: float = 15.0
@@ -172,11 +180,6 @@ const FANTIAN_ROOT_RELEASE_DURATION: float = 0.18
 ## Portion of the difficulty-scaled melee damage dealt by a ranged strike.
 ## Keeping this below one compensates for attacking outside close mitigation.
 @export_range(0.0, 2.0, 0.05) var ranged_damage_multiplier: float = 0.70
-## Radius in world pixels of the compact target reticle shown during a ranged
-## wind-up. This does not change hit detection or attack range.
-@export_range(20.0, 120.0, 1.0) var ranged_target_reticle_radius: float = 52.0
-## Width in world pixels of the ranged enemy-to-target warning tether.
-@export_range(1.0, 8.0, 0.5) var ranged_tether_width: float = 2.0
 ## Lateral autonomous movement speed in pixels per second. Zero stays straight.
 @export_range(0.0, 800.0, 5.0) var autonomous_lateral_speed: float = 0.0
 ## Seconds between left-right autonomous direction changes.
@@ -231,6 +234,7 @@ var _autonomous_time_remaining: float = 0.0
 var _autonomous_direction: float = 1.0
 var _healing_time_remaining: float = 0.0
 var _healing_pulse_remaining: float = 0.0
+var _healing_icon_rng := RandomNumberGenerator.new()
 var _melee_weapon_visibility: float = 0.0
 var _melee_weapon_attack_start_rotation: float = 0.0
 var _melee_weapon_return_remaining: float = 0.0
@@ -255,6 +259,7 @@ var _holds_ranged_attack_slot: bool = false
 
 func _ready() -> void:
 	add_to_group("enemies")
+	LanguageManager.language_changed.connect(_on_language_changed)
 	if _ordinary_health_equivalent <= 0:
 		_ordinary_health_equivalent = maxi(max_health, 1)
 	current_health = maxi(max_health, 1)
@@ -265,6 +270,7 @@ func _ready() -> void:
 	_melee_cooldown_remaining = _get_recovery_duration()
 	_autonomous_time_remaining = maxf(autonomous_turn_interval, 0.2)
 	_healing_time_remaining = maxf(healing_interval, 0.2)
+	_healing_icon_rng.randomize()
 	z_index = 12 if is_flying else 4
 	_configure_sprite_animation()
 	_configure_melee_weapon()
@@ -1218,24 +1224,28 @@ func _draw_ranged_aim_line() -> void:
 		get_ranged_aim_fill(),
 		RANGED_AIM_LINE_MINIMUM_FILL
 	)
+	var aim_color := get_ranged_aim_line_color()
+	var highlight_color := (
+		Color("ffd1d5") if is_elite else Color("f2e7ff")
+	)
 	draw_line(
 		start,
 		finish,
-		Color(RANGED_AIM_LINE_COLOR, 0.14),
+		Color(aim_color, 0.14),
 		2.0,
 		true
 	)
 	draw_line(
 		start,
 		start + aim_vector * fill,
-		Color(RANGED_AIM_LINE_COLOR, lerpf(0.48, 0.92, fill)),
+		Color(aim_color, lerpf(0.52, 1.0, fill)),
 		3.0,
 		true
 	)
 	draw_line(
 		start,
 		start + aim_vector * fill,
-		Color(1.0, 0.78, 1.0, lerpf(0.24, 0.72, fill)),
+		Color(highlight_color, lerpf(0.20, 0.62, fill)),
 		1.0,
 		true
 	)
@@ -1243,7 +1253,6 @@ func _draw_ranged_aim_line() -> void:
 
 func _draw_threat_indicator() -> void:
 	if uses_ranged_attack:
-		_draw_ranged_attack_indicator()
 		return
 	if _uses_melee_weapon():
 		return
@@ -1313,71 +1322,6 @@ func _draw_threat_indicator() -> void:
 		40,
 		Color(1.0, 0.92, 0.5, 0.85),
 		3.0,
-		true
-	)
-
-
-func _draw_ranged_attack_indicator() -> void:
-	if not _is_attack_winding_up:
-		return
-	var target := _get_combat_target()
-	if not is_instance_valid(target):
-		return
-	var world_scale_x := maxf(absf(global_transform.get_scale().x), 0.01)
-	var target_position := to_local(_get_target_combat_position(target))
-	var reticle_radius := (
-		maxf(ranged_target_reticle_radius, 1.0) / world_scale_x
-	)
-	var tether_width := maxf(ranged_tether_width, 1.0) / world_scale_x
-	var progress := get_attack_windup_progress()
-	var target_in_range := (
-		global_position.distance_to(_get_target_combat_position(target))
-			<= _get_attack_range()
-	)
-	var warning_color := (
-		Color(1.0, lerpf(0.72, 0.18, progress), 0.08, 0.72)
-		if target_in_range
-		else Color(0.42, 0.78, 0.92, 0.46)
-	)
-	var target_direction := target_position.normalized()
-	var tether_start := target_direction * (30.0 / world_scale_x)
-	var tether_end := target_position - target_direction * reticle_radius
-	draw_dashed_line(
-		tether_start,
-		tether_end,
-		warning_color,
-		tether_width,
-		10.0 / world_scale_x,
-		true
-	)
-	draw_arc(
-		target_position,
-		reticle_radius,
-		0.0,
-		TAU,
-		40,
-		Color(warning_color, 0.82),
-		2.5 / world_scale_x,
-		true
-	)
-	draw_arc(
-		target_position,
-		reticle_radius + 5.0 / world_scale_x,
-		-PI * 0.5,
-		-PI * 0.5 + TAU * progress,
-		40,
-		Color(1.0, 0.86, 0.2, 0.95 if target_in_range else 0.42),
-		4.0 / world_scale_x,
-		true
-	)
-	draw_arc(
-		target_position,
-		lerpf(reticle_radius * 1.35, reticle_radius * 0.35, progress),
-		0.0,
-		TAU,
-		32,
-		Color(1.0, 0.94, 0.56, 0.78 if target_in_range else 0.36),
-		2.0 / world_scale_x,
 		true
 	)
 
@@ -1580,6 +1524,7 @@ func _update_healing(delta: float) -> void:
 		return
 	_healing_time_remaining = maxf(healing_interval, 0.2)
 	_healing_pulse_remaining = HEALING_PULSE_DURATION
+	_spawn_healing_icons()
 	for enemy_node in get_tree().get_nodes_in_group("enemies"):
 		if enemy_node is not EnemyController or enemy_node == self:
 			continue
@@ -1590,6 +1535,74 @@ func _update_healing(delta: float) -> void:
 		):
 			ally.heal(healing_amount)
 	queue_redraw()
+
+
+func _spawn_healing_icons() -> void:
+	var icon_area_radius := maxf(
+		_get_local_healing_radius() * 0.72,
+		24.0
+	)
+	for icon_index in HEALING_ICON_COUNT:
+		var icon := Label.new()
+		icon.name = "HealingIcon%d" % (icon_index + 1)
+		icon.text = "+"
+		icon.size = Vector2(28.0, 32.0)
+		icon.pivot_offset = icon.size * 0.5
+		icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon.z_index = 8
+		icon.add_theme_font_size_override("font_size", 25)
+		icon.add_theme_color_override("font_color", Color("67ff91"))
+		icon.add_theme_color_override(
+			"font_outline_color",
+			Color(0.01, 0.18, 0.06, 0.95)
+		)
+		icon.add_theme_constant_override("outline_size", 5)
+		var angle := _healing_icon_rng.randf_range(0.0, TAU)
+		var distance := (
+			sqrt(_healing_icon_rng.randf()) * icon_area_radius
+		)
+		var icon_center := Vector2.from_angle(angle) * distance
+		icon.position = icon_center - icon.size * 0.5
+		icon.scale = Vector2.ONE * 0.72
+		icon.hide()
+		add_child(icon)
+
+		var icon_tween := create_tween()
+		icon_tween.tween_interval(
+			float(icon_index) * HEALING_ICON_STAGGER
+		)
+		icon_tween.tween_callback(icon.show)
+		icon_tween.set_parallel(true)
+		icon_tween.tween_property(
+			icon,
+			"position:y",
+			icon.position.y - HEALING_ICON_FLOAT_DISTANCE,
+			HEALING_ICON_FLOAT_DURATION
+		).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		icon_tween.tween_property(
+			icon,
+			"scale",
+			Vector2.ONE * 1.08,
+			HEALING_ICON_FLOAT_DURATION
+		).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		icon_tween.tween_property(
+			icon,
+			"modulate:a",
+			0.0,
+			HEALING_ICON_FLOAT_DURATION * 0.55
+		).set_delay(HEALING_ICON_FLOAT_DURATION * 0.45)
+		icon_tween.chain().tween_callback(icon.queue_free)
+
+
+## Returns the live floating plus signs spawned by the current healing pulse.
+func get_active_healing_icon_count() -> int:
+	var active_count := 0
+	for child in get_children():
+		if child is Label and child.name.begins_with("HealingIcon"):
+			active_count += 1
+	return active_count
 
 
 func _update_healing_pulse(delta: float) -> void:
@@ -1819,6 +1832,16 @@ func get_ranged_aim_fill() -> float:
 	)
 
 
+## Returns the authored solid aim-line tint used by visuals and diagnostics.
+## Ordinary ranged enemies use pale purple; elites use high-salience red.
+func get_ranged_aim_line_color() -> Color:
+	return (
+		RANGED_AIM_LINE_ELITE_COLOR
+		if is_elite
+		else RANGED_AIM_LINE_NORMAL_COLOR
+	)
+
+
 ## Keeps this enemy inside a dynamic road whose width is sampled at the
 ## enemy's live world Y. EnemySpawner owns the resolver and route center;
 ## clearance is measured in world pixels from either visible road edge.
@@ -1898,9 +1921,9 @@ func _update_elite_identity() -> void:
 	if not is_elite:
 		return
 	elite_label.text = (
-		"武器精英"
+		LanguageManager.text("elite_weapon")
 		if elite_reward_type == EliteRewardType.WEAPON
-		else "强化精英"
+		else LanguageManager.text("elite_upgrade")
 	)
 	elite_label.add_theme_color_override(
 		"font_color",
@@ -2054,7 +2077,7 @@ func _update_fantian_seal_immobilized_status() -> void:
 		immobilized_status_label.scale = Vector2.ONE
 		immobilized_status_label.modulate = Color.WHITE
 		return
-	immobilized_status_label.text = "定"
+	immobilized_status_label.text = LanguageManager.text("immobilized")
 	if active:
 		var flash_progress := 1.0 - clampf(
 			_fantian_seal_root_flash_remaining / FANTIAN_ROOT_FLASH_DURATION,
@@ -2084,6 +2107,11 @@ func _update_fantian_seal_immobilized_status() -> void:
 		1.0,
 		release_alpha
 	)
+
+
+func _on_language_changed(_locale: String) -> void:
+	_update_elite_identity()
+	_update_fantian_seal_immobilized_status()
 
 
 ## Shows exact survivor health briefly after a Fantian Seal hit. The readout
@@ -2206,13 +2234,20 @@ func _draw_fantian_seal_root_vfx() -> void:
 
 
 ## Applies player damage exactly once per hit and removes the enemy after its
-## health reaches zero. Critical metadata changes presentation only.
-func take_melee_damage(amount: int, is_critical: bool = false) -> void:
+## health reaches zero. Critical metadata changes presentation only. The
+## optional source identifier is used exclusively by end-of-run statistics.
+func take_melee_damage(
+	amount: int,
+	is_critical: bool = false,
+	source_id: StringName = &""
+) -> void:
 	if not _combat_active or amount <= 0:
 		return
 	if is_critical:
 		_spawn_critical_hit_vfx(amount)
-	current_health = maxi(current_health - amount, 0)
+	var actual_damage := mini(amount, current_health)
+	current_health = maxi(current_health - actual_damage, 0)
+	damage_recorded.emit(source_id, actual_damage)
 	_hit_flash_remaining = 0.2 if is_critical else 0.12
 	_update_sprite_feedback()
 	queue_redraw()

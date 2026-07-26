@@ -126,7 +126,7 @@ func _draw() -> void:
 	draw_string(
 		ThemeDB.fallback_font,
 		label_rect.position + Vector2(0.0, 13.0),
-		"二选一",
+		_get_lifetime_label(),
 		HORIZONTAL_ALIGNMENT_CENTER,
 		label_rect.size.x,
 		12,
@@ -221,6 +221,15 @@ func get_remaining_lifetime_seconds() -> float:
 	return maxf(
 		_maximum_lifetime_seconds - _elapsed_lifetime_seconds,
 		0.0
+	)
+
+
+func _get_lifetime_label() -> String:
+	var remaining_seconds := get_remaining_lifetime_seconds()
+	if remaining_seconds < 0.0:
+		return "∞"
+	return LanguageManager.text("countdown_seconds") % ceili(
+		remaining_seconds
 	)
 
 

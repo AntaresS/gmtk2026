@@ -53,7 +53,7 @@ func _physics_process(delta: float) -> void:
 	if _attack_cooldown <= 0.0:
 		var target := _find_nearest_enemy()
 		if is_instance_valid(target):
-			target.take_melee_damage(attack_damage)
+			target.take_melee_damage(attack_damage, false, &"realm_echo")
 			_attack_cooldown = attack_interval
 	queue_redraw()
 

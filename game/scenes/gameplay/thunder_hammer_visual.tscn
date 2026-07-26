@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://game/scripts/gameplay/thunder_hammer_visual.gd" id="1_visual"]
+[ext_resource type="Texture2D" path="res://image_asset/chara_weapon_hammer/ChatGPT Image 2026年7月26日 14_24_38.png" id="2_hammer_texture"]
 
 [node name="ThunderHammerVisual" type="Node2D"]
 visible = false
@@ -10,14 +11,9 @@ script = ExtResource("1_visual")
 [node name="HammerPivot" type="Node2D" parent="."]
 rotation = -0.28
 
-[node name="HammerHandle" type="Polygon2D" parent="HammerPivot"]
-polygon = PackedVector2Array(-2.5, -1, 2.5, -1, 2.5, 26, -2.5, 26)
-color = Color(0.603922, 0.482353, 0.329412, 1)
-
-[node name="HammerHead" type="Polygon2D" parent="HammerPivot"]
-position = Vector2(0, -5)
-polygon = PackedVector2Array(-15, -7, 13, -7, 17, -2, 13, 7, -15, 7, -18, 2, -18, -3)
-color = Color(0.301961, 0.376471, 0.470588, 1)
+[node name="HammerSprite" type="Sprite2D" parent="HammerPivot"]
+texture = ExtResource("2_hammer_texture")
+scale = Vector2(0.075, 0.075)
 
 [node name="ChargeArc" type="Line2D" parent="."]
 width = 2.0

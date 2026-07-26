@@ -1,0 +1,26 @@
+Godot Engine v4.7.1.stable.steam.a13da4feb - https://godotengine.org
+
+SCRIPT ERROR: Compile Error: Identifier not found: LanguageManager
+   at: GDScript::reload (res://game/scripts/menus/game_info_overlay.gd:46)
+SCRIPT ERROR: Compile Error: Identifier not found: LanguageManager
+   at: GDScript::reload (res://game/scripts/gameplay/gameplay_hud.gd:96)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://tmp/menu_ui_smoke.gd:0)
+ERROR: Failed to load script "res://tmp/menu_ui_smoke.gd" with error "Compilation failed".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2582)
+SCRIPT ERROR: Trying to assign value of type 'Control' to a variable of type 'game_info_overlay.gd'.
+   at: @implicit_ready (res://game/scripts/menus/main_menu.gd:15)
+   GDScript backtrace (most recent call first):
+       [0] @implicit_ready (res://game/scripts/menus/main_menu.gd:15)
+       [1] _run (res://tmp/menu_ui_smoke.gd:22)
+SCRIPT ERROR: Invalid access to property or key 'closed' on a base object of type 'Nil'.
+   at: _ready (res://game/scripts/menus/main_menu.gd:26)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://game/scripts/menus/main_menu.gd:26)
+       [1] _run (res://tmp/menu_ui_smoke.gd:22)
+SCRIPT ERROR: Invalid call. Nonexistent function 'open_weapon_gallery' in base 'Nil'.
+   at: _run (res://tmp/menu_ui_smoke.gd:33)
+   GDScript backtrace (most recent call first):
+       [0] _run (res://tmp/menu_ui_smoke.gd:33)

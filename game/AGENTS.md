@@ -58,6 +58,7 @@ game/
       qi_density_profile.gd
       qi_pickup.gd
       qiankun_ring_projectile.gd
+      realm_progress_bar.gd
       technique_fragment.gd
       weapon_power_fragment.gd
       road_fork.gd
@@ -94,7 +95,8 @@ manually.
   `gameplay_hud.tscn` only presents resource signals.
 - `player.tscn` is a reusable `CharacterBody2D`. `player.gd` owns movement,
   speed modes, accumulated distance, lateral clamping, incoming melee damage
-  signals, the best collected copy of each equipment type, Tab cycling,
+  signals, the best collected copy of each equipment type, direct number-key
+  equipment selection,
   automatic equipment-specific attacks, per-run rolled damage, one visible
   current-attack circle, and a separate invisible collectible-attraction
   circle. Shared `WeaponData` resources provide identity, base combat tuning,
@@ -227,6 +229,8 @@ when behavior or authority changes; stale documentation is a defect.
 
 ## Engineering conventions
 
+- Do not create, update, or run smoke tests. Validate requested changes with
+  focused static inspection, parser checks, or other non-smoke verification.
 - Use typed GDScript where practical.
 - Prefer resource driven and composable driven pattern when best fit.
 - Prefer direct ownership references and focused signals over broad scene-tree

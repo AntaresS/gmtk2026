@@ -33,9 +33,9 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Menu" type="VBoxContainer" parent="Overlay/CenterContainer"]
-custom_minimum_size = Vector2(340, 0)
+custom_minimum_size = Vector2(1220, 0)
 layout_mode = 2
-theme_override_constants/separation = 18
+theme_override_constants/separation = 12
 
 [node name="Title" type="Label" parent="Overlay/CenterContainer/Menu"]
 unique_name_in_owner = true
@@ -43,6 +43,75 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 42
 text = "Run Ended"
 horizontal_alignment = 1
+
+[node name="OutcomeMessage" type="Label" parent="Overlay/CenterContainer/Menu"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 20
+text = "Run outcome"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="ResultsScroll" type="ScrollContainer" parent="Overlay/CenterContainer/Menu"]
+custom_minimum_size = Vector2(0, 430)
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="Content" type="HBoxContainer" parent="Overlay/CenterContainer/Menu/ResultsScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 32
+
+[node name="SummaryColumn" type="VBoxContainer" parent="Overlay/CenterContainer/Menu/ResultsScroll/Content"]
+custom_minimum_size = Vector2(560, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="SummaryTitle" type="Label" parent="Overlay/CenterContainer/Menu/ResultsScroll/Content/SummaryColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.82, 0.38, 1)
+theme_override_font_sizes/font_size = 25
+text = "Run Summary"
+
+[node name="Summary" type="RichTextLabel" parent="Overlay/CenterContainer/Menu/ResultsScroll/Content/SummaryColumn"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 230)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+theme_override_font_sizes/normal_font_size = 19
+theme_override_font_sizes/bold_font_size = 19
+text = "Summary"
+
+[node name="VerticalSeparator" type="VSeparator" parent="Overlay/CenterContainer/Menu/ResultsScroll/Content"]
+layout_mode = 2
+
+[node name="LeaderboardColumn" type="VBoxContainer" parent="Overlay/CenterContainer/Menu/ResultsScroll/Content"]
+custom_minimum_size = Vector2(620, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="LeaderboardTitle" type="Label" parent="Overlay/CenterContainer/Menu/ResultsScroll/Content/LeaderboardColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.82, 0.38, 1)
+theme_override_font_sizes/font_size = 25
+text = "Local Leaderboard"
+
+[node name="Leaderboard" type="RichTextLabel" parent="Overlay/CenterContainer/Menu/ResultsScroll/Content/LeaderboardColumn"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+theme_override_font_sizes/normal_font_size = 19
+text = "Leaderboard"
 
 [node name="RestartButton" type="Button" parent="Overlay/CenterContainer/Menu"]
 unique_name_in_owner = true

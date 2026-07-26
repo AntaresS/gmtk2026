@@ -1,5 +1,9 @@
 extends Node2D
 
+const WeaponDataResource = preload(
+	"res://game/scripts/gameplay/weapon_data.gd"
+)
+
 ## Vertical camera lead in world pixels. Larger values show more road ahead and
 ## place the player lower on screen; smaller values move the player upward.
 @export var camera_forward_look_ahead: float = 180.0
@@ -49,6 +53,11 @@ var _camera_pan_start_x: float = 0.0
 var _camera_pan_target_x: float = 0.0
 var _camera_pan_elapsed: float = 0.0
 var _camera_pan_active: bool = false
+var _elapsed_run_time: float = 0.0
+var _total_damage_dealt: int = 0
+var _enemies_defeated: int = 0
+var _elite_enemies_defeated: int = 0
+var _weapon_damage_dealt: Dictionary = {}
 
 
 func _ready() -> void:
@@ -65,6 +74,11 @@ func _ready() -> void:
 	_camera_pan_target_x = _active_route_center_x
 	_camera_pan_elapsed = 0.0
 	_camera_pan_active = false
+	_elapsed_run_time = 0.0
+	_total_damage_dealt = 0
+	_enemies_defeated = 0
+	_elite_enemies_defeated = 0
+	_weapon_damage_dealt.clear()
 	player.set_movement_enabled(true)
 	infinite_world.set_progression_enabled(true)
 	enemy_spawner.set_road_half_width(infinite_world.chunk_config.road_half_width)
@@ -84,12 +98,21 @@ func _ready() -> void:
 	enemy_spawner.set_route_center_x(_active_route_center_x)
 	gameplay_hud.bind_resources(run_resources)
 	gameplay_hud.bind_player(player)
+	gameplay_hud.pause_requested.connect(
+		Callable(pause_menu, "pause_game")
+	)
 	pause_menu.call("bind_debug_targets", player, run_resources)
 	player.bind_cultivation(run_resources)
 	infinite_world.qi_collected.connect(run_resources.add_qi)
 	enemy_spawner.qi_collected.connect(run_resources.add_qi)
 	enemy_spawner.universal_upgrade_collected.connect(
 		player.apply_universal_upgrade
+	)
+	enemy_spawner.player_damage_recorded.connect(
+		_on_player_damage_recorded
+	)
+	enemy_spawner.enemy_defeat_recorded.connect(
+		_on_enemy_defeat_recorded
 	)
 	player.melee_damage_received.connect(run_resources.apply_lifespan_damage)
 	player.lifespan_decay_multiplier_changed.connect(
@@ -134,7 +157,9 @@ func request_camera_shake(strength: float) -> void:
 	_camera_shake_remaining = maxf(_camera_shake_remaining, 0.18)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if not _run_ended:
+		_elapsed_run_time += maxf(delta, 0.0)
 	if not show_debug_ui:
 		return
 	debug_label.text = "Speed: %d\nDistance: %d\nChunks: %d\nEnemies: %d" % [
@@ -234,6 +259,8 @@ func _try_start_next_tribulation() -> void:
 	tribulation.tribulation_completed.connect(
 		_on_heavenly_tribulation_completed
 	)
+	tribulation.camera_shake_requested.connect(request_camera_shake)
+	gameplay_hud.show_tribulation_warning()
 	tribulation.start(player, run_resources.max_lifespan)
 
 
@@ -265,6 +292,10 @@ func _start_realm_annihilation() -> void:
 		_on_realm_annihilation_landed,
 		CONNECT_ONE_SHOT
 	)
+	annihilation.fatal_sequence_completed.connect(
+		_on_realm_annihilation_completed,
+		CONNECT_ONE_SHOT
+	)
 	annihilation.tree_exited.connect(
 		_on_realm_annihilation_exited,
 		CONNECT_ONE_SHOT
@@ -273,7 +304,21 @@ func _start_realm_annihilation() -> void:
 
 
 func _on_realm_annihilation_landed() -> void:
-	run_resources.force_deplete()
+	player.set_movement_enabled(false)
+	infinite_world.set_progression_enabled(false)
+	enemy_spawner.set_spawning_enabled(false)
+	road_fork_spawner.set_forks_enabled(false)
+	request_camera_shake(18.0)
+
+
+func _on_realm_annihilation_completed() -> void:
+	# Clear the active guard before depletion emits synchronously. The visual
+	# node queues itself afterward, so the complete impact remains on screen.
+	_active_annihilation = null
+	if run_resources.is_run_active():
+		run_resources.force_deplete()
+	else:
+		_finish_run(false)
 
 
 func _on_realm_annihilation_exited() -> void:
@@ -282,6 +327,10 @@ func _on_realm_annihilation_exited() -> void:
 
 func _on_lifespan_depleted() -> void:
 	if _run_ended:
+		return
+	# Once the final unavoidable sequence begins, all depletion paths wait for
+	# its visible impact to complete instead of replacing it with the overlay.
+	if is_instance_valid(_active_annihilation):
 		return
 	_finish_run(false)
 
@@ -305,12 +354,84 @@ func _finish_run(ascended: bool) -> void:
 
 
 func _show_run_outcome() -> void:
+	var summary := _build_run_summary()
 	if _run_won:
-		run_ended_overlay.show_ascension()
+		run_ended_overlay.show_ascension(summary)
 	elif _fatal_breakthrough_triggered:
-		run_ended_overlay.show_fatal_breakthrough()
+		run_ended_overlay.show_fatal_breakthrough(summary)
 	else:
-		run_ended_overlay.show_defeat()
+		run_ended_overlay.show_defeat(summary)
+
+
+func _on_player_damage_recorded(
+	source_id: StringName,
+	amount: int
+) -> void:
+	var actual_amount := maxi(amount, 0)
+	_total_damage_dealt += actual_amount
+	var resolved_source := source_id if not source_id.is_empty() else &"other"
+	_weapon_damage_dealt[resolved_source] = (
+		int(_weapon_damage_dealt.get(resolved_source, 0))
+		+ actual_amount
+	)
+
+
+func _on_enemy_defeat_recorded(is_elite: bool) -> void:
+	_enemies_defeated += 1
+	if is_elite:
+		_elite_enemies_defeated += 1
+
+
+func _build_run_summary() -> Dictionary:
+	var weapon_levels: Array[Dictionary] = []
+	var weapon_names: Dictionary = {}
+	for equipment in player.get_equipment_inventory_snapshot():
+		var weapon_data := equipment.get("data") as WeaponDataResource
+		if weapon_data == null:
+			continue
+		weapon_names[weapon_data.weapon_id] = weapon_data.display_name
+		weapon_levels.append({
+			"weapon_id": weapon_data.weapon_id,
+			"fallback_name": weapon_data.display_name,
+			"level": maxi(int(equipment.get("quantity", 1)), 1),
+		})
+	var damage_ranking: Array[Dictionary] = []
+	var ranked_sources: Dictionary = {}
+	for weapon_id_variant in weapon_names:
+		var weapon_id := StringName(weapon_id_variant)
+		ranked_sources[weapon_id] = true
+		damage_ranking.append({
+			"weapon_id": weapon_id,
+			"fallback_name": str(weapon_names[weapon_id]),
+			"damage": int(_weapon_damage_dealt.get(weapon_id, 0)),
+		})
+	for source_variant in _weapon_damage_dealt:
+		var source_id := StringName(source_variant)
+		if ranked_sources.has(source_id):
+			continue
+		damage_ranking.append({
+			"weapon_id": source_id,
+			"fallback_name": str(
+				weapon_names.get(
+					source_id,
+					"境界化身" if source_id == &"realm_echo" else "其他"
+				)
+			),
+			"damage": int(_weapon_damage_dealt[source_id]),
+		})
+	damage_ranking.sort_custom(
+		func(a: Dictionary, b: Dictionary) -> bool:
+			return int(a["damage"]) > int(b["damage"])
+	)
+	return {
+		"duration_seconds": _elapsed_run_time,
+		"weapon_levels": weapon_levels,
+		"total_damage": _total_damage_dealt,
+		"enemies_defeated": _enemies_defeated,
+		"elite_enemies_defeated": _elite_enemies_defeated,
+		"weapon_damage_ranking": damage_ranking,
+		"fatal_breakthrough": _fatal_breakthrough_triggered,
+	}
 
 
 ## Aggregates read-only subsystem snapshots for a future in-run debug panel.

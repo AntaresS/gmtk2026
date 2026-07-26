@@ -1,9 +1,17 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://game/scripts/gameplay/qiankun_ring_projectile.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/player_weapons/qiankun_ring.png" id="2_ring"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_ring"]
 radius = 10.0
+
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_additive"]
+blend_mode = 1
+
+[sub_resource type="Gradient" id="Gradient_ring_trail"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(0.95, 0.12, 0.65, 0, 1, 0.32, 0.72, 0.58, 1, 0.9, 0.35, 0.96)
 
 [node name="QiankunRingProjectile" type="Area2D"]
 z_index = 8
@@ -12,6 +20,56 @@ collision_mask = 8
 monitoring = true
 monitorable = false
 script = ExtResource("1_script")
+
+[node name="TrailGlow" type="Line2D" parent="."]
+material = SubResource("CanvasItemMaterial_additive")
+z_index = -2
+width = 18.0
+gradient = SubResource("Gradient_ring_trail")
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+modulate = Color(1, 0.38, 0.82, 0.105)
+
+[node name="TrailCore" type="Line2D" parent="."]
+material = SubResource("CanvasItemMaterial_additive")
+z_index = -1
+width = 6.0
+gradient = SubResource("Gradient_ring_trail")
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+modulate = Color(1, 1, 1, 0.25)
+
+[node name="RingSprite" type="Sprite2D" parent="."]
+scale = Vector2(0.036, 0.036)
+texture = ExtResource("2_ring")
+
+[node name="HitAfterimage1" type="Sprite2D" parent="."]
+material = SubResource("CanvasItemMaterial_additive")
+visible = false
+z_index = -1
+texture = ExtResource("2_ring")
+
+[node name="HitAfterimage2" type="Sprite2D" parent="."]
+material = SubResource("CanvasItemMaterial_additive")
+visible = false
+z_index = -1
+texture = ExtResource("2_ring")
+
+[node name="HitAfterimage3" type="Sprite2D" parent="."]
+material = SubResource("CanvasItemMaterial_additive")
+visible = false
+z_index = -1
+texture = ExtResource("2_ring")
+
+[node name="HitAfterimage4" type="Sprite2D" parent="."]
+material = SubResource("CanvasItemMaterial_additive")
+visible = false
+z_index = -1
+texture = ExtResource("2_ring")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_ring")

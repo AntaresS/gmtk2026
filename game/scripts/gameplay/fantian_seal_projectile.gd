@@ -146,7 +146,7 @@ func _impact() -> void:
 			or not _does_enemy_overlap_impact(enemy)
 		):
 			continue
-		enemy.take_melee_damage(_damage, _is_critical)
+		enemy.take_melee_damage(_damage, _is_critical, &"fantian_seal")
 		if enemy.is_combat_active():
 			enemy.show_temporary_health_readout(
 				FANTIAN_SEAL_HEALTH_READOUT_DURATION

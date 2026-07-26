@@ -32,6 +32,9 @@ enum AttackDomain {
 ## Color used by the world pickup representation. This may differ slightly
 ## from display_color to preserve contrast against terrain.
 @export var pickup_color: Color = Color("7dffd8")
+## Optional real weapon artwork shown by HUD slots. When omitted, the HUD
+## renders the attack-kind fallback symbol so incomplete art sets stay usable.
+@export var icon_texture: Texture2D
 ## Single cultivation track used by the shared stat pipeline. -1 is neutral and
 ## preserves unchanged behavior for legacy or future untyped weapons.
 @export_enum("Neutral:-1", "JING 精:0", "QI 气:1", "SHEN 神:2")

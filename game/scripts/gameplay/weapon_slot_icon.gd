@@ -23,6 +23,7 @@ func _ready() -> void:
 	custom_minimum_size = SLOT_SIZE
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pivot_offset = SLOT_SIZE * 0.5
+	LanguageManager.language_changed.connect(_on_language_changed)
 	set_process(false)
 	queue_redraw()
 
@@ -44,11 +45,31 @@ func configure(
 	locked = is_locked
 	new_unselected = is_new_unselected
 	tooltip_text = (
-		"%s  Lv.%d" % [weapon_data.display_name, quantity]
+		"%s  Lv.%d" % [
+			LanguageManager.get_weapon_name(
+				weapon_data.weapon_id,
+				weapon_data.display_name
+			),
+			quantity,
+		]
 		if weapon_data != null
-		else "尚未获得"
+		else LanguageManager.text("not_obtained")
 	)
 	set_process(new_unselected or _power_up_remaining > 0.0)
+	queue_redraw()
+
+
+func _on_language_changed(_locale: String) -> void:
+	if weapon_data != null:
+		tooltip_text = "%s  Lv.%d" % [
+			LanguageManager.get_weapon_name(
+				weapon_data.weapon_id,
+				weapon_data.display_name
+			),
+			quantity,
+		]
+	else:
+		tooltip_text = LanguageManager.text("not_obtained")
 	queue_redraw()
 
 
@@ -156,15 +177,30 @@ func _draw() -> void:
 		_draw_placeholder()
 		return
 
-	_draw_weapon_icon(weapon_data.attack_kind, weapon_color)
+	_draw_weapon_icon(weapon_data, weapon_color)
 	_draw_weapon_footer(weapon_color)
 	if locked:
 		draw_rect(bounds, Color(0.12, 0.02, 0.03, 0.62), true)
-		_draw_centered_text("境界锁定", 55.0, 14, Color("ff8b83"))
+		_draw_centered_text(
+			LanguageManager.text("locked_by_realm"),
+			55.0,
+			14,
+			Color("ff8b83")
+		)
 	if selected:
-		_draw_centered_text("当前", 17.0, 13, Color("7dffd8"))
+		_draw_centered_text(
+			LanguageManager.text("current"),
+			17.0,
+			13,
+			Color("7dffd8")
+		)
 	elif new_unselected:
-		_draw_centered_text("新武器", 17.0, 13, Color("ffd35a"))
+		_draw_centered_text(
+			LanguageManager.text("new_weapon"),
+			17.0,
+			13,
+			Color("ffd35a")
+		)
 	if _power_up_remaining > 0.0:
 		var rise := (
 			1.0 - _power_up_remaining / POWER_UP_DURATION
@@ -204,7 +240,12 @@ func _draw_placeholder() -> void:
 	draw_rect(placeholder, Color(0.44, 0.52, 0.62, 0.48), false, 2.0)
 	_draw_centered_text("?", 59.0, 25, Color(0.5, 0.58, 0.68, 0.68))
 	draw_rect(FOOTER_RECT, Color(0.035, 0.05, 0.072, 0.88), true)
-	_draw_centered_text("空", 95.0, 13, Color(0.48, 0.55, 0.64, 0.78))
+	_draw_centered_text(
+		LanguageManager.text("empty"),
+		95.0,
+		13,
+		Color(0.48, 0.55, 0.64, 0.78)
+	)
 
 
 func _draw_weapon_footer(weapon_color: Color) -> void:
@@ -226,7 +267,10 @@ func _draw_weapon_footer(weapon_color: Color) -> void:
 	draw_string(
 		font,
 		Vector2(6.0, 95.0),
-		weapon_data.display_name,
+		LanguageManager.get_weapon_name(
+			weapon_data.weapon_id,
+			weapon_data.display_name
+		),
 		HORIZONTAL_ALIGNMENT_CENTER,
 		56.0,
 		12,
@@ -265,7 +309,14 @@ func _draw_centered_text(
 	)
 
 
-func _draw_weapon_icon(attack_kind: int, weapon_color: Color) -> void:
+func _draw_weapon_icon(
+	slot_weapon_data: WeaponDataResource,
+	weapon_color: Color
+) -> void:
+	if slot_weapon_data.icon_texture != null:
+		_draw_texture_icon(slot_weapon_data.icon_texture)
+		return
+	var attack_kind := slot_weapon_data.attack_kind
 	var center := ICON_CENTER
 	if attack_kind == WeaponDataResource.AttackKind.GREAT_STRENGTH_PALM:
 		draw_circle(center, 20.0, Color(weapon_color, 0.12))
@@ -366,3 +417,17 @@ func _draw_weapon_icon(attack_kind: int, weapon_color: Color) -> void:
 			Color.WHITE,
 			3.0
 		)
+
+
+func _draw_texture_icon(texture: Texture2D) -> void:
+	var texture_size := texture.get_size()
+	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
+		return
+	var maximum_size := Vector2(54.0, 48.0)
+	var scale_factor := minf(
+		maximum_size.x / texture_size.x,
+		maximum_size.y / texture_size.y
+	)
+	var draw_size := texture_size * scale_factor
+	var draw_rect := Rect2(ICON_CENTER - draw_size * 0.5, draw_size)
+	draw_texture_rect(texture, draw_rect, false, Color.WHITE)

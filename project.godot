@@ -10,10 +10,14 @@ config_version=5
 
 [application]
 
-config/name="gmtk2026"
+config/name="追求永生"
 run/main_scene="res://game/scenes/menus/main_menu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
+
+[autoload]
+
+LanguageManager="*res://game/scripts/menus/language_manager.gd"
 
 [display]
 
@@ -53,7 +57,7 @@ pause={
 "events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":4194305,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
 ]
 }
-switch_equipment={
+show_details={
 "deadzone": 0.5,
 "events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":4194308,"physical_keycode":0,"key_label":0,"unicode":9,"location":0,"echo":false,"script":null)
 ]

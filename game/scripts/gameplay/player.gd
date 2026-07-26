@@ -65,6 +65,9 @@ const FLYING_SWORD_TEXTURE: Texture2D = preload(
 const FANTIAN_SEAL_TEXTURE: Texture2D = preload(
 	"res://assets/player_weapons/fantian_seal.png"
 )
+const QIANKUN_RING_TEXTURE: Texture2D = preload(
+	"res://assets/player_weapons/qiankun_ring.png"
+)
 const OUTLINE_SHADER: Shader = preload(
 	"res://game/shaders/enemy_outline.gdshader"
 )
@@ -118,6 +121,7 @@ const FLYING_SWORD_MAX_SUMMON_WINDOW: float = 0.28
 const FLYING_SWORD_REFILL_DURATION: float = 0.14
 const FLYING_SWORD_OUTLINE_TEXTURE_WIDTH: float = 22.0
 const FLYING_SWORD_OUTLINE_COLOR: Color = Color("f6fbff")
+const QIANKUN_RING_SCALE: float = 0.036
 const FANTIAN_SEAL_IDLE_SCALE: float = 0.052
 const FANTIAN_SEAL_IDLE_POSITION: Vector2 = Vector2(54.0, -8.0)
 const FANTIAN_SEAL_SUMMON_DURATION: float = 0.18
@@ -285,10 +289,11 @@ const DAO_MAX_ATTACK_TRAIL_COUNT: int = 24
 @export_range(0.2, 2.0, 0.05) var level_up_effect_duration: float = 0.8
 ## Final radius, in world pixels, reached by the expanding level-up ring.
 @export_range(36.0, 140.0, 1.0) var level_up_effect_radius: float = 76.0
-## Duration, in seconds, of the larger effect played after surviving any
+## Duration, in seconds, of the yellow light pillar played after surviving any
 ## cultivation-realm breakthrough tribulation.
 @export_range(0.5, 5.0, 0.1) var breakthrough_effect_duration: float = 2.4
-## Outer radius, in world pixels, of the breakthrough rings and light rays.
+## Size, in world pixels, used to derive the breakthrough pillar's height and
+## soft ground glow.
 @export_range(80.0, 260.0, 1.0) var breakthrough_effect_radius: float = 156.0
 
 @export_category("Damage Feedback")
@@ -453,6 +458,7 @@ var _current_weapon_combat_stats: WeaponCombatStatsResource = (
 
 func _ready() -> void:
 	_movement_enabled = true
+	LanguageManager.language_changed.connect(_on_language_changed)
 	_prepare_dao_trail_geometry()
 	_character_sprite_rest_position = character_sprite.position
 	_character_sprite_rest_modulate = character_sprite.modulate
@@ -526,22 +532,6 @@ func _input(event: InputEvent) -> void:
 				select_starting_weapon()
 				get_viewport().set_input_as_handled()
 				return
-	var tab_pressed: bool = (
-		event is InputEventKey
-		and event.pressed
-		and not event.echo
-		and event.keycode == KEY_TAB
-	)
-	if (
-		not _movement_enabled
-		or (
-			not tab_pressed
-			and not event.is_action_pressed("switch_equipment")
-		)
-	):
-		return
-	cycle_equipment()
-	get_viewport().set_input_as_handled()
 
 
 func _physics_process(delta: float) -> void:
@@ -864,9 +854,9 @@ func _draw_qi_shield() -> void:
 	)
 
 	var label_text := (
-		"灵盾 %.0f" % shield_capacity
+		LanguageManager.text("shield_capacity_short_format") % shield_capacity
 		if has_capacity
-		else "灵盾耗尽"
+		else LanguageManager.text("shield_empty_short")
 	)
 	var label_width := 82.0
 	var label_position := center + Vector2(-label_width * 0.5, -78.0)
@@ -898,7 +888,7 @@ func _draw_qi_shield() -> void:
 		3.0 + flash_ratio * 4.0,
 		true
 	)
-	var feedback_text := "抵挡 %.0f  ·  -%d 灵气" % [
+	var feedback_text := LanguageManager.text("shield_blocked_format") % [
 		_last_shield_blocked_damage,
 		_last_shield_qi_spent,
 	]
@@ -979,7 +969,9 @@ func _receive_direct_damage(
 	_last_damage_amount = resolved_amount
 	_damage_feedback_is_projectile = projectile_feedback
 	_damage_flash_remaining = maxf(damage_feedback_duration, 0.01)
-	damage_taken_label.text = "-%.1f 寿元" % resolved_amount
+	damage_taken_label.text = LanguageManager.text(
+		"lifespan_damage_format"
+	) % resolved_amount
 	damage_taken_label.show()
 	_update_damage_feedback_presentation()
 	queue_redraw()
@@ -1466,7 +1458,8 @@ func is_level_up_effect_active() -> bool:
 	return _level_up_effect_remaining > 0.0
 
 
-## Starts the elaborate aura reserved for a successful realm breakthrough.
+## Starts the restrained yellow RPG-style pillar reserved for a successful
+## realm breakthrough.
 func play_breakthrough_effect() -> void:
 	_breakthrough_effect_remaining = maxf(
 		breakthrough_effect_duration,
@@ -1500,20 +1493,31 @@ func get_equipment_inventory_entries() -> Array[String]:
 		var weapon_data := equipment["data"] as WeaponDataResource
 		var marker := "▶ " if index == _current_equipment_index else "  "
 		var lock_suffix := (
-			"  [当前境界不可用]"
+			LanguageManager.text("equipment_locked_suffix")
 			if not realm_abilities.is_weapon_allowed(weapon_data)
 			else ""
 		)
 		entries.append(
-			"%s%s ×%d  伤害 %d%s" % [
+			LanguageManager.text("equipment_entry_format") % [
 				marker,
-				weapon_data.display_name,
+				LanguageManager.get_weapon_name(
+					weapon_data.weapon_id,
+					weapon_data.display_name
+				),
 				int(equipment.get("quantity", 1)),
 				_get_equipment_damage(equipment),
 				lock_suffix,
 			]
 		)
 	return entries
+
+
+func _on_language_changed(_locale: String) -> void:
+	if damage_taken_label.visible:
+		damage_taken_label.text = LanguageManager.text(
+			"lifespan_damage_format"
+		) % _last_damage_amount
+	queue_redraw()
 
 
 ## Returns read-only inventory snapshots for the HUD. Dictionaries preserve
@@ -1791,7 +1795,8 @@ func _update_weapon_attack(delta: float) -> void:
 		for enemy in targets:
 			enemy.take_melee_damage(
 				attack_damage.damage,
-				attack_damage.is_critical
+				attack_damage.is_critical,
+				weapon_data.weapon_id
 			)
 		_dao_attack_remaining = 0.28
 	elif attack_kind == WeaponDataResource.AttackKind.FLYING_SWORD:
@@ -2044,7 +2049,11 @@ func _apply_palm_damage(
 		and randf() < weapon_data.palm_execute_chance
 	):
 		_spawn_palm_execute_vfx(enemy)
-		enemy.take_melee_damage(maxi(enemy.current_health, 1))
+		enemy.take_melee_damage(
+			maxi(enemy.current_health, 1),
+			false,
+			weapon_data.weapon_id
+		)
 		return
 	var resolved_damage := attack_damage.damage
 	if (
@@ -2060,7 +2069,8 @@ func _apply_palm_damage(
 		)
 	enemy.take_melee_damage(
 		resolved_damage,
-		attack_damage.is_critical
+		attack_damage.is_critical,
+		weapon_data.weapon_id
 	)
 
 
@@ -4230,78 +4240,87 @@ func _draw_level_up_effect() -> void:
 
 func _draw_breakthrough_effect() -> void:
 	var duration := maxf(breakthrough_effect_duration, 0.01)
-	var progress := 1.0 - _breakthrough_effect_remaining / duration
-	var fade := minf(
-		clampf(progress / 0.12, 0.0, 1.0),
-		clampf((1.0 - progress) / 0.22, 0.0, 1.0)
+	var progress := clampf(
+		1.0 - _breakthrough_effect_remaining / duration,
+		0.0,
+		1.0
 	)
-	var pulse := 0.88 + sin(progress * TAU * 6.0) * 0.08
-	var outer_radius := breakthrough_effect_radius * pulse
+	var fade := minf(
+		clampf(progress / 0.1, 0.0, 1.0),
+		clampf((1.0 - progress) / 0.2, 0.0, 1.0)
+	)
+	var beam_height := breakthrough_effect_radius * 2.25
+	var beam_bottom := breakthrough_effect_radius * 0.42
+	var pulse := 0.96 + sin(progress * TAU * 2.0) * 0.04
+	var outer_width := 58.0 * pulse
+	_draw_fading_pillar_layer(
+		outer_width,
+		beam_height,
+		beam_bottom,
+		Color(1.0, 0.72, 0.08, fade * 0.16)
+	)
+	_draw_fading_pillar_layer(
+		36.0 * pulse,
+		beam_height,
+		beam_bottom,
+		Color(1.0, 0.88, 0.28, fade * 0.34)
+	)
+	_draw_fading_pillar_layer(
+		14.0 * pulse,
+		beam_height,
+		beam_bottom,
+		Color(1.0, 0.98, 0.72, fade * 0.62)
+	)
+
+
+func _draw_fading_pillar_layer(
+	width: float,
+	height: float,
+	bottom: float,
+	color: Color
+) -> void:
+	var safe_width := maxf(width, 1.0)
+	var safe_height := maxf(height, 1.0)
+	var cap_radius := safe_width * 0.5
+	var cap_center_y := bottom - cap_radius
+	var fade_height := safe_height * 0.44
+	var fade_bottom := -safe_height + fade_height
+	const FADE_STEP_COUNT: int = 48
+	for step_index in FADE_STEP_COUNT:
+		var step_start := float(step_index) / float(FADE_STEP_COUNT)
+		var step_end := float(step_index + 1) / float(FADE_STEP_COUNT)
+		var step_alpha := step_end * step_end
+		var strip_top := lerpf(-safe_height, fade_bottom, step_start)
+		var strip_bottom := lerpf(-safe_height, fade_bottom, step_end)
+		draw_rect(
+			Rect2(
+				Vector2(-safe_width * 0.5, strip_top),
+				Vector2(safe_width, strip_bottom - strip_top + 0.5)
+			),
+			Color(color, color.a * step_alpha)
+		)
 	draw_rect(
 		Rect2(
-			Vector2(-24.0, -outer_radius * 1.35),
-			Vector2(48.0, outer_radius * 2.7)
+			Vector2(-safe_width * 0.5, fade_bottom),
+			Vector2(safe_width, cap_center_y - fade_bottom)
 		),
-		Color(0.55, 0.95, 1.0, fade * 0.09)
+		color
 	)
-	draw_circle(
-		Vector2.ZERO,
-		outer_radius * 0.78,
-		Color(0.2, 0.85, 1.0, fade * 0.12)
-	)
-	for ring_index in 3:
-		var ring_phase := fmod(
-			progress * 1.8 + float(ring_index) / 3.0,
-			1.0
+	var cap_points := PackedVector2Array()
+	cap_points.append(Vector2(-cap_radius, cap_center_y))
+	cap_points.append(Vector2(cap_radius, cap_center_y))
+	const CAP_SEGMENT_COUNT: int = 24
+	for segment_index in CAP_SEGMENT_COUNT + 1:
+		var angle := (
+			float(segment_index) / float(CAP_SEGMENT_COUNT) * PI
 		)
-		var ring_radius := lerpf(42.0, outer_radius, ring_phase)
-		draw_arc(
-			Vector2.ZERO,
-			ring_radius,
-			0.0,
-			TAU,
-			80,
-			Color(0.5, 0.94, 1.0, fade * (1.0 - ring_phase)),
-			5.0 - float(ring_index),
-			true
+		cap_points.append(
+			Vector2(
+				cos(angle) * cap_radius,
+				cap_center_y + sin(angle) * cap_radius
+			)
 		)
-	for ray_index in 16:
-		var ray_angle := (
-			float(ray_index) / 16.0 * TAU
-			+ progress * (0.8 if ray_index % 2 == 0 else -0.55)
-		)
-		var direction := Vector2.from_angle(ray_angle)
-		var ray_inner := outer_radius * (0.48 if ray_index % 2 == 0 else 0.64)
-		var ray_outer := outer_radius * (1.08 if ray_index % 2 == 0 else 0.94)
-		draw_line(
-			direction * ray_inner,
-			direction * ray_outer,
-			Color(1.0, 0.85, 0.3, fade * 0.78),
-			3.0
-		)
-	for mote_index in 12:
-		var mote_angle := (
-			float(mote_index) / 12.0 * TAU
-			- progress * TAU * 1.5
-		)
-		var mote_radius := outer_radius * (
-			0.52 + 0.22 * sin(progress * TAU + float(mote_index))
-		)
-		draw_circle(
-			Vector2.from_angle(mote_angle) * mote_radius,
-			4.0 + float(mote_index % 3),
-			Color(0.78, 0.98, 1.0, fade * 0.9)
-		)
-	draw_arc(
-		Vector2.ZERO,
-		outer_radius * 0.38,
-		-progress * TAU * 2.0,
-		TAU - progress * TAU * 2.0,
-		64,
-		Color.WHITE,
-		6.0,
-		true
-	)
+	draw_colored_polygon(cap_points, color)
 
 
 func _publish_lifespan_decay_multiplier() -> void:
@@ -4380,26 +4399,14 @@ func _draw_weapon_companions() -> void:
 
 
 func _draw_qiankun_ring(position: Vector2) -> void:
-	draw_arc(
+	var texture_size := QIANKUN_RING_TEXTURE.get_size()
+	draw_set_transform(
 		position,
-		10.0,
-		0.0,
-		TAU,
-		36,
-		Color("ff8ee7"),
-		4.0,
-		true
+		_companion_phase * 2.2,
+		Vector2.ONE * QIANKUN_RING_SCALE
 	)
-	draw_arc(
-		position,
-		5.0,
-		0.0,
-		TAU,
-		30,
-		Color("ffe9a8"),
-		2.0,
-		true
-	)
+	draw_texture(QIANKUN_RING_TEXTURE, -texture_size * 0.5)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _create_equipment(
@@ -4437,9 +4444,10 @@ func _get_direct_weapon_slot(event: InputEventKey) -> int:
 
 func _is_starting_weapon_key(event: InputEventKey) -> bool:
 	return (
-		int(event.physical_keycode) == 96
-		or int(event.keycode) == 96
-		or event.unicode == 96
+		event.physical_keycode == KEY_Q
+		or event.keycode == KEY_Q
+		or event.unicode == 113
+		or event.unicode == 81
 	)
 
 

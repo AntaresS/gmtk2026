@@ -109,7 +109,7 @@ func _hit_enemy(enemy: EnemyController) -> void:
 	if _hit_enemy_ids.has(enemy_id):
 		return
 	_hit_enemy_ids[enemy_id] = true
-	enemy.take_melee_damage(_damage, _is_critical)
+	enemy.take_melee_damage(_damage, _is_critical, &"flying_sword")
 	_energy = maxf(_energy - maxf(energy_cost_per_hit, 0.1), 0.0)
 	queue_redraw()
 	if _energy <= 0.0:

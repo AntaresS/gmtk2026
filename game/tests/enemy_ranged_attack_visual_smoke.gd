@@ -88,6 +88,13 @@ func _run() -> void:
 		and absf(enemy.get_ranged_aim_fill() - 0.25) <= 0.04,
 		"Outer warning distance did not begin the partially filled aim line."
 	)
+	_check(
+		enemy.get_ranged_aim_line_color().is_equal_approx(
+			EnemyController.RANGED_AIM_LINE_NORMAL_COLOR
+		)
+		and not enemy.has_method("_draw_ranged_attack_indicator"),
+		"Ordinary ranged warning kept the old reticle or wrong aim-line tint."
+	)
 
 	enemy.global_position = (
 		player.get_combat_anchor_position()
@@ -142,6 +149,12 @@ func _run() -> void:
 	enemy.queue_free()
 	await _wait_physics_frames(2)
 	var elite_enemy := _make_ranged_enemy(player, true)
+	_check(
+		elite_enemy.get_ranged_aim_line_color().is_equal_approx(
+			EnemyController.RANGED_AIM_LINE_ELITE_COLOR
+		),
+		"Elite ranged enemy did not select the bright-red aim-line tint."
+	)
 	elite_enemy.global_position = (
 		player.get_combat_anchor_position()
 		+ Vector2(0.0, -elite_enemy.ranged_attack_range + 8.0)

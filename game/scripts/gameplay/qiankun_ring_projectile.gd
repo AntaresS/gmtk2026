@@ -4,12 +4,28 @@ extends Area2D
 signal returned_to_player
 signal enemy_hit(enemy: EnemyController)
 
+const TRAIL_MAXIMUM_POINTS: int = 10
+const TRAIL_SAMPLE_DISTANCE: float = 18.0
+const HIT_AFTERIMAGE_DURATION: float = 0.2
+const HIT_AFTERIMAGE_START_SCALE: float = 0.043
+const HIT_AFTERIMAGE_END_SCALE: float = 0.11
+
 ## Outbound and bounce travel speed in world pixels per second.
 @export var travel_speed: float = 760.0
 ## Homing speed in world pixels per second after the final bounce.
 @export var return_speed: float = 920.0
 ## Maximum lifetime in seconds before a lost ring is safely removed.
 @export_range(1.0, 20.0, 0.5) var maximum_lifetime: float = 8.0
+
+@onready var trail_glow: Line2D = $TrailGlow
+@onready var trail_core: Line2D = $TrailCore
+@onready var hit_afterimages: Array[Sprite2D] = [
+	$HitAfterimage1,
+	$HitAfterimage2,
+	$HitAfterimage3,
+	$HitAfterimage4,
+]
+
 var _player: PlayerController
 var _target: EnemyController
 var _damage: int = 1
@@ -22,6 +38,24 @@ var _last_hit_enemy_id: int = 0
 var _aoe_radius: float = 0.0
 var _projectile_speed_multiplier: float = 1.0
 var _is_critical: bool = false
+var _trail_world_points := PackedVector2Array()
+var _last_trail_sample_position := Vector2.ZERO
+var _hit_afterimage_ages := PackedFloat32Array()
+var _next_hit_afterimage_index: int = 0
+
+
+func _ready() -> void:
+	# Trail geometry is kept in world space so the spinning projectile never
+	# rotates old trail points. Both lines share the same small point array.
+	for trail in [trail_glow, trail_core]:
+		trail.set_as_top_level(true)
+		trail.global_transform = Transform2D.IDENTITY
+	_hit_afterimage_ages.resize(hit_afterimages.size())
+	for afterimage_index in hit_afterimages.size():
+		var afterimage := hit_afterimages[afterimage_index]
+		afterimage.set_as_top_level(true)
+		afterimage.hide()
+		_hit_afterimage_ages[afterimage_index] = HIT_AFTERIMAGE_DURATION
 
 
 ## Launches the ring at one enemy. `bounce_count` counts extra enemy hits
@@ -53,6 +87,7 @@ func configure(
 func _physics_process(delta: float) -> void:
 	if _finished:
 		return
+	_update_hit_afterimages(delta)
 	_lifetime_remaining -= delta
 	rotation += delta * 11.0
 	if _lifetime_remaining <= 0.0 or not is_instance_valid(_player):
@@ -60,42 +95,14 @@ func _physics_process(delta: float) -> void:
 		return
 	if _returning:
 		_move_back_to_player(delta)
+		_update_trail()
 		return
 	if not is_instance_valid(_target) or not _target.is_combat_active():
 		_select_next_target_or_return()
+		_update_trail()
 		return
 	_move_toward_enemy(delta)
-
-
-func _draw() -> void:
-	draw_circle(Vector2.ZERO, 15.0, Color(1.0, 0.3, 0.82, 0.14))
-	draw_arc(
-		Vector2.ZERO,
-		11.0,
-		0.0,
-		TAU,
-		40,
-		Color("ff8ee7"),
-		5.0,
-		true
-	)
-	draw_arc(
-		Vector2.ZERO,
-		6.0,
-		0.0,
-		TAU,
-		32,
-		Color("ffe9a8"),
-		2.0,
-		true
-	)
-	for spark_index in 4:
-		var spark_angle := float(spark_index) / 4.0 * TAU
-		draw_circle(
-			Vector2.from_angle(spark_angle) * 14.0,
-			2.2,
-			Color.WHITE
-		)
+	_update_trail()
 
 
 func _move_toward_enemy(delta: float) -> void:
@@ -151,7 +158,8 @@ func _hit_enemy(enemy: EnemyController) -> void:
 	if enemy_id == _last_hit_enemy_id:
 		return
 	_last_hit_enemy_id = enemy_id
-	enemy.take_melee_damage(_damage, _is_critical)
+	_spawn_hit_afterimage(enemy.global_position)
+	enemy.take_melee_damage(_damage, _is_critical, &"qiankun_ring")
 	_apply_aoe_damage(enemy, _damage)
 	enemy_hit.emit(enemy)
 	if _remaining_bounces <= 0:
@@ -163,6 +171,71 @@ func _hit_enemy(enemy: EnemyController) -> void:
 		return
 	_remaining_bounces -= 1
 	_target = next_target
+
+
+func _update_trail() -> void:
+	var current_position := global_position
+	if _trail_world_points.is_empty():
+		_trail_world_points.append(current_position)
+		_trail_world_points.append(current_position)
+		_last_trail_sample_position = current_position
+	elif (
+		current_position.distance_squared_to(
+			_last_trail_sample_position
+		)
+		>= TRAIL_SAMPLE_DISTANCE * TRAIL_SAMPLE_DISTANCE
+	):
+		_trail_world_points.append(current_position)
+		_last_trail_sample_position = current_position
+		while _trail_world_points.size() > TRAIL_MAXIMUM_POINTS:
+			_trail_world_points.remove_at(0)
+	else:
+		_trail_world_points[
+			_trail_world_points.size() - 1
+		] = current_position
+	trail_glow.points = _trail_world_points
+	trail_core.points = _trail_world_points
+
+
+func _spawn_hit_afterimage(hit_position: Vector2) -> void:
+	if hit_afterimages.is_empty():
+		return
+	var afterimage_index := (
+		_next_hit_afterimage_index % hit_afterimages.size()
+	)
+	_next_hit_afterimage_index = (
+		afterimage_index + 1
+	) % hit_afterimages.size()
+	var afterimage := hit_afterimages[afterimage_index]
+	afterimage.global_position = hit_position
+	afterimage.global_rotation = rotation
+	afterimage.scale = Vector2.ONE * HIT_AFTERIMAGE_START_SCALE
+	afterimage.self_modulate = Color(1.0, 0.82, 0.34, 0.9)
+	afterimage.show()
+	_hit_afterimage_ages[afterimage_index] = 0.0
+
+
+func _update_hit_afterimages(delta: float) -> void:
+	for afterimage_index in hit_afterimages.size():
+		var age := (
+			_hit_afterimage_ages[afterimage_index]
+			+ maxf(delta, 0.0)
+		)
+		_hit_afterimage_ages[afterimage_index] = age
+		var afterimage := hit_afterimages[afterimage_index]
+		if age >= HIT_AFTERIMAGE_DURATION:
+			afterimage.hide()
+			continue
+		var progress := age / HIT_AFTERIMAGE_DURATION
+		var expansion := 1.0 - pow(1.0 - progress, 3.0)
+		var current_scale := lerpf(
+			HIT_AFTERIMAGE_START_SCALE,
+			HIT_AFTERIMAGE_END_SCALE,
+			expansion
+		)
+		afterimage.scale = Vector2.ONE * current_scale
+		afterimage.rotation += delta * 4.0
+		afterimage.self_modulate.a = pow(1.0 - progress, 2.0) * 0.9
 
 
 func _apply_aoe_damage(primary_enemy: EnemyController, damage: int) -> void:
@@ -178,7 +251,7 @@ func _apply_aoe_damage(primary_enemy: EnemyController, damage: int) -> void:
 			or enemy.global_position.distance_to(global_position) > _aoe_radius
 		):
 			continue
-		enemy.take_melee_damage(damage, _is_critical)
+		enemy.take_melee_damage(damage, _is_critical, &"qiankun_ring")
 
 
 func _select_next_target_or_return() -> void:

@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://ddr0tj47oo4w8" path="res://game/scripts/gameplay/weapon_data.gd" id="1_weapon_data"]
 [ext_resource type="PackedScene" path="res://game/scenes/gameplay/qiankun_ring_projectile.tscn" id="2_projectile"]
+[ext_resource type="Texture2D" path="res://assets/player_weapons/qiankun_ring.png" id="3_icon"]
 
 [resource]
 script = ExtResource("1_weapon_data")
@@ -11,6 +12,7 @@ attack_kind = 3
 attack_domain = 1
 display_color = Color(1, 0.556863, 0.905882, 1)
 pickup_color = Color(1, 0.556863, 0.905882, 1)
+icon_texture = ExtResource("3_icon")
 cultivation_type = 2
 minimum_damage = 5
 maximum_damage = 5
