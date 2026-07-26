@@ -293,11 +293,11 @@ func _run() -> void:
 		enemy_spawner.enemy_qi_drop_amount == 15
 		and is_equal_approx(
 			enemy_spawner.qi_drop_increase_per_difficulty_step,
-			0.5
+			0.75
 		)
 		and is_equal_approx(
 			enemy_spawner.elite_qi_drop_multiplier,
-			1.5
+			2.0
 		)
 		and is_equal_approx(
 			enemy_spawner.trial_qi_drop_multiplier,
@@ -322,31 +322,31 @@ func _run() -> void:
 			false,
 			false,
 			false
-		) == 24
-		and enemy_spawner.get_enemy_qi_drop_amount(
-			18,
-			true,
-			false,
-			false
-		) == 36
-		and enemy_spawner.get_enemy_qi_drop_amount(
-			18,
-			false,
-			true,
-			false
 		) == 29
 		and enemy_spawner.get_enemy_qi_drop_amount(
 			18,
+			true,
+			false,
+			false
+		) == 57
+		and enemy_spawner.get_enemy_qi_drop_amount(
+			18,
+			false,
+			true,
+			false
+		) == 34
+		and enemy_spawner.get_enemy_qi_drop_amount(
+			18,
 			false,
 			false,
 			true
-		) == 28
+		) == 33
 		and enemy_spawner.get_enemy_qi_drop_amount(
 			18,
 			true,
 			true,
 			true
-		) == 50
+		) == 79
 		and enemy_spawner.get_enemy_qi_drop_amount(
 			10000,
 			true,
@@ -356,13 +356,14 @@ func _run() -> void:
 		"Enemy Qi progression did not apply step, type, and cap modifiers."
 	)
 	_check(
-		is_equal_approx(enemy_spawner.initial_elite_spawn_chance, 0.06)
-		and is_equal_approx(enemy_spawner.elite_spawn_chance, 0.10)
+		is_equal_approx(enemy_spawner.initial_elite_spawn_chance, 0.10)
+		and is_equal_approx(enemy_spawner.elite_spawn_chance, 0.18)
 		and is_equal_approx(
 			enemy_spawner.trial_initial_elite_spawn_chance,
-			0.08
+			0.12
 		)
-		and is_equal_approx(enemy_spawner.trial_elite_spawn_chance, 0.12)
+		and is_equal_approx(enemy_spawner.trial_elite_spawn_chance, 0.30)
+		and enemy_spawner.elite_ramp_difficulty_steps == 18
 		and is_equal_approx(
 			enemy_spawner.minimum_elite_spawn_interval,
 			6.0
@@ -370,6 +371,16 @@ func _run() -> void:
 		and is_equal_approx(
 			enemy_spawner.trial_minimum_elite_spawn_interval,
 			4.0
+		)
+		and is_equal_approx(enemy_spawner.normal_elite_pity_seconds, 30.0)
+		and is_equal_approx(enemy_spawner.trial_elite_pity_seconds, 20.0)
+		and enemy_spawner.normal_elite_pity_defeats == 8
+		and enemy_spawner.trial_elite_pity_defeats == 6
+		and is_equal_approx(enemy_spawner.normal_elite_population_ratio, 0.16)
+		and is_equal_approx(enemy_spawner.elite_health_multiplier, 2.5)
+		and is_equal_approx(
+			enemy_spawner.trial_elite_health_multiplier,
+			3.0
 		)
 		and is_equal_approx(enemy_spawner.weapon_reward_elite_ratio, 0.5)
 		and is_equal_approx(
@@ -397,41 +408,38 @@ func _run() -> void:
 	_check(
 		is_equal_approx(
 			enemy_spawner.get_current_elite_spawn_chance(),
-			0.06
+			0.10
 		),
-		"Normal-road elite chance did not start at six percent."
+		"Normal-road elite chance did not start at ten percent."
 	)
-	enemy_spawner.set(
-		"_elapsed_run_time",
-		enemy_spawner.elite_ramp_duration_seconds
-	)
+	enemy_spawner.set("_elapsed_run_time", 0.0)
 	enemy_spawner.set_cultivation_level(
-		enemy_spawner.elite_ramp_cultivation_levels + 1
+		enemy_spawner.elite_ramp_difficulty_steps + 1
 	)
 	_check(
 		is_equal_approx(
 			enemy_spawner.get_current_elite_spawn_chance(),
-			0.10
+			0.18
 		)
 		and enemy_spawner.call(
 			"_get_elite_cap_for_band",
 			EnemySpawner.EliteRoadWidthBand.VERY_NARROW
-		) == 2
-		and enemy_spawner.call(
-			"_get_elite_cap_for_band",
-			EnemySpawner.EliteRoadWidthBand.NARROW
 		) == 3
 		and enemy_spawner.call(
 			"_get_elite_cap_for_band",
+			EnemySpawner.EliteRoadWidthBand.NARROW
+		) == 4
+		and enemy_spawner.call(
+			"_get_elite_cap_for_band",
 			EnemySpawner.EliteRoadWidthBand.STANDARD
-		) == 4,
+		) == 5,
 		"Normal-road elite curve or width caps did not mature correctly."
 	)
 	enemy_spawner.set_trial_hell_active(true)
 	_check(
 		is_equal_approx(
 			enemy_spawner.get_current_elite_spawn_chance(),
-			0.12
+			0.30
 		)
 		and enemy_spawner.call(
 			"_get_elite_cap_for_band",
@@ -765,6 +773,49 @@ func _run() -> void:
 		guaranteed_enemy.queue_free()
 	await _wait_process_frames(2)
 	enemy_spawner.set("_elapsed_run_time", 0.0)
+	enemy_spawner.set(
+		"_elite_pity_time_elapsed",
+		enemy_spawner.normal_elite_pity_seconds - 0.01
+	)
+	enemy_spawner.set(
+		"_ordinary_defeats_since_elite",
+		enemy_spawner.normal_elite_pity_defeats - 1
+	)
+	_check(
+		not enemy_spawner.is_elite_pity_due(),
+		"Normal elite pity activated before either fairness threshold."
+	)
+	enemy_spawner.set(
+		"_ordinary_defeats_since_elite",
+		enemy_spawner.normal_elite_pity_defeats
+	)
+	_check(
+		enemy_spawner.is_elite_pity_due(),
+		"Normal elite pity did not activate after eight ordinary defeats."
+	)
+	enemy_spawner.set("_elite_spawn_time_remaining", 0.0)
+	enemy_spawner.call("_spawn_enemy")
+	await _wait_physics_frames(2)
+	var pity_enemies := get_nodes_in_group("enemies")
+	var pity_snapshot := enemy_spawner.get_debug_snapshot()
+	_check(
+		pity_enemies.size() == 1
+		and (pity_enemies[0] as EnemyController).is_elite_enemy()
+		and (pity_enemies[0] as EnemyController).get_elite_reward_type()
+			== EnemyController.EliteRewardType.WEAPON
+		and (pity_enemies[0] as EnemyController).max_health == 8
+		and not bool(pity_snapshot["elite_pity_due"])
+		and int(pity_snapshot["ordinary_defeats_since_elite"]) == 0
+		and enemy_spawner.call("_get_next_elite_reward_type")
+			== EnemyController.EliteRewardType.POWER_FRAGMENT,
+		(
+			"Elite pity did not force one affordable, alternating reward elite "
+			+ "and reset its drought counters."
+		)
+	)
+	for pity_enemy in pity_enemies:
+		pity_enemy.queue_free()
+	await _wait_process_frames(2)
 	enemy_spawner.set_cultivation_level(5)
 	_check(
 		enemy_spawner.get_difficulty_step() == 4
@@ -956,6 +1007,22 @@ func _run() -> void:
 			var fragment_options: Array[Node2D] = []
 			if fragment_choice != null:
 				fragment_options = fragment_choice.get_options()
+			var combat_upgrade_types: Array[int] = [
+				UniversalUpgradeTypes.UpgradeType.ATTACK_SPEED,
+				UniversalUpgradeTypes.UpgradeType.DAMAGE,
+				UniversalUpgradeTypes.UpgradeType.DAMAGE_RANGE,
+			]
+			var fragment_choice_has_combat_output := false
+			for fragment_option_node in fragment_options:
+				if (
+					fragment_option_node is WeaponPowerFragment
+					and combat_upgrade_types.has(
+						(
+							fragment_option_node as WeaponPowerFragment
+						).upgrade_type
+					)
+				):
+					fragment_choice_has_combat_output = true
 			_check(
 				fragment_choice != null
 				and fragment_options.size() == 2
@@ -971,8 +1038,12 @@ func _run() -> void:
 				)
 				and weapon_choice.global_position.distance_to(
 					fragment_choice.global_position
-				) >= enemy_spawner.reward_group_minimum_spacing,
-				"Fragment elite rewards were not distinct or safely separated."
+				) >= enemy_spawner.reward_group_minimum_spacing
+				and fragment_choice_has_combat_output,
+				(
+					"Fragment elite rewards were not distinct, safely separated, "
+					+ "and protected from utility-only choices."
+				)
 			)
 
 			var choice_player := preload(

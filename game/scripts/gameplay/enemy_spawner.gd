@@ -105,26 +105,36 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 
 @export_category("Elite Enemies")
 ## Normal-road elite probability at the start of a run. It eases toward
-## elite_spawn_chance as time and cultivation progress.
-@export_range(0.0, 1.0, 0.01) var initial_elite_spawn_chance: float = 0.06
+## elite_spawn_chance as combined difficulty pressure rises.
+@export_range(0.0, 1.0, 0.01) var initial_elite_spawn_chance: float = 0.10
 ## Normal-road elite probability after the progression curve reaches its cap.
-@export_range(0.0, 1.0, 0.01) var elite_spawn_chance: float = 0.10
+@export_range(0.0, 1.0, 0.01) var elite_spawn_chance: float = 0.18
 ## Trial Hell elite probability at the start of a run.
-@export_range(0.0, 1.0, 0.01) var trial_initial_elite_spawn_chance: float = 0.08
+@export_range(0.0, 1.0, 0.01) var trial_initial_elite_spawn_chance: float = 0.12
 ## Trial Hell elite probability after the progression curve reaches its cap.
-@export_range(0.0, 1.0, 0.01) var trial_elite_spawn_chance: float = 0.12
-## Unpaused seconds required for the time half of the elite curve to mature.
-@export_range(60.0, 900.0, 10.0) var elite_ramp_duration_seconds: float = 360.0
-## Cultivation levels above one required for the level half of the elite curve
-## to mature.
-@export_range(1, 81, 1) var elite_ramp_cultivation_levels: int = 35
+@export_range(0.0, 1.0, 0.01) var trial_elite_spawn_chance: float = 0.30
+## Combined time-and-cultivation difficulty steps required for the elite chance
+## curve to mature. This synchronizes reward access with enemy pressure.
+@export_range(1, 100, 1) var elite_ramp_difficulty_steps: int = 18
 ## Minimum seconds between non-guaranteed elite spawns on a normal road.
 @export_range(0.0, 30.0, 0.5) var minimum_elite_spawn_interval: float = 6.0
 ## Minimum seconds between non-guaranteed elite spawns in Trial Hell.
 @export_range(0.0, 30.0, 0.5) var trial_minimum_elite_spawn_interval: float = 4.0
+## Maximum unpaused seconds without an elite spawn on a normal road before the
+## next eligible spawn is forced elite. Pity never exceeds active caps.
+@export_range(1.0, 180.0, 1.0) var normal_elite_pity_seconds: float = 30.0
+## Maximum unpaused seconds without an elite spawn in Trial Hell before the
+## next eligible spawn is forced elite. Pity never exceeds active caps.
+@export_range(1.0, 180.0, 1.0) var trial_elite_pity_seconds: float = 20.0
+## Ordinary defeats allowed between normal-road elite spawns before the next
+## eligible spawn is forced elite.
+@export_range(1, 100, 1) var normal_elite_pity_defeats: int = 8
+## Ordinary defeats allowed between Trial Hell elite spawns before the next
+## eligible spawn is forced elite.
+@export_range(1, 100, 1) var trial_elite_pity_defeats: int = 6
 ## Maximum elite share of the current total-enemy cap on a normal road. This
 ## population cap is combined with the road-width cap below.
-@export_range(0.01, 1.0, 0.01) var normal_elite_population_ratio: float = 0.12
+@export_range(0.01, 1.0, 0.01) var normal_elite_population_ratio: float = 0.16
 ## Maximum elite share of the current total-enemy cap in Trial Hell.
 @export_range(0.01, 1.0, 0.01) var trial_elite_population_ratio: float = 0.18
 ## Half-width in world pixels at or below which a road is very narrow.
@@ -138,13 +148,13 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 ## changes when a generated road hovers near a width threshold.
 @export_range(0.0, 50.0, 1.0) var elite_road_width_hysteresis: float = 10.0
 ## Maximum active elites on a very narrow normal road.
-@export_range(1, 20, 1) var normal_very_narrow_elite_cap: int = 2
+@export_range(1, 20, 1) var normal_very_narrow_elite_cap: int = 3
 ## Maximum active elites on a narrow normal road.
-@export_range(1, 20, 1) var normal_narrow_elite_cap: int = 3
+@export_range(1, 20, 1) var normal_narrow_elite_cap: int = 4
 ## Maximum active elites on a standard normal road.
-@export_range(1, 20, 1) var normal_standard_elite_cap: int = 4
+@export_range(1, 20, 1) var normal_standard_elite_cap: int = 5
 ## Maximum active elites on a wide normal road.
-@export_range(1, 20, 1) var normal_wide_elite_cap: int = 5
+@export_range(1, 20, 1) var normal_wide_elite_cap: int = 6
 ## Maximum active elites on a very narrow Trial Hell road.
 @export_range(1, 30, 1) var trial_very_narrow_elite_cap: int = 3
 ## Maximum active elites on a narrow Trial Hell road.
@@ -153,14 +163,18 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 @export_range(1, 30, 1) var trial_standard_elite_cap: int = 6
 ## Maximum active elites on a wide Trial Hell road.
 @export_range(1, 30, 1) var trial_wide_elite_cap: int = 7
-## Health multiplier applied after elapsed-time difficulty scaling.
-@export_range(1.1, 10.0, 0.1) var elite_health_multiplier: float = 3.0
+## Health multiplier applied to normal-road elites after difficulty scaling.
+## The reduced default avoids making a recovery reward a severe farming tax.
+@export_range(1.1, 10.0, 0.1) var elite_health_multiplier: float = 2.5
+## Health multiplier applied to Trial Hell elites after route difficulty.
+## Trial Hell retains the former triple-health elite challenge.
+@export_range(1.1, 10.0, 0.1) var trial_elite_health_multiplier: float = 3.0
 ## Melee-range multiplier applied to elite enemies.
 @export_range(1.1, 4.0, 0.1) var elite_attack_range_multiplier: float = 1.6
 ## Visual and collision scale applied to elite enemy bodies.
 @export_range(1.0, 2.0, 0.05) var elite_visual_scale: float = 1.25
-## Portion of elite spawns that advertise and grant a weapon choice. Remaining
-## elites advertise and grant a universal power-fragment choice.
+## Chance that the first unsequenced elite grants a weapon choice. Later elite
+## reward categories alternate to prevent weapon or power-fragment droughts.
 @export_range(0.0, 1.0, 0.05) var weapon_reward_elite_ratio: float = 0.5
 ## Unpaused run time in seconds by which at least one weapon-rewarding elite
 ## must have spawned. Crossing this mark creates one immediately if needed.
@@ -247,11 +261,11 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 ## Base Qi granted by a normal enemy before difficulty and type adjustments.
 @export_range(1, 1000, 1) var enemy_qi_drop_amount: int = 15
 ## Additional Qi added per combined time-and-cultivation difficulty step before
-## enemy-type multipliers. The default adds one Qi every two steps after rounding.
-@export_range(0.0, 20.0, 0.05) var qi_drop_increase_per_difficulty_step: float = 0.5
+## enemy-type multipliers. This compensates more of the rising farming pressure.
+@export_range(0.0, 20.0, 0.05) var qi_drop_increase_per_difficulty_step: float = 0.75
 ## Qi multiplier for elite enemies. This deliberately compensates only part of
-## their triple health because elites also grant one exclusive reward choice.
-@export_range(0.0, 5.0, 0.05) var elite_qi_drop_multiplier: float = 1.5
+## their increased health because elites also grant one exclusive reward choice.
+@export_range(0.0, 5.0, 0.05) var elite_qi_drop_multiplier: float = 2.0
 ## Qi multiplier for enemies spawned while Trial Hell is active. It stacks with
 ## elite and rear-pursuer multipliers and rewards the route's added danger.
 @export_range(0.0, 5.0, 0.05) var trial_qi_drop_multiplier: float = 1.2
@@ -310,6 +324,9 @@ var _road_half_width_resolver: Callable
 var _weapon_reward_elite_spawned: bool = false
 var _fragment_reward_elite_spawned: bool = false
 var _elite_spawn_time_remaining: float = 0.0
+var _elite_pity_time_elapsed: float = 0.0
+var _ordinary_defeats_since_elite: int = 0
+var _last_elite_reward_type: int = EnemyController.EliteRewardType.NONE
 var _forward_elite_road_band: int = -1
 var _rear_elite_road_band: int = -1
 var _active_ranged_attackers: Dictionary = {}
@@ -322,6 +339,9 @@ func _ready() -> void:
 	_weapon_reward_elite_spawned = false
 	_fragment_reward_elite_spawned = false
 	_elite_spawn_time_remaining = 0.0
+	_elite_pity_time_elapsed = 0.0
+	_ordinary_defeats_since_elite = 0
+	_last_elite_reward_type = EnemyController.EliteRewardType.NONE
 	_forward_elite_road_band = -1
 	_rear_elite_road_band = -1
 	_active_ranged_attackers.clear()
@@ -338,6 +358,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	_elapsed_run_time += delta
+	_elite_pity_time_elapsed += delta
 	_spawn_time_remaining -= delta
 	_rear_spawn_time_remaining -= delta
 	_elite_spawn_time_remaining = maxf(
@@ -443,6 +464,9 @@ func get_debug_snapshot() -> Dictionary:
 		"ranged_windup_cap": get_current_ranged_windup_cap(),
 		"elite_spawn_chance": get_current_elite_spawn_chance(),
 		"elite_spawn_cooldown": _elite_spawn_time_remaining,
+		"elite_pity_time": _elite_pity_time_elapsed,
+		"ordinary_defeats_since_elite": _ordinary_defeats_since_elite,
+		"elite_pity_due": is_elite_pity_due(),
 		"forward_elite_cap": get_current_elite_cap(
 			_get_spawn_y(false)
 		),
@@ -637,21 +661,16 @@ func get_current_spawn_interval(from_behind: bool) -> float:
 
 ## Returns the smoothly ramped elite probability for the active route.
 func get_current_elite_spawn_chance() -> float:
-	var time_progress := clampf(
-		_elapsed_run_time / maxf(elite_ramp_duration_seconds, 1.0),
-		0.0,
-		1.0
-	)
-	var cultivation_progress := clampf(
-		float(maxi(_cultivation_level - 1, 0))
-			/ float(maxi(elite_ramp_cultivation_levels, 1)),
+	var difficulty_progress := clampf(
+		float(get_difficulty_step())
+			/ float(maxi(elite_ramp_difficulty_steps, 1)),
 		0.0,
 		1.0
 	)
 	var progress := smoothstep(
 		0.0,
 		1.0,
-		(time_progress + cultivation_progress) * 0.5
+		difficulty_progress
 	)
 	var start_chance := (
 		trial_initial_elite_spawn_chance
@@ -667,6 +686,26 @@ func get_current_elite_spawn_chance() -> float:
 		lerpf(start_chance, end_chance, progress),
 		0.0,
 		1.0
+	)
+
+
+## Returns whether elapsed time or ordinary defeats have activated the current
+## route's bad-luck protection. Admission still requires no living elite and
+## room under the active road-width and population caps.
+func is_elite_pity_due() -> bool:
+	var pity_seconds := (
+		trial_elite_pity_seconds
+		if _trial_hell_active
+		else normal_elite_pity_seconds
+	)
+	var pity_defeats := (
+		trial_elite_pity_defeats
+		if _trial_hell_active
+		else normal_elite_pity_defeats
+	)
+	return (
+		_elite_pity_time_elapsed >= maxf(pity_seconds, 1.0)
+		or _ordinary_defeats_since_elite >= maxi(pity_defeats, 1)
 	)
 
 
@@ -773,6 +812,8 @@ func _can_spawn_random_elite(spawn_y: float, from_behind: bool) -> bool:
 	)
 	if get_active_elite_count() >= _get_elite_cap_for_band(road_band):
 		return false
+	if get_active_elite_count() == 0 and is_elite_pity_due():
+		return true
 	return _rng.randf() <= get_current_elite_spawn_chance()
 
 
@@ -823,14 +864,14 @@ func _spawn_enemy(
 		var reward_type := (
 			forced_elite_reward_type
 			if has_forced_elite_reward
-			else (
-				EnemyController.EliteRewardType.WEAPON
-				if _rng.randf() <= clampf(weapon_reward_elite_ratio, 0.0, 1.0)
-				else EnemyController.EliteRewardType.POWER_FRAGMENT
-			)
+			else _get_next_elite_reward_type()
 		)
 		enemy.configure_elite(
-			elite_health_multiplier,
+			(
+				trial_elite_health_multiplier
+				if _trial_hell_active
+				else elite_health_multiplier
+			),
 			elite_attack_range_multiplier,
 			elite_visual_scale,
 			reward_type
@@ -886,11 +927,29 @@ func _spawn_due_elite_guarantees() -> void:
 
 
 func _record_elite_reward_spawn(reward_type: int) -> void:
+	_elite_pity_time_elapsed = 0.0
+	_ordinary_defeats_since_elite = 0
+	_last_elite_reward_type = reward_type
 	match reward_type:
 		EnemyController.EliteRewardType.WEAPON:
 			_weapon_reward_elite_spawned = true
 		EnemyController.EliteRewardType.POWER_FRAGMENT:
 			_fragment_reward_elite_spawned = true
+
+
+func _get_next_elite_reward_type() -> int:
+	match _last_elite_reward_type:
+		EnemyController.EliteRewardType.WEAPON:
+			return EnemyController.EliteRewardType.POWER_FRAGMENT
+		EnemyController.EliteRewardType.POWER_FRAGMENT:
+			return EnemyController.EliteRewardType.WEAPON
+		_:
+			return (
+				EnemyController.EliteRewardType.WEAPON
+				if _rng.randf()
+					<= clampf(weapon_reward_elite_ratio, 0.0, 1.0)
+				else EnemyController.EliteRewardType.POWER_FRAGMENT
+			)
 
 
 func _configure_enemy_variant(enemy: EnemyController, elite: bool) -> void:
@@ -1016,15 +1075,15 @@ func _on_enemy_defeated(
 	defeated_enemy: EnemyController,
 	qi_reward: int
 ) -> void:
-	enemy_defeat_recorded.emit(
-		is_instance_valid(defeated_enemy)
-			and defeated_enemy.is_elite_enemy()
-	)
-	_drop_qi(drop_position, qi_reward)
-	if (
+	var defeated_elite := (
 		is_instance_valid(defeated_enemy)
 		and defeated_enemy.is_elite_enemy()
-	):
+	)
+	enemy_defeat_recorded.emit(defeated_elite)
+	if not defeated_elite:
+		_ordinary_defeats_since_elite += 1
+	_drop_qi(drop_position, qi_reward)
+	if defeated_elite:
 		match defeated_enemy.get_elite_reward_type():
 			EnemyController.EliteRewardType.WEAPON:
 				_drop_weapon_choice(drop_position)
@@ -1110,22 +1169,13 @@ func _drop_weapon_choice(drop_position: Vector2) -> void:
 func _drop_weapon_power_fragment_choice(drop_position: Vector2) -> void:
 	if weapon_power_fragment_scene == null:
 		return
-	var first_type := _rng.randi_range(0, UniversalUpgradeTypes.COUNT - 1)
-	var second_type := first_type
-	if UniversalUpgradeTypes.COUNT > 1:
-		second_type = _rng.randi_range(
-			0,
-			UniversalUpgradeTypes.COUNT - 2
-		)
-		if second_type >= first_type:
-			second_type += 1
+	var upgrade_types := _roll_power_fragment_choice_types()
 	var choice_group := _create_reward_choice_group(
 		drop_position,
 		EliteRewardChoiceResource.RewardKind.POWER_FRAGMENT
 	)
 	if choice_group == null:
 		return
-	var upgrade_types: Array[int] = [first_type, second_type]
 	for choice_index in upgrade_types.size():
 		var fragment := (
 			weapon_power_fragment_scene.instantiate()
@@ -1151,6 +1201,28 @@ func _drop_weapon_power_fragment_choice(drop_position: Vector2) -> void:
 				0.0
 			)
 		)
+
+
+## Rolls two distinct universal upgrades with at least one direct farming
+## output option: attack speed, damage, or damage range.
+func _roll_power_fragment_choice_types() -> Array[int]:
+	var combat_types: Array[int] = [
+		UniversalUpgradeTypes.UpgradeType.ATTACK_SPEED,
+		UniversalUpgradeTypes.UpgradeType.DAMAGE,
+		UniversalUpgradeTypes.UpgradeType.DAMAGE_RANGE,
+	]
+	var first_type := combat_types[
+		_rng.randi_range(0, combat_types.size() - 1)
+	]
+	var second_type := _rng.randi_range(
+		0,
+		UniversalUpgradeTypes.COUNT - 2
+	)
+	if second_type >= first_type:
+		second_type += 1
+	if _rng.randf() <= 0.5:
+		return [first_type, second_type]
+	return [second_type, first_type]
 
 
 func _create_reward_choice_group(

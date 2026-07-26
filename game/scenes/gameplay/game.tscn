@@ -1,27 +1,27 @@
-[gd_scene load_steps=12 format=3 uid="uid://dt3cq5k4og56r"]
+[gd_scene format=3 uid="uid://dt3cq5k4og56r"]
 
 [ext_resource type="Script" uid="uid://8y3eqgopjr0k" path="res://game/scripts/gameplay/game.gd" id="1_script"]
-[ext_resource type="Script" path="res://game/scripts/audio/background_music_player.gd" id="2_bgm_script"]
-[ext_resource type="PackedScene" path="res://game/scenes/gameplay/player.tscn" id="3_player"]
+[ext_resource type="Script" uid="uid://saekbmlj3h6b" path="res://game/scripts/audio/background_music_player.gd" id="2_bgm_script"]
+[ext_resource type="PackedScene" uid="uid://dhwwmgs6upxg4" path="res://game/scenes/gameplay/player.tscn" id="3_player"]
 [ext_resource type="Script" uid="uid://dh365sfe2c42s" path="res://game/scripts/gameplay/infinite_world.gd" id="4_world"]
 [ext_resource type="PackedScene" uid="uid://cs0urbmqtpj4t" path="res://game/scenes/menus/pause_menu.tscn" id="5_pause"]
 [ext_resource type="Script" uid="uid://cd6uay63wcsya" path="res://game/scripts/gameplay/run_resources.gd" id="6_resources"]
-[ext_resource type="PackedScene" path="res://game/scenes/gameplay/gameplay_hud.tscn" id="7_hud"]
+[ext_resource type="PackedScene" uid="uid://bbvlvsi3sds38" path="res://game/scenes/gameplay/gameplay_hud.tscn" id="7_hud"]
 [ext_resource type="PackedScene" path="res://game/scenes/gameplay/run_ended_overlay.tscn" id="8_run_ended"]
 [ext_resource type="Script" uid="uid://busmi46k4retl" path="res://game/scripts/gameplay/enemy_spawner.gd" id="9_enemy_spawner"]
 [ext_resource type="Script" uid="uid://brpwd6i43a2mv" path="res://game/scripts/gameplay/road_fork_spawner.gd" id="10_fork_spawner"]
-[ext_resource type="Script" path="res://game/scripts/menus/logical_ui_scaler.gd" id="11_ui_scaler"]
+[ext_resource type="Script" uid="uid://dvd3xj4ak8qtj" path="res://game/scripts/menus/logical_ui_scaler.gd" id="11_ui_scaler"]
 
 [node name="Game" type="Node2D" unique_id=666890130]
 script = ExtResource("1_script")
 camera_forward_look_ahead = 300.0
 
-[node name="BackgroundMusic" type="AudioStreamPlayer" parent="."]
+[node name="BackgroundMusic" type="AudioStreamPlayer" parent="." unique_id=753722419]
 script = ExtResource("2_bgm_script")
 music_volume_db = -10.0
 transition_duration = 0.6
 
-[node name="BreakthroughSuccessSfx" type="AudioStreamPlayer" parent="."]
+[node name="BreakthroughSuccessSfx" type="AudioStreamPlayer" parent="." unique_id=1902993690]
 
 [node name="RunResources" type="Node" parent="." unique_id=130728736]
 script = ExtResource("6_resources")
@@ -41,6 +41,14 @@ position = Vector2(0, -180)
 script = ExtResource("9_enemy_spawner")
 player = NodePath("../Player")
 camera = NodePath("../Camera2D")
+initial_elite_spawn_chance = 0.1
+elite_spawn_chance = 0.18
+trial_initial_elite_spawn_chance = 0.12
+trial_elite_spawn_chance = 0.3
+normal_very_narrow_elite_cap = 3
+normal_narrow_elite_cap = 4
+normal_standard_elite_cap = 5
+normal_wide_elite_cap = 6
 maximum_enemy_qi_drop = 88
 
 [node name="RoadForkSpawner" type="Node2D" parent="." unique_id=1213503090 node_paths=PackedStringArray("player", "camera")]
@@ -57,7 +65,7 @@ camera = NodePath("../Camera2D")
 [node name="DebugLayer" type="CanvasLayer" parent="." unique_id=1783769906]
 layer = 50
 
-[node name="DebugRoot" type="Control" parent="DebugLayer"]
+[node name="DebugRoot" type="Control" parent="DebugLayer" unique_id=2042115198]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -66,10 +74,11 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="LogicalUiScaler" type="Node" parent="DebugLayer/DebugRoot"]
+[node name="LogicalUiScaler" type="Node" parent="DebugLayer/DebugRoot" unique_id=940530022]
 script = ExtResource("11_ui_scaler")
 
 [node name="MarginContainer" type="MarginContainer" parent="DebugLayer/DebugRoot" unique_id=1357146757]
+layout_mode = 0
 offset_right = 120.0
 offset_bottom = 128.0
 theme_override_constants/margin_left = 16

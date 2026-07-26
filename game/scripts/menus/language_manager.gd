@@ -427,7 +427,7 @@ const TEXTS: Dictionary = {
 		"lifespan_drain_format": "Drain  -%.2f / sec",
 		"realm_format": "Realm %d",
 		"realm_layer_format": "%s · Layer %d/%d",
-		"realm_stage_format": "%s Realm",
+		"realm_stage_format": "%s",
 		"qi_format": "Spiritual Qi  %d / %d",
 		"technique_format": "Cultivation Art  %s",
 		"equipped_format": "Equipped  %s  · Damage %d",

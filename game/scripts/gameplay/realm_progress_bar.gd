@@ -4,7 +4,10 @@ extends Control
 signal infusion_finished
 
 const SEGMENT_COUNT: int = 9
-const LABEL_WIDTH: float = 148.0
+const LABEL_WIDTH: float = 220.0
+const LABEL_TEXT_WIDTH: float = LABEL_WIDTH - 12.0
+const LABEL_FONT_SIZE: int = 22
+const LABEL_MIN_FONT_SIZE: int = 16
 const SEGMENT_GAP: float = 5.0
 const SEGMENT_HEIGHT: float = 24.0
 const INFUSION_DURATION: float = 1.08
@@ -116,16 +119,14 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	var realm_color := get_current_realm_color()
 	var font := ThemeDB.fallback_font
+	var label_text := _get_realm_label_text()
 	draw_string(
 		font,
 		Vector2(0.0, 31.0),
-		LanguageManager.text("realm_progress_format") % [
-			_realm_name,
-			_layer,
-		],
+		label_text,
 		HORIZONTAL_ALIGNMENT_LEFT,
-		LABEL_WIDTH - 8.0,
-		22,
+		LABEL_TEXT_WIDTH,
+		_get_realm_label_font_size(font, label_text),
 		Color.WHITE
 	)
 	var segment_area_width := maxf(size.x - LABEL_WIDTH, 180.0)
@@ -186,6 +187,29 @@ func _draw() -> void:
 			2.0,
 			true
 		)
+
+
+func _get_realm_label_text() -> String:
+	return _realm_name
+
+
+func _get_realm_label_font_size(font: Font, label_text: String) -> int:
+	for font_size in range(
+		LABEL_FONT_SIZE,
+		LABEL_MIN_FONT_SIZE - 1,
+		-1
+	):
+		if (
+			font.get_string_size(
+				label_text,
+				HORIZONTAL_ALIGNMENT_LEFT,
+				-1.0,
+				font_size
+			).x
+			<= LABEL_TEXT_WIDTH
+		):
+			return font_size
+	return LABEL_MIN_FONT_SIZE
 
 
 func _draw_infusion(target: Vector2, realm_color: Color) -> void:
