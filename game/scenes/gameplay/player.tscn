@@ -291,24 +291,26 @@ sprite_frames = SubResource("SpriteFrames_character")
 animation = &"fly"
 autoplay = "fly"
 
-[node name="DaoWeapons" type="Node2D" parent="."]
+[node name="CombatAnchor" type="Node2D" parent="."]
+
+[node name="DaoWeapons" type="Node2D" parent="CombatAnchor"]
 z_index = 5
 
-[node name="FlyingSwordWeapons" type="Node2D" parent="."]
+[node name="FlyingSwordWeapons" type="Node2D" parent="CombatAnchor"]
 z_index = 5
 
-[node name="PalmWeapon" type="Sprite2D" parent="."]
+[node name="PalmWeapon" type="Sprite2D" parent="CombatAnchor"]
 visible = false
 z_index = 5
 
-[node name="PalmEchoes" type="Node2D" parent="."]
+[node name="PalmEchoes" type="Node2D" parent="CombatAnchor"]
 z_index = 5
 
-[node name="FantianSealWeapon" type="Sprite2D" parent="."]
+[node name="FantianSealWeapon" type="Sprite2D" parent="CombatAnchor"]
 visible = false
 z_index = 5
 
-[node name="ThunderHammerVisual" parent="." instance=ExtResource("60_thunder_hammer")]
+[node name="ThunderHammerVisual" parent="CombatAnchor" instance=ExtResource("60_thunder_hammer")]
 
 [node name="RealmAbilities" type="Node" parent="." unique_id=1314996068 node_paths=PackedStringArray("character_sprite", "player_shadow", "spirit_sprite")]
 script = ExtResource("13_realm_abilities")
@@ -331,7 +333,7 @@ shape = SubResource("CircleShape2D_golden_bell")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1673772724]
 shape = SubResource("CircleShape2D_player")
 
-[node name="DamageTakenLabel" type="Label" parent="." unique_id=1139618906]
+[node name="DamageTakenLabel" type="Label" parent="CombatAnchor" unique_id=1139618906]
 visible = false
 z_index = 20
 offset_left = -52.0
@@ -345,18 +347,18 @@ theme_override_font_sizes/font_size = 24
 text = "-3.0 寿元"
 horizontal_alignment = 1
 
-[node name="AttackArea" type="Area2D" parent="." unique_id=1764565832]
+[node name="AttackArea" type="Area2D" parent="CombatAnchor" unique_id=1764565832]
 collision_layer = 0
 collision_mask = 8
 monitorable = false
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackArea" unique_id=229649188]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CombatAnchor/AttackArea" unique_id=229649188]
 shape = SubResource("CircleShape2D_attack")
 
-[node name="AttractionArea" type="Area2D" parent="." unique_id=747395240]
+[node name="AttractionArea" type="Area2D" parent="CombatAnchor" unique_id=747395240]
 collision_layer = 0
 collision_mask = 2
 monitorable = false
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="AttractionArea" unique_id=1956436526]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CombatAnchor/AttractionArea" unique_id=1956436526]
 shape = SubResource("CircleShape2D_attraction")

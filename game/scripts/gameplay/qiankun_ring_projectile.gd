@@ -130,11 +130,12 @@ func _move_toward_enemy(delta: float) -> void:
 
 
 func _move_back_to_player(delta: float) -> void:
+	var return_position := _player.get_combat_anchor_position()
 	global_position = global_position.move_toward(
-		_player.global_position,
+		return_position,
 		maxf(return_speed, 1.0) * _projectile_speed_multiplier * delta
 	)
-	if global_position.distance_to(_player.global_position) <= 18.0:
+	if global_position.distance_to(return_position) <= 18.0:
 		_finish_return()
 
 

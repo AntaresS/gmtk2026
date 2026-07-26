@@ -263,7 +263,7 @@ func _physics_process(delta: float) -> void:
 
 	var target := _get_combat_target()
 	var distance_to_target := (
-		global_position.distance_to(target.global_position)
+		global_position.distance_to(_get_target_combat_position(target))
 		if is_instance_valid(target)
 		else INF
 	)
@@ -556,7 +556,7 @@ func _get_melee_weapon_proximity() -> float:
 		return 0.0
 	var attack_range := _get_attack_range()
 	var distance_to_target := global_position.distance_to(
-		target.global_position
+		_get_target_combat_position(target)
 	)
 	return 1.0 - clampf(
 		(distance_to_target - attack_range)
@@ -820,7 +820,7 @@ func _get_bomber_warning_progress() -> float:
 		trigger_radius * BOMBER_WARNING_RANGE_MULTIPLIER
 	)
 	var distance_to_target := global_position.distance_to(
-		target.global_position
+		_get_target_combat_position(target)
 	)
 	return 1.0 - clampf(
 		(distance_to_target - trigger_radius)
@@ -850,7 +850,9 @@ func _update_melee_attack(
 ) -> void:
 	if _is_attack_winding_up:
 		if is_instance_valid(target):
-			_attack_direction = global_position.direction_to(target.global_position)
+			_attack_direction = global_position.direction_to(
+				_get_target_combat_position(target)
+			)
 		_attack_windup_remaining = maxf(
 			_attack_windup_remaining - delta,
 			0.0
@@ -876,7 +878,9 @@ func _begin_melee_attack() -> void:
 	_attack_windup_remaining = maxf(melee_windup_duration, 0.2)
 	var target := _get_combat_target()
 	if is_instance_valid(target):
-		_attack_direction = global_position.direction_to(target.global_position)
+		_attack_direction = global_position.direction_to(
+			_get_target_combat_position(target)
+		)
 	_melee_weapon_attack_start_rotation = (
 		_attack_direction.angle() + PI * 0.5
 	)
@@ -1021,7 +1025,9 @@ func _get_threat_indicator_visibility() -> float:
 	if not is_instance_valid(target):
 		return 0.0
 	var attack_range := _get_attack_range()
-	var distance_to_player := global_position.distance_to(target.global_position)
+	var distance_to_player := global_position.distance_to(
+		_get_target_combat_position(target)
+	)
 	return 1.0 - clampf(
 		(distance_to_player - attack_range)
 			/ maxf(threat_indicator_margin, 1.0),
@@ -1037,7 +1043,9 @@ func _get_attack_range() -> float:
 func _get_combat_target() -> Node2D:
 	var closest: Node2D = player
 	var closest_distance := (
-		global_position.distance_squared_to(player.global_position)
+		global_position.distance_squared_to(
+			_get_target_combat_position(player)
+		)
 		if is_instance_valid(player)
 		else INF
 	)
@@ -1053,10 +1061,22 @@ func _get_combat_target() -> Node2D:
 	return closest
 
 
+## Resolves the visible combat center for the player while keeping echoes and
+## other future combat targets on their ordinary Node2D origins.
+func _get_target_combat_position(target: Node2D) -> Vector2:
+	if target is PlayerController:
+		return (target as PlayerController).get_combat_anchor_position()
+	if is_instance_valid(target):
+		return target.global_position
+	return global_position
+
+
 func _get_bomber_tracking_velocity(target: Node2D) -> float:
 	if not is_instance_valid(target) or bomber_tracking_speed <= 0.0:
 		return 0.0
-	var lateral_offset := target.global_position.x - global_position.x
+	var lateral_offset := (
+		_get_target_combat_position(target).x - global_position.x
+	)
 	return clampf(
 		lateral_offset,
 		-bomber_tracking_speed,
@@ -1083,7 +1103,9 @@ func _explode(_trigger_target: Node2D) -> void:
 		return
 	for damage_target in _get_explosion_damage_targets():
 		if (
-			global_position.distance_to(damage_target.global_position)
+			global_position.distance_to(
+				_get_target_combat_position(damage_target)
+			)
 			> explosion_damage_radius
 		):
 			continue

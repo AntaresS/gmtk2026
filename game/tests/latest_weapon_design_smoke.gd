@@ -241,13 +241,13 @@ func _run() -> void:
 	)
 	var palm_edge_target := _make_enemy(
 		player,
-		player.global_position
+		player.get_combat_anchor_position()
 			+ Vector2(player.get_current_attack_range() + 19.0, 0.0),
 		99
 	)
 	var palm_outside_target := _make_enemy(
 		player,
-		player.global_position
+		player.get_combat_anchor_position()
 			+ Vector2(player.get_current_attack_range() + 21.0, 0.0),
 		99
 	)
@@ -275,7 +275,7 @@ func _run() -> void:
 	)
 	var foundation_visual_target := _make_enemy(
 		player,
-		player.global_position + Vector2(50.0, 0.0)
+		player.get_combat_anchor_position() + Vector2(50.0, 0.0)
 	)
 	player.call(
 		"_release_great_strength_palm",
@@ -290,7 +290,7 @@ func _run() -> void:
 	foundation_visual_target.queue_free()
 	var foundation_target := _make_enemy(
 		player,
-		player.global_position + Vector2(50.0, 0.0)
+		player.get_combat_anchor_position() + Vector2(50.0, 0.0)
 	)
 	player.call(
 		"_apply_palm_damage",
@@ -324,7 +324,7 @@ func _run() -> void:
 	)
 	var golden_high_target := _make_enemy(
 		player,
-		player.global_position + Vector2(50.0, 0.0),
+		player.get_combat_anchor_position() + Vector2(50.0, 0.0),
 		100
 	)
 	player.call(
@@ -342,7 +342,7 @@ func _run() -> void:
 	)
 	var golden_threshold_target := _make_enemy(
 		player,
-		player.global_position + Vector2(50.0, 0.0),
+		player.get_combat_anchor_position() + Vector2(50.0, 0.0),
 		100
 	)
 	golden_threshold_target.take_melee_damage(25)
@@ -359,12 +359,12 @@ func _run() -> void:
 	golden_threshold_target.queue_free()
 	var golden_front_target := _make_enemy(
 		player,
-		player.global_position + Vector2(50.0, 0.0),
+		player.get_combat_anchor_position() + Vector2(50.0, 0.0),
 		100
 	)
 	var golden_rear_target := _make_enemy(
 		player,
-		player.global_position + Vector2(-50.0, 0.0),
+		player.get_combat_anchor_position() + Vector2(-50.0, 0.0),
 		100
 	)
 	golden_front_target.set_physics_process(false)
@@ -399,7 +399,7 @@ func _run() -> void:
 	)
 	var nascent_visual_target := _make_enemy(
 		player,
-		player.global_position + Vector2(50.0, 0.0),
+		player.get_combat_anchor_position() + Vector2(50.0, 0.0),
 		100
 	)
 	nascent_visual_target.set_physics_process(false)
@@ -428,7 +428,7 @@ func _run() -> void:
 	execute_resources.demote_to_realm(3, 1)
 	var nascent_target := _make_enemy(
 		execute_player,
-		execute_player.global_position + Vector2(50.0, 0.0),
+		execute_player.get_combat_anchor_position() + Vector2(50.0, 0.0),
 		100
 	)
 	nascent_target.take_melee_damage(51)
@@ -444,7 +444,7 @@ func _run() -> void:
 	)
 	var threshold_target := _make_enemy(
 		execute_player,
-		execute_player.global_position + Vector2(50.0, 0.0),
+		execute_player.get_combat_anchor_position() + Vector2(50.0, 0.0),
 		100
 	)
 	threshold_target.take_melee_damage(50)
@@ -460,7 +460,7 @@ func _run() -> void:
 	)
 	var palm_elite_target := _make_enemy(
 		execute_player,
-		execute_player.global_position + Vector2(50.0, 0.0),
+		execute_player.get_combat_anchor_position() + Vector2(50.0, 0.0),
 		100
 	)
 	palm_elite_target.configure_elite(2.0, 1.2, 1.2)
@@ -477,7 +477,7 @@ func _run() -> void:
 	)
 	var nascent_high_target := _make_enemy(
 		execute_player,
-		execute_player.global_position + Vector2(50.0, 0.0),
+		execute_player.get_combat_anchor_position() + Vector2(50.0, 0.0),
 		100
 	)
 	execute_player.call(
@@ -568,7 +568,7 @@ func _run() -> void:
 	)
 	var thunder_target := _make_enemy(
 		player,
-		player.global_position + Vector2(60.0, 0.0)
+		player.get_combat_anchor_position() + Vector2(60.0, 0.0)
 	)
 	await _wait_physics_frames(2)
 	await process_frame
@@ -720,7 +720,7 @@ func _run() -> void:
 	)
 	var exact_damage_target := _make_enemy(
 		capped_thunder_player,
-		capped_thunder_player.global_position,
+		capped_thunder_player.get_combat_anchor_position(),
 		100
 	)
 	var exact_damage_cloud := (
@@ -806,12 +806,12 @@ func _run() -> void:
 	)
 	var normal_target := _make_enemy(
 		player,
-		player.global_position + Vector2(-100.0, 0.0),
+		player.get_combat_anchor_position() + Vector2(-100.0, 0.0),
 		500
 	)
 	var elite_target := _make_enemy(
 		player,
-		player.global_position + Vector2(100.0, 0.0),
+		player.get_combat_anchor_position() + Vector2(100.0, 0.0),
 		100
 	)
 	elite_target.configure_elite(2.0, 1.2, 1.2)
@@ -868,7 +868,7 @@ func _run() -> void:
 	level_four_player.set("_attack_cooldown_remaining", 999.0)
 	var level_four_target := _make_enemy(
 		level_four_player,
-		level_four_player.global_position + Vector2(80.0, 0.0),
+		level_four_player.get_combat_anchor_position() + Vector2(80.0, 0.0),
 		500
 	)
 	await _wait_physics_frames(2)

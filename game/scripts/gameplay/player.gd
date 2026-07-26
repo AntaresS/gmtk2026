@@ -298,21 +298,29 @@ const DAO_MAX_ATTACK_TRAIL_COUNT: int = 24
 ## Larger values make hits more prominent among nearby combat effects.
 @export_range(36.0, 120.0, 1.0) var damage_feedback_radius: float = 68.0
 
-@onready var attack_area: Area2D = $AttackArea
-@onready var attack_shape: CollisionShape2D = $AttackArea/CollisionShape2D
-@onready var attraction_area: Area2D = $AttractionArea
-@onready var attraction_shape: CollisionShape2D = (
-	$AttractionArea/CollisionShape2D
+@onready var combat_anchor: Node2D = $CombatAnchor
+@onready var attack_area: Area2D = $CombatAnchor/AttackArea
+@onready var attack_shape: CollisionShape2D = (
+	$CombatAnchor/AttackArea/CollisionShape2D
 )
+@onready var attraction_area: Area2D = $CombatAnchor/AttractionArea
+@onready var attraction_shape: CollisionShape2D = (
+	$CombatAnchor/AttractionArea/CollisionShape2D
+)
+@onready var body_shape: CollisionShape2D = $CollisionShape2D
 @onready var character_sprite: AnimatedSprite2D = $CharacterSprite
 @onready var spirit_sprite: AnimatedSprite2D = $SpiritSprite
-@onready var dao_weapon_layer: Node2D = $DaoWeapons
-@onready var flying_sword_layer: Node2D = $FlyingSwordWeapons
-@onready var palm_weapon: Sprite2D = $PalmWeapon
-@onready var palm_echo_layer: Node2D = $PalmEchoes
-@onready var fantian_seal_weapon: Sprite2D = $FantianSealWeapon
-@onready var thunder_hammer_visual: ThunderHammerVisual = $ThunderHammerVisual
-@onready var damage_taken_label: Label = $DamageTakenLabel
+@onready var dao_weapon_layer: Node2D = $CombatAnchor/DaoWeapons
+@onready var flying_sword_layer: Node2D = $CombatAnchor/FlyingSwordWeapons
+@onready var palm_weapon: Sprite2D = $CombatAnchor/PalmWeapon
+@onready var palm_echo_layer: Node2D = $CombatAnchor/PalmEchoes
+@onready var fantian_seal_weapon: Sprite2D = (
+	$CombatAnchor/FantianSealWeapon
+)
+@onready var thunder_hammer_visual: ThunderHammerVisual = (
+	$CombatAnchor/ThunderHammerVisual
+)
+@onready var damage_taken_label: Label = $CombatAnchor/DamageTakenLabel
 @onready var realm_abilities: RealmAbilityController = $RealmAbilities
 @onready var golden_bell: GoldenBellController = $GoldenBell
 
@@ -572,6 +580,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _draw() -> void:
+	draw_set_transform(combat_anchor.position)
 	var attack_range := get_current_attack_range()
 	var range_color := _get_current_range_color()
 	var attack_kind := _get_current_weapon_data().attack_kind
@@ -785,7 +794,7 @@ func _draw_fantian_seal_switch_shadow(attack_range: float) -> void:
 
 
 func _draw_qi_shield() -> void:
-	var center := Vector2(0.0, _character_sprite_rest_position.y)
+	var center := Vector2.ZERO
 	var shield_capacity := get_qi_shield_capacity()
 	var current_qi := (
 		_cultivation_resources.current_qi
@@ -908,12 +917,18 @@ func set_movement_enabled(enabled: bool) -> void:
 		_cancel_special_projectile_sequence()
 
 
-## Returns the visible body's world-space center for reward interactions. Flight
-## raises CharacterSprite above the ground-root collision body after 筑基.
-func get_reward_interaction_position() -> Vector2:
-	if is_instance_valid(character_sprite):
-		return character_sprite.global_position
+## Returns the stable world-space center shared by the airborne body hitbox,
+## weapon geometry, projectiles, and reward interactions. The road-travel root
+## and shadow remain at ground level while this anchor rises after 筑基.
+func get_combat_anchor_position() -> Vector2:
+	if is_instance_valid(combat_anchor):
+		return combat_anchor.global_position
 	return global_position
+
+
+## Returns the visible body's world-space center for reward interactions.
+func get_reward_interaction_position() -> Vector2:
+	return get_combat_anchor_position()
 
 
 ## Receives direct damage and reports its cultivation-adjusted amount to the
@@ -934,7 +949,7 @@ func take_melee_damage(amount: float, source: Node2D = null) -> void:
 	var resolved_amount := amount
 	if (
 		is_instance_valid(source)
-		and global_position.distance_to(source.global_position)
+		and get_combat_anchor_position().distance_to(source.global_position)
 			<= _global_combat_stats.close_range_mitigation_radius
 	):
 		resolved_amount *= (
@@ -1864,7 +1879,7 @@ func _begin_palm_cast(
 ) -> void:
 	if not is_instance_valid(primary_target):
 		return
-	_palm_cast_direction = global_position.direction_to(
+	_palm_cast_direction = get_combat_anchor_position().direction_to(
 		primary_target.global_position
 	).normalized()
 	if _palm_cast_direction.is_zero_approx():
@@ -1913,7 +1928,7 @@ func _is_enemy_in_palm_coverage(
 	direction: Vector2
 ) -> bool:
 	return _is_offset_in_palm_coverage(
-		enemy.global_position - global_position,
+		enemy.global_position - get_combat_anchor_position(),
 		direction,
 		_get_enemy_target_radius(enemy)
 	)
@@ -2000,7 +2015,7 @@ func _apply_palm_damage(
 	var weapon_data := _get_current_weapon_data()
 	if realm_index >= 1 and weapon_data.palm_knockback_speed > 0.0:
 		enemy.apply_knockback(
-			global_position.direction_to(enemy.global_position),
+			get_combat_anchor_position().direction_to(enemy.global_position),
 			weapon_data.palm_knockback_speed,
 			weapon_data.palm_knockback_recovery
 		)
@@ -2131,7 +2146,7 @@ func _begin_special_projectile_sequence(
 		attack_kind == WeaponDataResource.AttackKind.THUNDER_HAMMER
 		and not _special_sequence_targets.is_empty()
 	):
-		_special_sequence_direction = global_position.direction_to(
+		_special_sequence_direction = get_combat_anchor_position().direction_to(
 			_special_sequence_targets[0].global_position
 		).normalized()
 		if _special_sequence_direction.is_zero_approx():
@@ -2162,7 +2177,7 @@ func _launch_next_special_projectile() -> void:
 		)
 		if cloud != null:
 			get_parent().add_child(cloud)
-			cloud.global_position = global_position
+			cloud.global_position = get_combat_anchor_position()
 			cloud.configure(
 				_special_sequence_direction,
 				_special_sequence_exact_damage,
@@ -2194,7 +2209,7 @@ func _launch_next_special_projectile() -> void:
 				_special_sequence_damage,
 				maxf(get_current_aoe_radius(), 48.0),
 				_special_sequence_is_critical,
-				global_position,
+				get_combat_anchor_position(),
 				get_current_attack_range(),
 				_active_fantian_seal_volley_id
 			)
@@ -2283,8 +2298,12 @@ func _get_attack_targets() -> Array[EnemyController]:
 			targets.append(body as EnemyController)
 	targets.sort_custom(
 		func(a: EnemyController, b: EnemyController) -> bool:
-			return global_position.distance_squared_to(a.global_position) < (
-				global_position.distance_squared_to(b.global_position)
+			return get_combat_anchor_position().distance_squared_to(
+				a.global_position
+			) < (
+				get_combat_anchor_position().distance_squared_to(
+					b.global_position
+				)
 			)
 	)
 	return targets
@@ -2344,7 +2363,7 @@ func _launch_qiankun_ring(
 		)
 		return
 	get_parent().add_child(projectile)
-	projectile.global_position = global_position
+	projectile.global_position = get_combat_anchor_position()
 	projectile.configure(
 		self,
 		target,
@@ -2429,19 +2448,12 @@ func _update_thunder_hammer_visual(delta: float) -> void:
 		or not _is_thunder_hammer_equipped()
 	):
 		return
-	var character_visual_position := (
-		character_sprite.position
-		if is_instance_valid(character_sprite)
-		else Vector2.ZERO
-	)
-	thunder_hammer_visual.position = (
-		character_visual_position + thunder_hammer_visual.equipped_offset
-	)
+	thunder_hammer_visual.position = thunder_hammer_visual.equipped_offset
 	var targets := _get_attack_targets()
 	var target_available := not targets.is_empty()
 	var aim_direction := Vector2.UP
 	if target_available:
-		aim_direction = global_position.direction_to(
+		aim_direction = get_combat_anchor_position().direction_to(
 			targets[0].global_position
 		).normalized()
 	var active_thunder_volley := (
@@ -2571,7 +2583,7 @@ func _get_nearest_dao_enemy_distance() -> float:
 			continue
 		nearest_distance = minf(
 			nearest_distance,
-			global_position.distance_to(enemy.global_position)
+			get_combat_anchor_position().distance_to(enemy.global_position)
 		)
 	return nearest_distance
 
@@ -3075,7 +3087,7 @@ func _get_palm_rotation(direction: Vector2) -> float:
 func _get_palm_idle_position() -> Vector2:
 	var direction := _palm_attack_direction.normalized()
 	if is_instance_valid(_palm_aim_target):
-		direction = global_position.direction_to(
+		direction = get_combat_anchor_position().direction_to(
 			_palm_aim_target.global_position
 		).normalized()
 	if direction.is_zero_approx():
@@ -3142,7 +3154,7 @@ func _get_palm_impact_position(
 		* PALM_CENTER_OFFSET_PIXELS
 		* scale_value
 	)
-	return to_local(impact_global_position) - palm_center_offset
+	return combat_anchor.to_local(impact_global_position) - palm_center_offset
 
 
 func _begin_palm_visual_strike(
@@ -3177,7 +3189,7 @@ func _begin_palm_visual_strike(
 		var impact_global_position := (
 			target.global_position
 			if sprite_index == 0
-			else global_position
+			else get_combat_anchor_position()
 				+ attack_direction * get_current_attack_range()
 		)
 		_palm_visual_start_positions.append(start_position)
@@ -3220,7 +3232,7 @@ func _update_palm_warning() -> void:
 	if not is_instance_valid(_palm_aim_target):
 		_palm_warning_strength = 0.0
 		return
-	var nearest_distance := global_position.distance_to(
+	var nearest_distance := get_combat_anchor_position().distance_to(
 		_palm_aim_target.global_position
 	)
 	var attack_range := get_current_attack_range()
@@ -3246,7 +3258,7 @@ func _update_palm_weapon_visual(delta: float) -> void:
 		PalmVisualState.IDLE:
 			var aim_direction := _palm_attack_direction
 			if is_instance_valid(_palm_aim_target):
-				aim_direction = global_position.direction_to(
+				aim_direction = get_combat_anchor_position().direction_to(
 					_palm_aim_target.global_position
 				).normalized()
 			var follow_weight := 1.0 - exp(-14.0 * delta)
@@ -3530,7 +3542,7 @@ func _get_nearest_flying_sword_target() -> EnemyController:
 		var enemy := enemy_node as EnemyController
 		if not enemy.is_combat_active():
 			continue
-		var distance_squared := global_position.distance_squared_to(
+		var distance_squared := get_combat_anchor_position().distance_squared_to(
 			enemy.global_position
 		)
 		if distance_squared < nearest_distance_squared:
@@ -3582,7 +3594,7 @@ func _update_flying_sword_visuals(delta: float) -> void:
 	var nearest_distance := INF
 	var aim_direction := Vector2.UP
 	if is_instance_valid(_flying_sword_aim_target):
-		nearest_distance = global_position.distance_to(
+		nearest_distance = get_combat_anchor_position().distance_to(
 			_flying_sword_aim_target.global_position
 		)
 	var attack_range := get_current_attack_range()
@@ -3601,7 +3613,7 @@ func _update_flying_sword_visuals(delta: float) -> void:
 			_flying_sword_warning_pulse_elapsed = 0.0
 		else:
 			_flying_sword_warning_pulse_elapsed += delta
-		aim_direction = global_position.direction_to(
+		aim_direction = get_combat_anchor_position().direction_to(
 			_flying_sword_aim_target.global_position
 		).normalized()
 		_flying_sword_orbit_phase = fmod(
@@ -3954,7 +3966,7 @@ func _update_palm_aim() -> void:
 		var enemy := enemy_node as EnemyController
 		if not enemy.is_combat_active():
 			continue
-		var distance_squared := global_position.distance_squared_to(
+		var distance_squared := get_combat_anchor_position().distance_squared_to(
 			enemy.global_position
 		)
 		if distance_squared < nearest_distance_squared:
@@ -3962,7 +3974,7 @@ func _update_palm_aim() -> void:
 			nearest_target = enemy
 	_palm_aim_target = nearest_target
 	if is_instance_valid(nearest_target):
-		_palm_attack_direction = global_position.direction_to(
+		_palm_attack_direction = get_combat_anchor_position().direction_to(
 			nearest_target.global_position
 		).normalized()
 
@@ -4548,6 +4560,13 @@ func _on_realm_ability_state_changed(snapshot: Dictionary) -> void:
 
 func _on_flight_elevation_changed(elevation: float) -> void:
 	_character_sprite_rest_position.y = -maxf(elevation, 0.0)
+	var anchor_position := Vector2(
+		0.0,
+		_character_sprite_rest_position.y
+	)
+	combat_anchor.position = anchor_position
+	body_shape.position = anchor_position
+	golden_bell.position = anchor_position
 
 
 func _find_first_allowed_equipment_index() -> int:
