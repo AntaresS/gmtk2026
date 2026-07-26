@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="WeaponData" format=3 uid="uid://d4k0uno7lqnvw"]
 
 [ext_resource type="Script" uid="uid://ddr0tj47oo4w8" path="res://game/scripts/gameplay/weapon_data.gd" id="1_weapon_data"]
+[ext_resource type="AudioStream" uid="uid://drq7a23ogbtht" path="res://assets/sound/sfx/dao.mp3" id="2_sfx"]
 
 [resource]
 script = ExtResource("1_weapon_data")
@@ -16,6 +17,10 @@ attack_range = 94.0
 attack_interval = 0.5
 delivery_count_cap = 10
 aoe_bonus_scales_attack_range = true
+activation_sfx = ExtResource("2_sfx")
+activation_sfx_start_time = 0.1
+activation_sfx_end_time = 0.65
+activation_sfx_volume_db = -8.0
 attack_range_increase_per_level = 18.0
 attack_range_level_cap = 10
 damage_ratio_per_level_above_range_cap = 0.1

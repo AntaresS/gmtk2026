@@ -15,6 +15,12 @@ const THUNDER_HAMMER_DATA := preload(
 const FANTIAN_SEAL_DATA := preload(
 	"res://game/resources/weapon/fantian_seal.tres"
 )
+const QIANKUN_RING_DATA := preload(
+	"res://game/resources/weapon/qiankun_ring.tres"
+)
+const GOLDEN_BELL_DATA := preload(
+	"res://game/resources/weapon/golden_bell.tres"
+)
 const PALM_DATA := preload("res://game/resources/great_strength_palm.tres")
 
 var _failures: Array[String] = []
@@ -51,7 +57,95 @@ func _make_enemy(
 	return enemy
 
 
+func _cue_matches(
+	stream: AudioStream,
+	expected_path: String,
+	start_time: float,
+	end_time: float
+) -> bool:
+	return (
+		stream != null
+		and stream.resource_path == expected_path
+		and start_time >= 0.0
+		and end_time > start_time
+	)
+
+
 func _run() -> void:
+	_check(
+		_cue_matches(
+			PALM_DATA.activation_sfx,
+			"res://assets/sound/sfx/palm.mp3",
+			PALM_DATA.activation_sfx_start_time,
+			PALM_DATA.activation_sfx_end_time
+		)
+		and _cue_matches(
+			FLYING_SWORD_DATA.activation_sfx,
+			"res://assets/sound/sfx/flying_sword.mp3",
+			FLYING_SWORD_DATA.activation_sfx_start_time,
+			FLYING_SWORD_DATA.activation_sfx_end_time
+		)
+		and _cue_matches(
+			DAO_DATA.activation_sfx,
+			"res://assets/sound/sfx/dao.mp3",
+			DAO_DATA.activation_sfx_start_time,
+			DAO_DATA.activation_sfx_end_time
+		)
+		and _cue_matches(
+			THUNDER_HAMMER_DATA.activation_sfx,
+			"res://assets/sound/sfx/thunder_hammer.mp3",
+			THUNDER_HAMMER_DATA.activation_sfx_start_time,
+			THUNDER_HAMMER_DATA.activation_sfx_end_time
+		),
+		"Palm, Flying Sword, Dao, or Thunder Hammer activation SFX is missing."
+	)
+	_check(
+		_cue_matches(
+			QIANKUN_RING_DATA.activation_sfx,
+			"res://assets/sound/sfx/qiankun_ring.mp3",
+			QIANKUN_RING_DATA.activation_sfx_start_time,
+			QIANKUN_RING_DATA.activation_sfx_end_time
+		)
+		and _cue_matches(
+			QIANKUN_RING_DATA.impact_sfx,
+			"res://assets/sound/sfx/qiankun_ring.mp3",
+			QIANKUN_RING_DATA.impact_sfx_start_time,
+			QIANKUN_RING_DATA.impact_sfx_end_time
+		)
+		and (
+			QIANKUN_RING_DATA.activation_sfx_end_time
+			<= QIANKUN_RING_DATA.impact_sfx_start_time
+		),
+		"Universe Ring launch/hit sections are missing or overlap."
+	)
+	_check(
+		_cue_matches(
+			FANTIAN_SEAL_DATA.activation_sfx,
+			"res://assets/sound/sfx/fantian_seal.mp3",
+			FANTIAN_SEAL_DATA.activation_sfx_start_time,
+			FANTIAN_SEAL_DATA.activation_sfx_end_time
+		)
+		and _cue_matches(
+			FANTIAN_SEAL_DATA.impact_sfx,
+			"res://assets/sound/sfx/fantian_seal.mp3",
+			FANTIAN_SEAL_DATA.impact_sfx_start_time,
+			FANTIAN_SEAL_DATA.impact_sfx_end_time
+		)
+		and (
+			FANTIAN_SEAL_DATA.activation_sfx_end_time
+			<= FANTIAN_SEAL_DATA.impact_sfx_start_time
+		),
+		"Fantian Seal summon/impact sections are missing or overlap."
+	)
+	_check(
+		_cue_matches(
+			GOLDEN_BELL_DATA.impact_sfx,
+			"res://assets/sound/sfx/bell.mp3",
+			GOLDEN_BELL_DATA.impact_sfx_start_time,
+			GOLDEN_BELL_DATA.impact_sfx_end_time
+		),
+		"Golden Bell enemy-hit SFX is missing."
+	)
 	var resources := RunResources.new()
 	root.add_child(resources)
 	resources.set_process(false)

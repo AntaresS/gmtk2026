@@ -40,7 +40,6 @@ qi_shield_enabled = true
 spirit_projection_enabled = true
 flight_height = 96.0
 character_scale_multiplier = 1.55
-spirit_incoming_damage_multiplier = 1.5
 fatal_breakthrough = true
 tribulation_strike_count = 1
 

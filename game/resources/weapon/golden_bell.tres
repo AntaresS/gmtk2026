@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="WeaponData" format=3]
+[gd_resource type="Resource" script_class="WeaponData" format=3 uid="uid://bgbwivnbpu5eo"]
 
-[ext_resource type="Script" path="res://game/scripts/gameplay/weapon_data.gd" id="1_weapon_data"]
+[ext_resource type="Script" uid="uid://ddr0tj47oo4w8" path="res://game/scripts/gameplay/weapon_data.gd" id="1_weapon_data"]
+[ext_resource type="AudioStream" uid="uid://dsp7m200fk28t" path="res://assets/sound/sfx/bell.mp3" id="2_sfx"]
 
 [resource]
 script = ExtResource("1_weapon_data")
@@ -14,3 +15,6 @@ minimum_damage = 3
 maximum_damage = 3
 attack_range = 38.0
 attack_interval = 1.0
+impact_sfx = ExtResource("2_sfx")
+impact_sfx_end_time = 4.82
+impact_sfx_volume_db = -6.0

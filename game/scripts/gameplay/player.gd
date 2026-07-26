@@ -181,6 +181,15 @@ const DAO_MAX_ATTACK_TRAIL_COUNT: int = 24
 ## Non-looping animation played during the Qi Refining invulnerable roll.
 @export var roll_animation: StringName = &"flip"
 
+@export_category("Weapon SFX")
+## Audio bus used by weapon cues. Missing bus names safely fall back to Master.
+@export var weapon_sfx_bus: StringName = &"Master"
+## Player-wide loudness adjustment applied after each weapon cue's own volume.
+@export_range(-40.0, 12.0, 0.5) var weapon_sfx_volume_db: float = 0.0
+## Maximum simultaneous weapon cues. When saturated, the oldest cue is reused
+## so rapid volleys remain bounded instead of creating unlimited audio nodes.
+@export_range(1, 32, 1) var maximum_weapon_sfx_voices: int = 16
+
 @export_category("Qi Refining Roll")
 ## Seconds during which one roll moves, disables attacks, and grants immunity.
 @export_range(0.1, 2.0, 0.05) var roll_duration: float = 0.6
@@ -435,6 +444,8 @@ var _special_sequence_targets: Array[EnemyController] = []
 var _special_sequence_direction: Vector2 = Vector2.UP
 var _fantian_seal_volley_serial: int = 0
 var _active_fantian_seal_volley_id: int = -1
+var _weapon_sfx_voices: Array[AudioStreamPlayer] = []
+var _weapon_sfx_serial: int = 0
 var _cultivation_resources: RunResources
 var _global_combat_stats: PlayerGlobalCombatStatsResource = (
 	PlayerGlobalCombatStatsResource.new()
@@ -460,6 +471,7 @@ func _ready() -> void:
 	realm_abilities.flight_elevation_changed.connect(
 		_on_flight_elevation_changed
 	)
+	golden_bell.enemy_hit.connect(_on_golden_bell_enemy_hit)
 	current_forward_speed = maxf(base_forward_speed, 1.0)
 	_last_lifespan_decay_multiplier = get_lifespan_decay_multiplier()
 	current_attraction_range = base_attraction_range
@@ -1749,6 +1761,7 @@ func _update_weapon_attack(delta: float) -> void:
 	var attack_damage := _roll_current_attack_damage()
 
 	if attack_kind == WeaponDataResource.AttackKind.DAO:
+		_play_weapon_activation_sfx(weapon_data)
 		_dao_attack_visual_hold_remaining = maxf(
 			_dao_attack_visual_hold_remaining,
 			DAO_ATTACK_VISUAL_HOLD_DURATION
@@ -1879,6 +1892,7 @@ func _begin_palm_cast(
 ) -> void:
 	if not is_instance_valid(primary_target):
 		return
+	_play_weapon_activation_sfx(_get_current_weapon_data())
 	_palm_cast_direction = get_combat_anchor_position().direction_to(
 		primary_target.global_position
 	).normalized()
@@ -2187,6 +2201,7 @@ func _launch_next_special_projectile() -> void:
 				get_current_projectile_speed_multiplier(),
 				_special_sequence_launched
 			)
+			_play_weapon_activation_sfx(weapon_data)
 			if is_instance_valid(thunder_hammer_visual):
 				thunder_hammer_visual.play_discharge(
 					_special_sequence_direction,
@@ -2213,6 +2228,10 @@ func _launch_next_special_projectile() -> void:
 				get_current_attack_range(),
 				_active_fantian_seal_volley_id
 			)
+			seal.impact_landed.connect(
+				_on_fantian_seal_impact_landed.bind(weapon_data)
+			)
+			_play_weapon_activation_sfx(weapon_data)
 			if get_parent().has_method("request_camera_shake"):
 				seal.impact_landed.connect(
 					Callable(get_parent(), "request_camera_shake")
@@ -2343,6 +2362,7 @@ func _launch_flying_sword(
 		get_current_projectile_speed_multiplier(),
 		is_critical
 	)
+	_play_weapon_activation_sfx(weapon_data)
 
 
 func _launch_qiankun_ring(
@@ -2362,6 +2382,9 @@ func _launch_qiankun_ring(
 			+ "QiankunRingProjectile."
 		)
 		return
+	projectile.enemy_hit.connect(
+		_on_qiankun_ring_enemy_hit.bind(weapon_data)
+	)
 	get_parent().add_child(projectile)
 	projectile.global_position = get_combat_anchor_position()
 	projectile.configure(
@@ -2374,6 +2397,7 @@ func _launch_qiankun_ring(
 		get_current_projectile_speed_multiplier(),
 		attack_damage.is_critical
 	)
+	_play_weapon_activation_sfx(weapon_data)
 	projectile.tree_exited.connect(_on_qiankun_ring_returned, CONNECT_ONE_SHOT)
 	_active_qiankun_rings += 1
 	queue_redraw()
@@ -2382,6 +2406,131 @@ func _launch_qiankun_ring(
 func _on_qiankun_ring_returned() -> void:
 	_active_qiankun_rings = maxi(_active_qiankun_rings - 1, 0)
 	queue_redraw()
+
+
+func _on_qiankun_ring_enemy_hit(
+	_enemy: EnemyController,
+	weapon_data: WeaponDataResource
+) -> void:
+	_play_weapon_impact_sfx(weapon_data)
+
+
+func _on_fantian_seal_impact_landed(
+	_strength: float,
+	weapon_data: WeaponDataResource
+) -> void:
+	_play_weapon_impact_sfx(weapon_data)
+
+
+func _on_golden_bell_enemy_hit(_enemy: EnemyController) -> void:
+	_play_weapon_impact_sfx(_get_current_weapon_data())
+
+
+func _play_weapon_activation_sfx(
+	weapon_data: WeaponDataResource
+) -> void:
+	if weapon_data == null:
+		return
+	_play_weapon_sfx(
+		weapon_data.activation_sfx,
+		weapon_data.activation_sfx_start_time,
+		weapon_data.activation_sfx_end_time,
+		weapon_data.activation_sfx_volume_db,
+		weapon_data.activation_sfx_pitch_scale
+	)
+
+
+func _play_weapon_impact_sfx(weapon_data: WeaponDataResource) -> void:
+	if weapon_data == null:
+		return
+	_play_weapon_sfx(
+		weapon_data.impact_sfx,
+		weapon_data.impact_sfx_start_time,
+		weapon_data.impact_sfx_end_time,
+		weapon_data.impact_sfx_volume_db,
+		weapon_data.impact_sfx_pitch_scale
+	)
+
+
+## Plays one bounded section of a weapon stream. Each cue acquires an
+## independent voice so sequential projectiles and rapid hits can overlap.
+func _play_weapon_sfx(
+	stream: AudioStream,
+	start_time: float,
+	end_time: float,
+	volume_db: float,
+	pitch_scale: float
+) -> void:
+	if stream == null:
+		return
+	var voice := _acquire_weapon_sfx_voice()
+	var safe_pitch := clampf(pitch_scale, 0.25, 4.0)
+	var stream_length := maxf(stream.get_length(), 0.0)
+	var safe_start := maxf(start_time, 0.0)
+	if stream_length > 0.0:
+		safe_start = minf(safe_start, stream_length)
+	var safe_end := maxf(end_time, 0.0)
+	if stream_length > 0.0:
+		safe_end = minf(safe_end, stream_length)
+	_weapon_sfx_serial += 1
+	var playback_serial := _weapon_sfx_serial
+	voice.set_meta("weapon_sfx_serial", playback_serial)
+	voice.stop()
+	voice.stream = stream
+	voice.bus = (
+		weapon_sfx_bus
+		if AudioServer.get_bus_index(weapon_sfx_bus) >= 0
+		else &"Master"
+	)
+	voice.volume_db = clampf(
+		weapon_sfx_volume_db + volume_db,
+		-80.0,
+		24.0
+	)
+	voice.pitch_scale = safe_pitch
+	voice.play(safe_start)
+	if safe_end <= safe_start:
+		return
+	var playback_duration := (safe_end - safe_start) / safe_pitch
+	get_tree().create_timer(playback_duration, false).timeout.connect(
+		_stop_weapon_sfx_voice.bind(voice, playback_serial)
+	)
+
+
+func _acquire_weapon_sfx_voice() -> AudioStreamPlayer:
+	for voice in _weapon_sfx_voices:
+		if not voice.playing:
+			return voice
+	if _weapon_sfx_voices.size() < maxi(maximum_weapon_sfx_voices, 1):
+		var new_voice := AudioStreamPlayer.new()
+		new_voice.name = "WeaponSfxVoice%d" % _weapon_sfx_voices.size()
+		add_child(new_voice)
+		_weapon_sfx_voices.append(new_voice)
+		return new_voice
+	var oldest_voice := _weapon_sfx_voices[0]
+	var oldest_serial := int(
+		oldest_voice.get_meta("weapon_sfx_serial", 0)
+	)
+	for voice_index in range(1, _weapon_sfx_voices.size()):
+		var voice := _weapon_sfx_voices[voice_index]
+		var voice_serial := int(voice.get_meta("weapon_sfx_serial", 0))
+		if voice_serial < oldest_serial:
+			oldest_voice = voice
+			oldest_serial = voice_serial
+	return oldest_voice
+
+
+func _stop_weapon_sfx_voice(
+	voice: AudioStreamPlayer,
+	playback_serial: int
+) -> void:
+	if (
+		not is_instance_valid(voice)
+		or int(voice.get_meta("weapon_sfx_serial", -1))
+			!= playback_serial
+	):
+		return
+	voice.stop()
 
 
 func _attract_collectibles(delta: float) -> void:

@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="WeaponData" format=3 uid="uid://kacuolh3dqn8"]
 
 [ext_resource type="Script" uid="uid://ddr0tj47oo4w8" path="res://game/scripts/gameplay/weapon_data.gd" id="1_weapon_data"]
+[ext_resource type="AudioStream" uid="uid://tpixp25ras2a" path="res://assets/sound/sfx/palm.mp3" id="2_sfx"]
 
 [resource]
 script = ExtResource("1_weapon_data")
@@ -14,3 +15,7 @@ palm_knockback_speed = 320.0
 palm_knockback_recovery = 1800.0
 palm_high_health_damage_multiplier = 1.5
 palm_execute_chance = 0.2
+activation_sfx = ExtResource("2_sfx")
+activation_sfx_start_time = 0.08
+activation_sfx_end_time = 0.75
+activation_sfx_volume_db = -4.0

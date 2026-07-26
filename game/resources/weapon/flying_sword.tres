@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://ddr0tj47oo4w8" path="res://game/scripts/gameplay/weapon_data.gd" id="1_weapon_data"]
 [ext_resource type="PackedScene" path="res://game/scenes/gameplay/flying_sword_projectile.tscn" id="2_projectile"]
+[ext_resource type="AudioStream" uid="uid://btmuub02qdo7s" path="res://assets/sound/sfx/flying_sword.mp3" id="3_sfx"]
 
 [resource]
 script = ExtResource("1_weapon_data")
@@ -17,3 +18,6 @@ maximum_damage = 8
 attack_range = 240.0
 attack_interval = 0.9
 projectile_scene = ExtResource("2_projectile")
+activation_sfx = ExtResource("3_sfx")
+activation_sfx_end_time = 0.95
+activation_sfx_volume_db = -6.0

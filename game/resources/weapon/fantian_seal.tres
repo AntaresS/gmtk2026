@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://ddr0tj47oo4w8" path="res://game/scripts/gameplay/weapon_data.gd" id="1_data"]
 [ext_resource type="PackedScene" uid="uid://br8038udk7ta1" path="res://game/scenes/gameplay/fantian_seal_projectile.tscn" id="2_projectile"]
+[ext_resource type="AudioStream" uid="uid://4r8hvges3384" path="res://assets/sound/sfx/fantian_seal.mp3" id="3_sfx"]
 
 [resource]
 script = ExtResource("1_data")
@@ -20,5 +21,12 @@ projectile_sequence_interval = 0.35
 delivery_count_cap = 10
 base_aoe_radius = 88.0
 bonuses_scale_aoe_radius = false
+activation_sfx = ExtResource("3_sfx")
+activation_sfx_end_time = 0.6
+activation_sfx_volume_db = -6.0
+impact_sfx = ExtResource("3_sfx")
+impact_sfx_start_time = 1.9
+impact_sfx_end_time = 3.5
+impact_sfx_volume_db = -4.0
 attack_range_level_cap = 10
 damage_ratio_per_level_above_range_cap = 0.1

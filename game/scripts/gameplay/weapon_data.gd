@@ -103,6 +103,32 @@ var cultivation_type: int = -1
 ## weapon's per-hit area. Disable for fixed-footprint attacks such as the Seal.
 @export var bonuses_scale_aoe_radius: bool = true
 
+@export_category("Sound")
+## Sound played when this weapon activates. Projectile weapons trigger this
+## once for every projectile or cloud that is successfully spawned.
+@export var activation_sfx: AudioStream
+## Start of the activation cue inside activation_sfx, in seconds.
+@export_range(0.0, 60.0, 0.01) var activation_sfx_start_time: float = 0.0
+## End of the activation cue inside activation_sfx, in seconds. Values at or
+## below the start time play through the remainder of the imported stream.
+@export_range(0.0, 60.0, 0.01) var activation_sfx_end_time: float = 0.0
+## Per-weapon activation loudness adjustment in decibels.
+@export_range(-40.0, 12.0, 0.5) var activation_sfx_volume_db: float = 0.0
+## Activation playback-speed and pitch multiplier. One preserves the source.
+@export_range(0.25, 4.0, 0.05) var activation_sfx_pitch_scale: float = 1.0
+## Optional second cue played by event-driven weapons. Universe Ring uses it
+## on every enemy hit, Fantian Seal on impact, and Golden Bell on contact.
+@export var impact_sfx: AudioStream
+## Start of the impact cue inside impact_sfx, in seconds.
+@export_range(0.0, 60.0, 0.01) var impact_sfx_start_time: float = 0.0
+## End of the impact cue inside impact_sfx, in seconds. Values at or below the
+## start time play through the remainder of the imported stream.
+@export_range(0.0, 60.0, 0.01) var impact_sfx_end_time: float = 0.0
+## Per-weapon impact loudness adjustment in decibels.
+@export_range(-40.0, 12.0, 0.5) var impact_sfx_volume_db: float = 0.0
+## Impact playback-speed and pitch multiplier. One preserves the source.
+@export_range(0.25, 4.0, 0.05) var impact_sfx_pitch_scale: float = 1.0
+
 @export_category("Weapon Level Progression")
 ## Flat attack-radius growth in world pixels for each duplicate level after
 ## Lv.1, up to attack_range_level_cap. Zero disables level-based range growth.

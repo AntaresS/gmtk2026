@@ -2,6 +2,7 @@ class_name GoldenBellController
 extends Node2D
 
 signal layer_state_changed(ready: int, flashing: int, recovering: int)
+signal enemy_hit(enemy: EnemyController)
 
 enum LayerPhase {
 	READY,
@@ -183,6 +184,7 @@ func _try_impact_enemy(enemy: EnemyController) -> void:
 		)
 	)
 	enemy.take_melee_damage(impact_damage)
+	enemy_hit.emit(enemy)
 	_layers[ready_layer_index]["phase"] = LayerPhase.FLASHING
 	_layers[ready_layer_index]["remaining"] = maxf(flash_duration, 0.01)
 	_emit_state()
