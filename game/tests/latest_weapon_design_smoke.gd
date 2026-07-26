@@ -522,8 +522,14 @@ func _run() -> void:
 		"Flying Sword could not be selected from weapon slot 1."
 	)
 
-	player.collect_weapon(THUNDER_HAMMER_DATA, 2)
-	player.collect_weapon(THUNDER_HAMMER_DATA, 2)
+	player.collect_weapon(
+		THUNDER_HAMMER_DATA,
+		THUNDER_HAMMER_DATA.minimum_damage
+	)
+	player.collect_weapon(
+		THUNDER_HAMMER_DATA,
+		THUNDER_HAMMER_DATA.minimum_damage
+	)
 	_check(
 		player.select_weapon_slot(1),
 		"Thunder Hammer could not be selected from weapon slot 2."
@@ -532,18 +538,85 @@ func _run() -> void:
 		player.get_current_delivery_count() == 2,
 		"Duplicate Thunder Hammer did not add one sequential cloud."
 	)
+	var thunder_acquisition_range_before_upgrade := (
+		player.get_current_attack_range()
+	)
+	var thunder_cloud_radius_before_upgrade := player.get_current_aoe_radius()
+	player.apply_universal_upgrade(
+		UniversalUpgradeTypes.UpgradeType.DAMAGE_RANGE
+	)
+	_check(
+		player.get_current_attack_range()
+			> thunder_acquisition_range_before_upgrade
+		and is_equal_approx(
+			player.get_current_aoe_radius(),
+			thunder_cloud_radius_before_upgrade
+		)
+		and is_equal_approx(
+			player.get_current_aoe_radius(),
+			THUNDER_HAMMER_DATA.base_aoe_radius
+		),
+		(
+			"Thunder range upgrade did not exclusively expand acquisition "
+			+ "(range=%.2f/%.2f, cloud=%.2f/%.2f)."
+		) % [
+			player.get_current_attack_range(),
+			thunder_acquisition_range_before_upgrade,
+			player.get_current_aoe_radius(),
+			THUNDER_HAMMER_DATA.base_aoe_radius,
+		]
+	)
 	var thunder_target := _make_enemy(
 		player,
 		player.global_position + Vector2(60.0, 0.0)
 	)
 	await _wait_physics_frames(2)
+	await process_frame
+	await process_frame
+	_check(
+		THUNDER_HAMMER_DATA.minimum_damage == 5
+		and is_equal_approx(THUNDER_HAMMER_DATA.attack_interval, 2.0)
+		and is_equal_approx(
+			THUNDER_HAMMER_DATA.projectile_sequence_interval,
+			0.2
+		)
+		and THUNDER_HAMMER_DATA.delivery_count_cap == 10
+		and player.is_thunder_hammer_visual_equipped()
+		and player.is_thunder_hammer_target_ready()
+		and player.get_thunder_hammer_charge_ratio() > 0.99,
+		(
+			"Thunder Hammer tuning/readiness mismatch "
+			+ "(damage=%d, cooldown=%.3f, gap=%.3f, cap=%d, "
+			+ "equipped=%s, ready=%s, charge=%.3f)."
+		) % [
+			THUNDER_HAMMER_DATA.minimum_damage,
+			THUNDER_HAMMER_DATA.attack_interval,
+			THUNDER_HAMMER_DATA.projectile_sequence_interval,
+			THUNDER_HAMMER_DATA.delivery_count_cap,
+			player.is_thunder_hammer_visual_equipped(),
+			player.is_thunder_hammer_target_ready(),
+			player.get_thunder_hammer_charge_ratio(),
+		]
+	)
 	player.velocity = Vector2(24.0, -260.0)
 	player.call(
 		"_begin_special_projectile_sequence",
 		WeaponData.AttackKind.THUNDER_HAMMER,
-		AttackDamageResult.new(2, false)
+		AttackDamageResult.new(5, false, 5.0)
+	)
+	var resolved_thunder_sequence_interval := float(
+		player.get("_special_sequence_interval")
+	)
+	var cooldown_after_first_cloud := float(
+		player.get("_attack_cooldown_remaining")
+	)
+	var volley_discharge_visible := (
+		player.get_thunder_hammer_discharge_strength() > 0.0
 	)
 	player.call("_launch_next_special_projectile")
+	var cooldown_after_final_cloud := float(
+		player.get("_attack_cooldown_remaining")
+	)
 	var cloud_count := 0
 	var spawned_clouds: Array[ThunderCloudProjectile] = []
 	for node in root.get_children():
@@ -558,19 +631,123 @@ func _run() -> void:
 	await _wait_physics_frames(35)
 	_check(
 		cloud_count == 2
-		and thunder_target.current_health <= 95
+		and thunder_target.current_health <= 89
 		and THUNDER_HAMMER_DATA.base_aoe_radius >= 112.0
-		and not spawned_clouds.is_empty()
-		and spawned_clouds[0].global_position.y
-			< first_cloud_start.y - 100.0,
-		(
-			"Thunder Hammer cloud count, inherited velocity, radius, or damage mismatch."
+		and is_equal_approx(resolved_thunder_sequence_interval, 0.2)
+		and is_zero_approx(cooldown_after_first_cloud)
+		and is_equal_approx(
+			cooldown_after_final_cloud,
+			player.get_current_attack_interval()
 		)
+		and volley_discharge_visible
+		and not spawned_clouds.is_empty()
+		and spawned_clouds[0].get_travel_direction().x > 0.99
+		and absf(spawned_clouds[0].get_travel_direction().y) < 0.01
+		and spawned_clouds[0].global_position.x
+			> first_cloud_start.x + 80.0
+		and absf(
+			spawned_clouds[0].global_position.y - first_cloud_start.y
+		) < 4.0
+		and spawned_clouds[0].collision_shape.shape is CircleShape2D
+		and is_equal_approx(spawned_clouds[0].damage_interval, 0.4)
+		and is_equal_approx(spawned_clouds[0].lifetime, 2.4)
+		and spawned_clouds[0].maximum_damage_pulses == 6
+		and is_equal_approx(spawned_clouds[0].aim_travel_speed, 160.0)
+		and is_equal_approx(
+			(spawned_clouds[0].collision_shape.shape as CircleShape2D).radius,
+			player.get_current_aoe_radius()
+		),
+		(
+			"Thunder Hammer mismatch (clouds=%d, health=%d, gap=%.3f, "
+			+ "first_cd=%.3f, final_cd=%.3f/%.3f, discharge=%s, direction=%s, "
+			+ "travel=%s, radius=%.2f/%.2f)."
+		) % [
+			cloud_count,
+			thunder_target.current_health,
+			resolved_thunder_sequence_interval,
+			cooldown_after_first_cloud,
+			cooldown_after_final_cloud,
+			player.get_current_attack_interval(),
+			volley_discharge_visible,
+			(
+				str(spawned_clouds[0].get_travel_direction())
+				if not spawned_clouds.is_empty()
+				else "missing"
+			),
+			(
+				str(spawned_clouds[0].global_position - first_cloud_start)
+				if not spawned_clouds.is_empty()
+				else "missing"
+			),
+			(
+				(spawned_clouds[0].collision_shape.shape as CircleShape2D).radius
+				if (
+					not spawned_clouds.is_empty()
+					and spawned_clouds[0].collision_shape.shape is CircleShape2D
+				)
+				else -1.0
+			),
+			player.get_current_aoe_radius(),
+		]
 	)
 	thunder_target.queue_free()
 	for node in root.get_children():
 		if node is ThunderCloudProjectile:
 			node.queue_free()
+	await _wait_physics_frames(2)
+
+	var capped_thunder_player := PLAYER_SCENE.instantiate() as PlayerController
+	root.add_child(capped_thunder_player)
+	capped_thunder_player.global_position = Vector2(12000.0, 12000.0)
+	capped_thunder_player.set_movement_enabled(false)
+	for _level in 11:
+		capped_thunder_player.collect_weapon(
+			THUNDER_HAMMER_DATA,
+			THUNDER_HAMMER_DATA.minimum_damage
+		)
+	_check(
+		capped_thunder_player.select_weapon_slot(0),
+		"Thunder Hammer could not be selected for cap validation."
+	)
+	var capped_thunder_stats := (
+		capped_thunder_player.get_current_weapon_combat_stats()
+	)
+	_check(
+		capped_thunder_player.get_current_delivery_count() == 10
+		and capped_thunder_player.get_current_weapon_damage() == 6
+		and is_equal_approx(capped_thunder_stats.resolved_damage_exact, 5.5),
+		"Thunder Hammer Lv.11 did not cap at ten clouds with exact +10% damage."
+	)
+	var exact_damage_target := _make_enemy(
+		capped_thunder_player,
+		capped_thunder_player.global_position,
+		100
+	)
+	var exact_damage_cloud := (
+		THUNDER_HAMMER_DATA.projectile_scene.instantiate()
+		as ThunderCloudProjectile
+	)
+	root.add_child(exact_damage_cloud)
+	exact_damage_cloud.global_position = exact_damage_target.global_position
+	exact_damage_cloud.configure(
+		Vector2.UP,
+		5.5,
+		THUNDER_HAMMER_DATA.base_aoe_radius,
+		false,
+		null,
+		1.0,
+		0
+	)
+	exact_damage_cloud.call("_on_body_entered", exact_damage_target)
+	for _pulse in 6:
+		exact_damage_cloud.call("_damage_enemies_in_cloud")
+	_check(
+		exact_damage_target.current_health == 67,
+		"Six Lv.11 Thunder pulses did not preserve exact 33 integrated damage."
+	)
+	exact_damage_cloud.queue_free()
+	exact_damage_target.queue_free()
+	capped_thunder_player.queue_free()
 	await _wait_physics_frames(2)
 
 	player.collect_weapon(

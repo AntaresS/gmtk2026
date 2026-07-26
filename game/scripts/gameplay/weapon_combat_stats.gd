@@ -16,6 +16,9 @@ var rolled_damage: int = 1
 var matching_damage_bonus: float = 0.0
 ## Current integer damage after preserving the existing rounding behavior.
 var resolved_damage: int = 1
+## Exact pre-round damage used by repeated-hit weapons to preserve fractional
+## progression across multiple strikes without changing ordinary hit behavior.
+var resolved_damage_exact: float = 1.0
 
 var critical_chance: float = 0.0
 var critical_damage_multiplier: float = 1.0

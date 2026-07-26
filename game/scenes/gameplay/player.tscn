@@ -58,6 +58,7 @@
 [ext_resource type="Texture2D" path="res://assets/chara_nascent_soul_fly_frames/nascent_soul_fly_06.png" id="57_nascent_soul_fly_06"]
 [ext_resource type="Texture2D" path="res://assets/chara_nascent_soul_fly_frames/nascent_soul_fly_07.png" id="58_nascent_soul_fly_07"]
 [ext_resource type="Texture2D" path="res://assets/chara_nascent_soul_fly_frames/nascent_soul_fly_08.png" id="59_nascent_soul_fly_08"]
+[ext_resource type="PackedScene" path="res://game/scenes/gameplay/thunder_hammer_visual.tscn" id="60_thunder_hammer"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_character"]
 animations = [{
@@ -306,6 +307,8 @@ z_index = 5
 [node name="FantianSealWeapon" type="Sprite2D" parent="."]
 visible = false
 z_index = 5
+
+[node name="ThunderHammerVisual" parent="." instance=ExtResource("60_thunder_hammer")]
 
 [node name="RealmAbilities" type="Node" parent="." unique_id=1314996068 node_paths=PackedStringArray("character_sprite", "player_shadow", "spirit_sprite")]
 script = ExtResource("13_realm_abilities")

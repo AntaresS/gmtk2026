@@ -174,19 +174,21 @@ static func resolve_weapon(
 		if global_stats != null
 		else 0.0
 	)
-	snapshot.resolved_damage = maxi(
-		roundi(
-			(float(snapshot.rolled_damage) + global_damage_bonus)
-				* (
-					1.0
-					+ (
-						maxf(global_stats.overall_level_damage_ratio, 0.0)
-						if global_stats != null
-						else 0.0
-					)
+	snapshot.resolved_damage_exact = maxf(
+		(float(snapshot.rolled_damage) + global_damage_bonus)
+			* (
+				1.0
+				+ (
+					maxf(global_stats.overall_level_damage_ratio, 0.0)
+					if global_stats != null
+					else 0.0
 				)
-				* (1.0 + snapshot.matching_damage_bonus)
-		),
+			)
+			* (1.0 + snapshot.matching_damage_bonus),
+		1.0
+	)
+	snapshot.resolved_damage = maxi(
+		roundi(snapshot.resolved_damage_exact),
 		1
 	)
 

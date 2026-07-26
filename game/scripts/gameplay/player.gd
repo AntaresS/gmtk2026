@@ -327,6 +327,7 @@ const DAO_MAX_ATTACK_TRAIL_COUNT: int = 24
 @onready var palm_weapon: Sprite2D = $PalmWeapon
 @onready var palm_echo_layer: Node2D = $PalmEchoes
 @onready var fantian_seal_weapon: Sprite2D = $FantianSealWeapon
+@onready var thunder_hammer_visual: ThunderHammerVisual = $ThunderHammerVisual
 @onready var damage_taken_label: Label = $DamageTakenLabel
 @onready var realm_abilities: RealmAbilityController = $RealmAbilities
 @onready var golden_bell: GoldenBellController = $GoldenBell
@@ -436,11 +437,13 @@ var _pending_special_projectiles: int = 0
 var _special_sequence_kind: int = -1
 var _special_sequence_launched: int = 0
 var _special_sequence_damage: int = 1
+var _special_sequence_exact_damage: float = 1.0
 var _special_sequence_is_critical: bool = false
 var _special_sequence_timer: float = 0.0
 var _special_sequence_interval: float = 0.01
 var _special_sequence_total: int = 0
 var _special_sequence_targets: Array[EnemyController] = []
+var _special_sequence_direction: Vector2 = Vector2.UP
 var _fantian_seal_volley_serial: int = 0
 var _active_fantian_seal_volley_id: int = -1
 var _cultivation_resources: RunResources
@@ -494,6 +497,7 @@ func _ready() -> void:
 	_refresh_flying_sword_visual_equipment()
 	_refresh_fantian_seal_visual_equipment()
 	_refresh_dao_visual_equipment()
+	_refresh_thunder_hammer_visual_equipment()
 	_publish_equipment()
 	queue_redraw()
 
@@ -1882,6 +1886,7 @@ func _update_weapon_attack(delta: float) -> void:
 
 	if (
 		attack_kind != WeaponDataResource.AttackKind.FLYING_SWORD
+		and attack_kind != WeaponDataResource.AttackKind.THUNDER_HAMMER
 		and attack_kind != WeaponDataResource.AttackKind.FANTIAN_SEAL
 	):
 		_attack_cooldown_remaining = get_current_attack_interval()
@@ -2244,9 +2249,20 @@ func _begin_special_projectile_sequence(
 	_pending_special_projectiles = _special_sequence_total
 	_special_sequence_launched = 0
 	_special_sequence_damage = maxi(attack_damage.damage, 1)
+	_special_sequence_exact_damage = maxf(attack_damage.exact_damage, 1.0)
 	_special_sequence_is_critical = attack_damage.is_critical
 	_special_sequence_timer = 0.0
 	_special_sequence_targets = _get_attack_targets()
+	_special_sequence_direction = Vector2.UP
+	if (
+		attack_kind == WeaponDataResource.AttackKind.THUNDER_HAMMER
+		and not _special_sequence_targets.is_empty()
+	):
+		_special_sequence_direction = global_position.direction_to(
+			_special_sequence_targets[0].global_position
+		).normalized()
+		if _special_sequence_direction.is_zero_approx():
+			_special_sequence_direction = Vector2.UP
 	_special_sequence_interval = _resolve_special_sequence_interval(
 		attack_kind,
 		_special_sequence_total
@@ -2262,10 +2278,6 @@ func _begin_special_projectile_sequence(
 func _launch_next_special_projectile() -> void:
 	if _pending_special_projectiles <= 0:
 		return
-	var target := _get_next_special_sequence_target()
-	if target == null:
-		_cancel_special_projectile_sequence()
-		return
 	var weapon_data := _get_current_weapon_data()
 	if weapon_data.projectile_scene == null:
 		_cancel_special_projectile_sequence()
@@ -2279,13 +2291,24 @@ func _launch_next_special_projectile() -> void:
 			get_parent().add_child(cloud)
 			cloud.global_position = global_position
 			cloud.configure(
-				global_position.direction_to(target.global_position),
-				_special_sequence_damage,
+				_special_sequence_direction,
+				_special_sequence_exact_damage,
 				maxf(get_current_aoe_radius(), 48.0),
 				_special_sequence_is_critical,
-				velocity
+				self,
+				get_current_projectile_speed_multiplier(),
+				_special_sequence_launched
 			)
+			if is_instance_valid(thunder_hammer_visual):
+				thunder_hammer_visual.play_discharge(
+					_special_sequence_direction,
+					_special_sequence_is_critical
+				)
 	elif _special_sequence_kind == WeaponDataResource.AttackKind.FANTIAN_SEAL:
+		var target := _get_next_special_sequence_target()
+		if target == null:
+			_cancel_special_projectile_sequence()
+			return
 		var seal := (
 			weapon_data.projectile_scene.instantiate()
 			as FantianSealProjectile
@@ -2310,7 +2333,10 @@ func _launch_next_special_projectile() -> void:
 	_pending_special_projectiles -= 1
 	_special_sequence_timer = _special_sequence_interval
 	if (
-		_special_sequence_kind == WeaponDataResource.AttackKind.FANTIAN_SEAL
+		(
+			_special_sequence_kind == WeaponDataResource.AttackKind.THUNDER_HAMMER
+			or _special_sequence_kind == WeaponDataResource.AttackKind.FANTIAN_SEAL
+		)
 		and _pending_special_projectiles <= 0
 	):
 		_attack_cooldown_remaining = get_current_attack_interval()
@@ -2367,11 +2393,13 @@ func _cancel_special_projectile_sequence() -> void:
 	_pending_special_projectiles = 0
 	_special_sequence_kind = -1
 	_special_sequence_launched = 0
+	_special_sequence_exact_damage = 1.0
 	_special_sequence_is_critical = false
 	_special_sequence_timer = 0.0
 	_special_sequence_interval = 0.01
 	_special_sequence_total = 0
 	_special_sequence_targets.clear()
+	_special_sequence_direction = Vector2.UP
 	_active_fantian_seal_volley_id = -1
 
 
@@ -2494,6 +2522,7 @@ func _update_visual_state(delta: float) -> void:
 	_update_flying_sword_visuals(delta)
 	_update_fantian_seal_visual(delta)
 	_update_dao_weapon_visuals(delta)
+	_update_thunder_hammer_visual(delta)
 	_update_character_animation()
 	_update_damage_feedback_presentation()
 	queue_redraw()
@@ -2504,6 +2533,92 @@ func _is_dao_equipped() -> bool:
 		not _equipment_inventory.is_empty()
 		and _get_current_weapon_data().attack_kind
 			== WeaponDataResource.AttackKind.DAO
+	)
+
+
+func _is_thunder_hammer_equipped() -> bool:
+	return (
+		not _equipment_inventory.is_empty()
+		and _get_current_weapon_data().attack_kind
+			== WeaponDataResource.AttackKind.THUNDER_HAMMER
+	)
+
+
+func _refresh_thunder_hammer_visual_equipment() -> void:
+	if not is_instance_valid(thunder_hammer_visual):
+		return
+	thunder_hammer_visual.set_equipped(_is_thunder_hammer_equipped())
+
+
+func _update_thunder_hammer_visual(delta: float) -> void:
+	if (
+		not is_instance_valid(thunder_hammer_visual)
+		or not _is_thunder_hammer_equipped()
+	):
+		return
+	var character_visual_position := (
+		character_sprite.position
+		if is_instance_valid(character_sprite)
+		else Vector2.ZERO
+	)
+	thunder_hammer_visual.position = (
+		character_visual_position + thunder_hammer_visual.equipped_offset
+	)
+	var targets := _get_attack_targets()
+	var target_available := not targets.is_empty()
+	var aim_direction := Vector2.UP
+	if target_available:
+		aim_direction = global_position.direction_to(
+			targets[0].global_position
+		).normalized()
+	var active_thunder_volley := (
+		_special_sequence_kind == WeaponDataResource.AttackKind.THUNDER_HAMMER
+		and _pending_special_projectiles > 0
+	)
+	if active_thunder_volley:
+		aim_direction = _special_sequence_direction
+	thunder_hammer_visual.update_combat_state(
+		delta,
+		_attack_cooldown_remaining,
+		get_current_attack_interval(),
+		_special_sequence_launched if active_thunder_volley else 0,
+		_special_sequence_total if active_thunder_volley else 0,
+		target_available,
+		aim_direction
+	)
+
+
+## Returns whether the dedicated Thunder Hammer companion is currently shown.
+func is_thunder_hammer_visual_equipped() -> bool:
+	return (
+		is_instance_valid(thunder_hammer_visual)
+		and thunder_hammer_visual.is_equipped_visual()
+	)
+
+
+## Returns normalized Thunder Hammer charge for HUD and focused visual tests.
+func get_thunder_hammer_charge_ratio() -> float:
+	return (
+		thunder_hammer_visual.get_charge_ratio()
+		if is_instance_valid(thunder_hammer_visual)
+		else 0.0
+	)
+
+
+## Returns whether Thunder Hammer is charged with a valid target in range.
+func is_thunder_hammer_target_ready() -> bool:
+	return (
+		is_instance_valid(thunder_hammer_visual)
+		and thunder_hammer_visual.is_target_ready()
+	)
+
+
+## Returns the active cloud-launch lightning flash strength.
+func get_thunder_hammer_discharge_strength() -> float:
+	return (
+		thunder_hammer_visual.get_discharge_flash_strength()
+		if is_instance_valid(thunder_hammer_visual)
+		else 0.0
 	)
 
 
@@ -4235,6 +4350,7 @@ func _draw_weapon_companions() -> void:
 		or attack_kind == WeaponDataResource.AttackKind.GOLDEN_BELL
 		or attack_kind == WeaponDataResource.AttackKind.DAO
 		or attack_kind == WeaponDataResource.AttackKind.FLYING_SWORD
+		or attack_kind == WeaponDataResource.AttackKind.THUNDER_HAMMER
 		or attack_kind == WeaponDataResource.AttackKind.FANTIAN_SEAL
 	):
 		return
@@ -4244,26 +4360,13 @@ func _draw_weapon_companions() -> void:
 	):
 		return
 	var angle := _companion_phase
-	if attack_kind == WeaponDataResource.AttackKind.THUNDER_HAMMER:
-		var hammer_position := Vector2.from_angle(angle) * 40.0
-		draw_rect(
-			Rect2(hammer_position - Vector2(8.0, 6.0), Vector2(16.0, 12.0)),
-			Color("8ecbff")
-		)
-		draw_line(
-			hammer_position + Vector2(0.0, 5.0),
-			hammer_position + Vector2(0.0, 17.0),
-			Color("e8d7ae"),
-			4.0
-		)
-	else:
-		var ring_position := Vector2.from_angle(angle) * 40.0
-		draw_circle(
-			ring_position,
-			15.0,
-			Color(1.0, 0.35, 0.82, 0.16)
-		)
-		_draw_qiankun_ring(ring_position)
+	var ring_position := Vector2.from_angle(angle) * 40.0
+	draw_circle(
+		ring_position,
+		15.0,
+		Color(1.0, 0.35, 0.82, 0.16)
+	)
+	_draw_qiankun_ring(ring_position)
 
 
 func _draw_qiankun_ring(position: Vector2) -> void:
@@ -4368,20 +4471,35 @@ func _resolve_equipment_combat_stats(
 	)
 	var excess_damage_levels := maxi(weapon_level - range_level_cap, 0)
 	if excess_damage_levels > 0:
-		snapshot.resolved_damage = maxi(
-			roundi(
-				float(snapshot.resolved_damage)
-				* (
-					1.0
-					+ float(excess_damage_levels)
-						* maxf(
-							weapon_data.damage_ratio_per_level_above_range_cap,
-							0.0
-						)
+		var post_cap_damage_multiplier := (
+			1.0
+			+ float(excess_damage_levels)
+				* maxf(
+					weapon_data.damage_ratio_per_level_above_range_cap,
+					0.0
 				)
-			),
-			1
 		)
+		if (
+			weapon_data.attack_kind
+			== WeaponDataResource.AttackKind.THUNDER_HAMMER
+		):
+			snapshot.resolved_damage_exact = maxf(
+				snapshot.resolved_damage_exact * post_cap_damage_multiplier,
+				1.0
+			)
+			snapshot.resolved_damage = maxi(
+				roundi(snapshot.resolved_damage_exact),
+				1
+			)
+		else:
+			snapshot.resolved_damage = maxi(
+				roundi(
+					float(snapshot.resolved_damage)
+						* post_cap_damage_multiplier
+				),
+				1
+			)
+			snapshot.resolved_damage_exact = float(snapshot.resolved_damage)
 	return snapshot
 
 
@@ -4438,6 +4556,9 @@ func _rebuild_combat_stats() -> void:
 			_current_weapon_combat_stats.resolved_damage += roundi(
 				float(completed_small_levels) * palm_damage_per_level
 			)
+			_current_weapon_combat_stats.resolved_damage_exact = float(
+				_current_weapon_combat_stats.resolved_damage
+			)
 			_current_weapon_combat_stats.attack_range *= (
 				1.0
 				+ float(completed_small_levels)
@@ -4478,25 +4599,44 @@ func _rebuild_combat_stats() -> void:
 
 
 func _roll_current_attack_damage() -> AttackDamageResultResource:
+	var outgoing_multiplier := realm_abilities.get_outgoing_damage_multiplier()
 	var damage := maxi(
 		roundi(
 			float(_current_weapon_combat_stats.resolved_damage)
-				* realm_abilities.get_outgoing_damage_multiplier()
+				* outgoing_multiplier
 		),
 		1
+	)
+	var uses_exact_repeated_damage := (
+		_get_current_weapon_data().attack_kind
+		== WeaponDataResource.AttackKind.THUNDER_HAMMER
+	)
+	var exact_damage := (
+		maxf(
+			_current_weapon_combat_stats.resolved_damage_exact
+				* outgoing_multiplier,
+			1.0
+		)
+		if uses_exact_repeated_damage
+		else float(damage)
 	)
 	var is_critical := (
 		randf() < _current_weapon_combat_stats.critical_chance
 	)
 	if is_critical:
-		damage = maxi(
-			roundi(
-				float(damage)
-					* _current_weapon_combat_stats.critical_damage_multiplier
-			),
-			1
+		var critical_multiplier := maxf(
+			_current_weapon_combat_stats.critical_damage_multiplier,
+			1.0
 		)
-	return AttackDamageResultResource.new(damage, is_critical)
+		damage = maxi(roundi(float(damage) * critical_multiplier), 1)
+		exact_damage = (
+			exact_damage * critical_multiplier
+			if uses_exact_repeated_damage
+			else float(damage)
+		)
+	if uses_exact_repeated_damage:
+		damage = maxi(roundi(exact_damage), 1)
+	return AttackDamageResultResource.new(damage, is_critical, exact_damage)
 
 
 func _on_cultivation_stats_changed(
@@ -4610,6 +4750,7 @@ func _on_current_equipment_changed() -> void:
 	_refresh_flying_sword_visual_equipment()
 	_refresh_fantian_seal_visual_equipment()
 	_refresh_dao_visual_equipment()
+	_refresh_thunder_hammer_visual_equipment()
 	_publish_equipment()
 	queue_redraw()
 
