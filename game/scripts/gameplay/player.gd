@@ -23,10 +23,8 @@ signal qi_shield_absorbed(
 	remaining_damage: float
 )
 signal spirit_projection_changed(active: bool)
-signal spirit_projection_broken
 signal realm_ability_state_changed(snapshot: Dictionary)
 signal roll_state_changed(active: bool, cooldown_remaining: float)
-signal echo_state_changed(active_count: int, cooldown_remaining: float)
 
 const WeaponDataResource = preload(
 	"res://game/scripts/gameplay/weapon_data.gd"
@@ -54,9 +52,6 @@ const AttackDamageResultResource = preload(
 )
 const DEFAULT_PLAYER_COMBAT_CONFIG: PlayerCombatConfigResource = preload(
 	"res://game/resources/player_combat_config.tres"
-)
-const DEFAULT_PLAYER_ECHO_SCENE: PackedScene = preload(
-	"res://game/scenes/gameplay/player_echo.tscn"
 )
 const DAO_WEAPON_TEXTURE: Texture2D = preload(
 	"res://assets/player_weapons/dao_knife.png"
@@ -193,18 +188,6 @@ const DAO_MAX_ATTACK_TRAIL_COUNT: int = 24
 @export_range(0.0, 5.0, 0.05) var roll_cooldown: float = 0.8
 ## Travel speed in world pixels per second during the roll.
 @export_range(100.0, 1200.0, 10.0) var roll_speed: float = 520.0
-
-@export_category("Golden Core Echoes")
-## Scene instantiated twice when Golden Core activates its Space ability.
-@export var player_echo_scene: PackedScene = DEFAULT_PLAYER_ECHO_SCENE
-## Fraction of current player health and weapon damage inherited by echoes.
-@export_range(0.01, 1.0, 0.01) var echo_attribute_ratio: float = 0.20
-## Seconds after either echo dies before the pair can be summoned again.
-@export_range(1.0, 60.0, 0.5) var echo_respawn_cooldown: float = 12.0
-## Cooldown seconds removed by pressing Space while accelerating.
-@export_range(0.1, 10.0, 0.1) var echo_cooldown_reduction_per_press: float = 1.0
-## Horizontal formation distance in world pixels from the player.
-@export_range(20.0, 200.0, 5.0) var echo_formation_distance: float = 72.0
 
 @export_category("Lateral Movement")
 ## Immediate left/right speed in world pixels per second. Horizontal input is
@@ -343,9 +326,6 @@ var _movement_enabled: bool = true
 var _roll_remaining: float = 0.0
 var _roll_cooldown_remaining: float = 0.0
 var _roll_direction: Vector2 = Vector2.UP
-var _active_echoes: Array[PlayerEcho] = []
-var _echo_cooldown_remaining: float = 0.0
-var _last_echo_cooldown_report: int = -1
 var _attack_cooldown_remaining: float = 0.0
 var _attack_flash_remaining: float = 0.0
 var _palm_attack_direction: Vector2 = Vector2.UP
@@ -466,9 +446,6 @@ func _ready() -> void:
 	realm_abilities.spirit_projection_changed.connect(
 		_on_spirit_projection_changed
 	)
-	realm_abilities.spirit_projection_broken.connect(
-		_on_spirit_projection_broken
-	)
 	realm_abilities.ability_state_changed.connect(
 		_on_realm_ability_state_changed
 	)
@@ -518,7 +495,7 @@ func _input(event: InputEvent) -> void:
 		if realm_index == 0:
 			handled = start_qi_refining_roll()
 		elif realm_index == 2:
-			handled = activate_golden_core_echoes()
+			handled = realm_abilities.toggle_qi_shield()
 		if handled:
 			get_viewport().set_input_as_handled()
 		return
@@ -556,7 +533,6 @@ func _physics_process(delta: float) -> void:
 	if not _movement_enabled:
 		velocity = Vector2.ZERO
 		return
-	_update_echo_cooldown(delta)
 	_roll_cooldown_remaining = maxf(_roll_cooldown_remaining - delta, 0.0)
 	if _roll_remaining > 0.0:
 		_roll_remaining = maxf(_roll_remaining - delta, 0.0)
@@ -642,7 +618,7 @@ func _draw() -> void:
 				2.0,
 				true
 			)
-	if realm_abilities.is_qi_shield_enabled():
+	if realm_abilities.is_qi_shield_active():
 		_draw_qi_shield()
 
 	_draw_dao_trails()
@@ -1593,98 +1569,6 @@ func get_roll_cooldown_remaining() -> float:
 	return maxf(_roll_cooldown_remaining - _roll_remaining, 0.0)
 
 
-## Summons both Golden Core echoes, or accelerates their recovery while the
-## player is actively using the speed-up control.
-func activate_golden_core_echoes() -> bool:
-	if not _movement_enabled or _get_current_realm_index() != 2:
-		return false
-	_prune_echoes()
-	if not _active_echoes.is_empty():
-		return true
-	if _echo_cooldown_remaining > 0.0:
-		if Input.is_action_pressed("speed_up"):
-			_echo_cooldown_remaining = maxf(
-				_echo_cooldown_remaining
-					- maxf(echo_cooldown_reduction_per_press, 0.0),
-				0.0
-			)
-			_emit_echo_state()
-		return true
-	_spawn_echo_pair()
-	return true
-
-
-func _spawn_echo_pair() -> void:
-	if player_echo_scene == null or get_parent() == null:
-		return
-	var health_basis := (
-		_cultivation_resources.max_lifespan
-		if _cultivation_resources != null
-		else 100.0
-	)
-	for side in [-1.0, 1.0]:
-		var echo := player_echo_scene.instantiate() as PlayerEcho
-		if echo == null:
-			continue
-		get_parent().add_child(echo)
-		echo.configure(
-			self,
-			Vector2(side * echo_formation_distance, 0.0),
-			health_basis * echo_attribute_ratio,
-			maxi(roundi(get_current_weapon_damage() * echo_attribute_ratio), 1),
-			get_current_attack_range(),
-			get_current_attack_interval()
-		)
-		echo.global_position = global_position
-		echo.defeated.connect(_on_echo_defeated)
-		_active_echoes.append(echo)
-	_emit_echo_state()
-
-
-func _on_echo_defeated() -> void:
-	for echo in _active_echoes:
-		if is_instance_valid(echo):
-			echo.queue_free()
-	_active_echoes.clear()
-	_echo_cooldown_remaining = maxf(echo_respawn_cooldown, 0.0)
-	_emit_echo_state()
-
-
-func _prune_echoes() -> void:
-	var living: Array[PlayerEcho] = []
-	for echo in _active_echoes:
-		if is_instance_valid(echo):
-			living.append(echo)
-	_active_echoes = living
-
-
-func _update_echo_cooldown(delta: float) -> void:
-	_prune_echoes()
-	if _echo_cooldown_remaining <= 0.0:
-		return
-	_echo_cooldown_remaining = maxf(_echo_cooldown_remaining - delta, 0.0)
-	var report := ceili(_echo_cooldown_remaining * 10.0)
-	if report != _last_echo_cooldown_report:
-		_emit_echo_state()
-
-
-func _emit_echo_state() -> void:
-	_last_echo_cooldown_report = ceili(_echo_cooldown_remaining * 10.0)
-	echo_state_changed.emit(
-		get_active_echo_count(),
-		_echo_cooldown_remaining
-	)
-
-
-func get_active_echo_count() -> int:
-	_prune_echoes()
-	return _active_echoes.size()
-
-
-func get_echo_cooldown_remaining() -> float:
-	return _echo_cooldown_remaining
-
-
 ## Returns one presentation-neutral snapshot for the realm's Space-key ability.
 ## The HUD may poll this lightweight view without owning cooldown state.
 func get_active_ability_snapshot() -> Dictionary:
@@ -1727,26 +1611,14 @@ func get_active_ability_snapshot() -> Dictionary:
 				),
 			}
 		&"golden_core":
-			var echo_count := get_active_echo_count()
-			var echo_recovery := get_echo_cooldown_remaining()
+			var shield_active := realm_abilities.is_qi_shield_active()
 			return {
-				"ability_id": &"golden_core_echoes",
-				"active": echo_count > 0,
-				"ready": echo_count == 0 and echo_recovery <= 0.0,
-				"cooldown_remaining": echo_recovery,
-				"cooldown_duration": maxf(echo_respawn_cooldown, 0.01),
-				"progress": (
-					clampf(
-						1.0
-							- echo_recovery
-							/ maxf(echo_respawn_cooldown, 0.01),
-						0.0,
-						1.0
-					)
-					if echo_count == 0
-					else 1.0
-				),
-				"active_count": echo_count,
+				"ability_id": &"qi_shield",
+				"active": shield_active,
+				"ready": true,
+				"cooldown_remaining": 0.0,
+				"cooldown_duration": 0.0,
+				"progress": 1.0,
 			}
 		&"nascent_soul":
 			var projection_active := (
@@ -1773,7 +1645,7 @@ func get_active_ability_snapshot() -> Dictionary:
 ## Returns the current amount of lifespan damage the Qi shield can absorb.
 func get_qi_shield_capacity() -> float:
 	if (
-		not realm_abilities.is_qi_shield_enabled()
+		not realm_abilities.is_qi_shield_active()
 		or _cultivation_resources == null
 	):
 		return 0.0
@@ -4711,13 +4583,6 @@ func _on_spirit_projection_changed(active: bool) -> void:
 	spirit_projection_changed.emit(active)
 
 
-func _on_spirit_projection_broken(
-	_fallback_realm_index: int,
-	_fallback_layer: int
-) -> void:
-	spirit_projection_broken.emit()
-
-
 func get_debug_snapshot() -> Dictionary:
 	return {
 		"position": global_position,
@@ -4737,8 +4602,6 @@ func get_debug_snapshot() -> Dictionary:
 		"slowed_speed_target": get_slowed_speed_target(),
 		"rolling": is_rolling(),
 		"roll_cooldown": get_roll_cooldown_remaining(),
-		"active_echoes": get_active_echo_count(),
-		"echo_cooldown": get_echo_cooldown_remaining(),
 		"realm_abilities": realm_abilities.get_debug_snapshot(),
 	}
 

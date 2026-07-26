@@ -2,7 +2,6 @@ extends SceneTree
 
 const PLAYER_SCENE := preload("res://game/scenes/gameplay/player.tscn")
 const ENEMY_SCENE := preload("res://game/scenes/gameplay/enemy.tscn")
-const ECHO_SCENE := preload("res://game/scenes/gameplay/player_echo.tscn")
 const SEAL_SCENE := preload(
 	"res://game/scenes/gameplay/fantian_seal_projectile.tscn"
 )
@@ -185,29 +184,27 @@ func _run() -> void:
 		player.character_sprite.animation == &"golden_core_fly",
 		"Golden Core did not select its realm-specific flying animation."
 	)
+	resources.add_qi(10)
 	_check(
-		player.activate_golden_core_echoes()
-		and player.get_active_echo_count() == 2,
-		"Golden Core Space ability did not create two echoes."
+		not player.realm_abilities.is_qi_shield_active()
+		and player.realm_abilities.toggle_qi_shield()
+		and player.realm_abilities.is_qi_shield_active(),
+		"Golden Core Space ability did not toggle its default-off Qi shield."
 	)
-	var echoes := get_nodes_in_group("player_echoes")
-	var first_echo := echoes[0] as PlayerEcho
+	var lifespan_before_shield := resources.current_lifespan
+	player.take_melee_damage(4.0)
 	_check(
-		first_echo.attack_damage
-			== maxi(roundi(player.get_current_weapon_damage() * 0.2), 1),
-		"Echo did not inherit twenty percent of player damage."
+		resources.current_qi == 6
+		and is_equal_approx(
+			resources.current_lifespan,
+			lifespan_before_shield
+		),
+		"Golden Core Qi shield did not absorb damage from the Qi bar."
 	)
-	first_echo.take_enemy_damage(first_echo.max_health)
-	await _wait_physics_frames(2)
-	var cooldown_before_acceleration := player.get_echo_cooldown_remaining()
-	Input.action_press("speed_up")
-	player.activate_golden_core_echoes()
-	Input.action_release("speed_up")
 	_check(
-		player.get_active_echo_count() == 0
-		and player.get_echo_cooldown_remaining()
-			< cooldown_before_acceleration - 0.8,
-		"Accelerating Space press did not shorten echo recovery."
+		player.realm_abilities.toggle_qi_shield()
+		and not player.realm_abilities.is_qi_shield_active(),
+		"Golden Core Qi shield did not toggle off."
 	)
 
 	var tracking_target := _enemy(player, 100)

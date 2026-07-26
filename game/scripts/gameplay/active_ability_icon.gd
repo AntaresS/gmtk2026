@@ -77,8 +77,8 @@ func _draw() -> void:
 			_draw_roll(center, color)
 		&"temporary_flight":
 			_draw_flight(center, color)
-		&"golden_core_echoes":
-			_draw_echoes(center, color)
+		&"qi_shield":
+			_draw_shield(center, color)
 		&"spirit_projection":
 			_draw_spirit(center, color)
 		_:
@@ -91,8 +91,8 @@ func _get_ability_color() -> Color:
 			return Color("72e8ff")
 		&"temporary_flight":
 			return Color("8fffd6")
-		&"golden_core_echoes":
-			return Color("ffd35a")
+		&"qi_shield":
+			return Color("72e8ff")
 		&"spirit_projection":
 			return Color("c6a2ff")
 		_:
@@ -153,19 +153,19 @@ func _draw_flight(center: Vector2, color: Color) -> void:
 	)
 
 
-func _draw_echoes(center: Vector2, color: Color) -> void:
-	for offset in [Vector2(-16.0, 5.0), Vector2.ZERO, Vector2(16.0, 5.0)]:
-		draw_circle(center + offset + Vector2(0.0, -9.0), 6.0, color)
-		draw_arc(
-			center + offset + Vector2(0.0, 7.0),
-			10.0,
-			PI,
-			TAU,
-			16,
-			Color(color, 0.82),
-			4.0,
-			true
-		)
+func _draw_shield(center: Vector2, color: Color) -> void:
+	draw_arc(center, 19.0, 0.0, TAU, 32, color, 4.0, true)
+	draw_arc(
+		center,
+		12.0,
+		-PI * 0.75,
+		PI * 0.75,
+		24,
+		Color(color, 0.65),
+		3.0,
+		true
+	)
+	draw_circle(center, 4.0, color)
 
 
 func _draw_spirit(center: Vector2, color: Color) -> void:

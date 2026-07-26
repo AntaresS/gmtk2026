@@ -4,6 +4,22 @@ Date: 2026-07-24
 
 Status: Design and implementation handoff
 
+## Adopted Realm-Skill Update — 2026-07-25
+
+The following implemented decisions supersede the automatic-shield and
+Spirit-Projection demotion/re-entry recommendations later in this audit:
+
+- Foundation no longer has a Qi shield.
+- Golden Core Space now toggles a Qi shield that is off when the realm is
+  entered. Only an active shield spends Qi; zero or insufficient Qi lets the
+  remaining damage reach lifespan.
+- Nascent Soul Space toggles Spirit Projection together with its Qi shield.
+  While active, outgoing damage is 200% and incoming damage is 150% before Qi
+  absorption.
+- Shield overflow no longer ends Spirit Projection or demotes the player to
+  Golden Core, so the old demotion-driven Nascent Soul re-entry loop is no
+  longer part of this ability.
+
 ## Purpose
 
 This document summarizes the gameplay-run review, screenshot evidence, and code

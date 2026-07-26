@@ -8,10 +8,6 @@ signal qi_shield_absorbed(
 	remaining_damage: float
 )
 signal spirit_projection_changed(active: bool)
-signal spirit_projection_broken(
-	fallback_realm_index: int,
-	fallback_layer: int
-)
 signal flight_elevation_changed(elevation: float)
 signal temporary_flight_changed(active: bool, phase: StringName)
 
@@ -37,6 +33,7 @@ enum TemporaryFlightPhase {
 var _resources: RunResources
 var _current_realm: RealmDefinition
 var _current_realm_index: int = -1
+var _qi_shield_active: bool = false
 var _spirit_projection_active: bool = false
 var _character_base_scale: Vector2 = Vector2.ONE
 var _spirit_base_scale: Vector2 = Vector2.ONE
@@ -104,18 +101,35 @@ func toggle_spirit_projection() -> bool:
 	return true
 
 
+## Toggles the standalone Golden Core Qi shield. Nascent Soul shield state is
+## coupled to spirit projection and cannot be changed independently.
+func toggle_qi_shield() -> bool:
+	if (
+		_current_realm == null
+		or not _current_realm.qi_shield_enabled
+		or _current_realm.spirit_projection_enabled
+	):
+		return false
+	_set_qi_shield_active(not _qi_shield_active)
+	return true
+
+
 func is_spirit_projection_active() -> bool:
 	return _spirit_projection_active
 
 
-func is_qi_shield_enabled() -> bool:
+func is_qi_shield_available() -> bool:
 	return _current_realm != null and _current_realm.qi_shield_enabled
+
+
+func is_qi_shield_active() -> bool:
+	return is_qi_shield_available() and _qi_shield_active
 
 
 ## Returns lifespan damage absorbed by each point of Qi in the current realm.
 ## Zero communicates that the shield is unavailable.
 func get_qi_shield_damage_per_qi() -> float:
-	if not is_qi_shield_enabled():
+	if not is_qi_shield_available():
 		return 0.0
 	return maxf(_current_realm.shield_damage_per_qi, 0.01)
 
@@ -186,6 +200,12 @@ func get_outgoing_damage_multiplier() -> float:
 	return maxf(_current_realm.spirit_damage_multiplier, 1.0)
 
 
+func get_incoming_damage_multiplier() -> float:
+	if not _spirit_projection_active or _current_realm == null:
+		return 1.0
+	return maxf(_current_realm.spirit_incoming_damage_multiplier, 1.0)
+
+
 func is_weapon_allowed(weapon_data: WeaponData) -> bool:
 	if weapon_data == null:
 		return false
@@ -198,13 +218,14 @@ func is_weapon_allowed(weapon_data: WeaponData) -> bool:
 ## The returned dictionary is intentionally presentation-neutral for HUD and
 ## future runtime debugging consumers.
 func resolve_incoming_damage(amount: float) -> Dictionary:
-	var remaining_damage := maxf(amount, 0.0)
+	var incoming_damage := maxf(amount, 0.0)
+	var damage_multiplier := get_incoming_damage_multiplier()
+	var remaining_damage := incoming_damage * damage_multiplier
 	var blocked_damage := 0.0
 	var qi_spent := 0
 	if (
 		remaining_damage > 0.0
-		and _current_realm != null
-		and _current_realm.qi_shield_enabled
+		and is_qi_shield_active()
 		and _resources != null
 	):
 		var shield_result := _resources.absorb_damage_with_qi(
@@ -221,28 +242,12 @@ func resolve_incoming_damage(amount: float) -> Dictionary:
 				remaining_damage
 			)
 
-	var projection_broken := false
-	if remaining_damage > 0.0 and _spirit_projection_active:
-		projection_broken = true
-		var fallback_realm_index := _current_realm.spirit_fallback_realm_index
-		var fallback_layer := _current_realm.spirit_fallback_layer
-		_set_spirit_projection_active(false)
-		if _resources != null:
-			_resources.demote_to_realm(
-				fallback_realm_index,
-				fallback_layer
-			)
-		spirit_projection_broken.emit(
-			fallback_realm_index,
-			fallback_layer
-		)
-
 	return {
-		"incoming_damage": maxf(amount, 0.0),
+		"incoming_damage": incoming_damage,
+		"incoming_damage_multiplier": damage_multiplier,
 		"blocked_damage": blocked_damage,
 		"qi_spent": qi_spent,
 		"remaining_damage": remaining_damage,
-		"projection_broken": projection_broken,
 	}
 
 
@@ -254,6 +259,7 @@ func get_debug_snapshot() -> Dictionary:
 			if _current_realm != null
 			else false
 		),
+		"qi_shield_active": is_qi_shield_active(),
 		"shield_damage_per_qi": get_qi_shield_damage_per_qi(),
 		"flight_height": (
 			_current_realm.flight_height if _current_realm != null else 0.0
@@ -281,6 +287,7 @@ func get_debug_snapshot() -> Dictionary:
 		),
 		"spirit_projection_active": _spirit_projection_active,
 		"outgoing_damage_multiplier": get_outgoing_damage_multiplier(),
+		"incoming_damage_multiplier": get_incoming_damage_multiplier(),
 	}
 
 
@@ -297,6 +304,7 @@ func _on_realm_state_changed(
 
 
 func _refresh_realm() -> void:
+	var previous_realm_index := _current_realm_index
 	_current_realm_index = (
 		_resources.get_current_realm_index()
 		if _resources != null
@@ -307,8 +315,13 @@ func _refresh_realm() -> void:
 		if _resources != null
 		else null
 	)
-	if _current_realm == null or not _current_realm.spirit_projection_enabled:
+	if previous_realm_index != _current_realm_index:
 		_set_spirit_projection_active(false)
+		_set_qi_shield_active(false)
+	elif _current_realm == null or not _current_realm.spirit_projection_enabled:
+		_set_spirit_projection_active(false)
+	if _current_realm == null or not _current_realm.qi_shield_enabled:
+		_set_qi_shield_active(false)
 	_temporary_flight_phase = TemporaryFlightPhase.GROUNDED
 	_temporary_flight_phase_elapsed = 0.0
 	_current_flight_elevation = (
@@ -455,6 +468,7 @@ func _set_spirit_projection_active(active: bool) -> void:
 	if _spirit_projection_active == next_active:
 		return
 	_spirit_projection_active = next_active
+	_set_qi_shield_active(_spirit_projection_active, false)
 	if character_sprite != null:
 		character_sprite.modulate = (
 			Color(0.72, 0.9, 1.0, 0.72)
@@ -465,3 +479,19 @@ func _set_spirit_projection_active(active: bool) -> void:
 		spirit_sprite.visible = _spirit_projection_active
 	spirit_projection_changed.emit(_spirit_projection_active)
 	ability_state_changed.emit(get_debug_snapshot())
+
+
+func _set_qi_shield_active(
+	active: bool,
+	emit_ability_state: bool = true
+) -> void:
+	var next_active := (
+		active
+		and _current_realm != null
+		and _current_realm.qi_shield_enabled
+	)
+	if _qi_shield_active == next_active:
+		return
+	_qi_shield_active = next_active
+	if emit_ability_state:
+		ability_state_changed.emit(get_debug_snapshot())

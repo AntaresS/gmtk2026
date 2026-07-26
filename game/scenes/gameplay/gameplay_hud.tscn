@@ -193,14 +193,6 @@ text = "通用碎片
 范围 Lv.0：每级全武器 +6%
 加减速 Lv.0：加速 +25 / 减速目标 -18（最低 8）"
 
-[node name="EchoStatusLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats" unique_id=1117086401]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-theme_override_colors/font_color = Color(0.48, 0.9, 1, 1)
-theme_override_font_sizes/font_size = 16
-text = "金丹虚影：可召唤"
-
 [node name="TechniqueLabel" type="Label" parent="HudRoot/MarginContainer/Panel/StatsMargin/Stats" unique_id=245853218]
 unique_name_in_owner = true
 layout_mode = 2

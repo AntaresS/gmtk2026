@@ -21,7 +21,8 @@ enum LocomotionMode {
 @export var locomotion_mode: LocomotionMode = LocomotionMode.GROUND
 ## Restricts equipment to WeaponData melee-domain definitions.
 @export var melee_weapons_only: bool = false
-## Enables automatic Qi expenditure to absorb incoming non-fatal damage.
+## Makes a Qi shield available to the realm's active ability. The shield still
+## starts inactive and only spends Qi while its stance is toggled on.
 @export var qi_shield_enabled: bool = false
 ## Lifespan damage absorbed by one Qi while the shield is enabled.
 @export_range(0.01, 100.0, 0.05) var shield_damage_per_qi: float = 1.0
@@ -44,10 +45,9 @@ enum LocomotionMode {
 @export_category("Spirit Projection")
 ## Final outgoing-damage multiplier while spirit projection is active.
 @export_range(1.0, 10.0, 0.05) var spirit_damage_multiplier: float = 2.0
-## Realm index entered when real damage is taken during spirit projection.
-@export_range(0, 20, 1) var spirit_fallback_realm_index: int = 0
-## One-based layer entered in the fallback realm.
-@export_range(1, 99, 1) var spirit_fallback_layer: int = 1
+## Incoming-damage multiplier applied before Qi absorption while spirit
+## projection is active. Values above one spend Qi faster and amplify overflow.
+@export_range(1.0, 10.0, 0.05) var spirit_incoming_damage_multiplier: float = 1.5
 ## Whether attempting to leave this realm triggers the fatal breakthrough
 ## sequence instead of a normal tribulation.
 @export var fatal_breakthrough: bool = false

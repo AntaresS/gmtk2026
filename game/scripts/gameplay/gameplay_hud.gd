@@ -41,7 +41,6 @@ const SHIELD_FEEDBACK_DURATION: float = 1.1
 @onready var qi_bar: ProgressBar = %QiBar
 @onready var qi_shield_status_label: Label = %QiShieldStatusLabel
 @onready var cultivation_tracks_label: Label = %CultivationTracksLabel
-@onready var echo_status_label: Label = %EchoStatusLabel
 @onready var technique_label: Label = %TechniqueLabel
 @onready var weapon_label: Label = %WeaponLabel
 @onready var player_stats_label: RichTextLabel = %PlayerStatsLabel
@@ -219,12 +218,6 @@ func bind_player(player: PlayerController) -> void:
 		_player.spirit_projection_changed.disconnect(
 			_on_spirit_projection_changed
 		)
-	if _player != null and _player.spirit_projection_broken.is_connected(
-		_on_spirit_projection_broken
-	):
-		_player.spirit_projection_broken.disconnect(
-			_on_spirit_projection_broken
-		)
 	if _player != null and _player.weapon_power_upgraded.is_connected(
 		_on_weapon_power_upgraded
 	):
@@ -237,10 +230,6 @@ func bind_player(player: PlayerController) -> void:
 		_player.universal_upgrade_applied.disconnect(
 			_on_universal_upgrade_applied
 		)
-	if _player != null and _player.echo_state_changed.is_connected(
-		_on_echo_state_changed
-	):
-		_player.echo_state_changed.disconnect(_on_echo_state_changed)
 	if _player != null and _player.qi_shield_absorbed.is_connected(
 		_on_qi_shield_absorbed
 	):
@@ -267,10 +256,8 @@ func bind_player(player: PlayerController) -> void:
 	_player.spirit_projection_changed.connect(
 		_on_spirit_projection_changed
 	)
-	_player.spirit_projection_broken.connect(_on_spirit_projection_broken)
 	_player.weapon_power_upgraded.connect(_on_weapon_power_upgraded)
 	_player.universal_upgrade_applied.connect(_on_universal_upgrade_applied)
-	_player.echo_state_changed.connect(_on_echo_state_changed)
 	_player.qi_shield_absorbed.connect(_on_qi_shield_absorbed)
 	_on_equipment_changed(
 		_player.get_technique_name(),
@@ -412,12 +399,6 @@ func _on_realm_state_changed(
 		layer,
 		layer_count,
 	]
-	echo_status_label.visible = realm_index == 2
-	if echo_status_label.visible and _player != null:
-		_on_echo_state_changed(
-			_player.get_active_echo_count(),
-			_player.get_echo_cooldown_remaining()
-		)
 
 
 func _on_cultivation_fragment_progress_changed(
@@ -818,8 +799,7 @@ func _on_realm_ability_state_changed(snapshot: Dictionary) -> void:
 	var entries: Array[String] = []
 	if StringName(snapshot.get("realm_id", &"")) == &"qi_refining":
 		entries.append("Space 翻滚无敌 · CD 0.8s")
-	if bool(snapshot.get("qi_shield_enabled", false)):
-		entries.append("灵气护盾")
+	var shield_active := bool(snapshot.get("qi_shield_active", false))
 	if bool(snapshot.get("temporary_flight_available", false)):
 		var flight_phase := StringName(
 			snapshot.get("temporary_flight_phase", &"grounded")
@@ -837,10 +817,14 @@ func _on_realm_ability_state_changed(snapshot: Dictionary) -> void:
 	elif float(snapshot.get("flight_height", 0.0)) > 0.0:
 		entries.append("御空飞行")
 	if StringName(snapshot.get("realm_id", &"")) == &"golden_core":
-		entries.append("Space 双生虚影")
+		entries.append(
+			"灵气护盾已开启 [Space]"
+			if shield_active
+			else "Space 开启灵气护盾"
+		)
 	if bool(snapshot.get("spirit_projection_available", false)):
 		entries.append(
-			"灵体出窍 ×2 [Space]"
+			"灵体出窍 ×2伤害 / ×1.5承伤 / 灵盾开启 [Space]"
 			if bool(snapshot.get("spirit_projection_active", false))
 			else "Space 灵体出窍"
 		)
@@ -887,22 +871,13 @@ func _refresh_active_ability_card() -> void:
 				&"holding": "驭空滑行",
 				&"descending": "正在落地",
 			}.get(phase, "可用"))
-		&"golden_core_echoes":
-			ability_name = "双生虚影"
-			description = "召唤两道继承属性的战斗虚影"
-			var echo_count := int(snapshot.get("active_count", 0))
-			status = (
-				"虚影战斗中 %d/2" % echo_count
-				if echo_count > 0
-				else (
-					"冷却 %.1fs" % cooldown_remaining
-					if cooldown_remaining > 0.0
-					else "可用"
-				)
-			)
+		&"qi_shield":
+			ability_name = "灵气护盾"
+			description = "开启时消耗灵气抵挡伤害，灵气耗尽后伤害穿透"
+			status = "护盾已开启 · 再按关闭" if is_active else "默认关闭 · 可开启"
 		&"spirit_projection":
 			ability_name = "灵体出窍"
-			description = "切换灵体姿态，伤害提升至 200%"
+			description = "开启灵盾并造成 200% 伤害，同时承受 150% 伤害"
 			status = "灵体已出窍 · 再按收回" if is_active else "可用"
 	active_ability_name_label.text = ability_name
 	active_ability_description_label.text = description
@@ -927,16 +902,38 @@ func _refresh_active_ability_card() -> void:
 
 
 func _update_qi_shield_presentation() -> void:
-	var shield_enabled := bool(
+	var shield_available := bool(
 		_realm_ability_snapshot.get("qi_shield_enabled", false)
 	)
-	if not shield_enabled:
+	var shield_active := bool(
+		_realm_ability_snapshot.get("qi_shield_active", false)
+	)
+	if not shield_available:
 		qi_label.text = "灵气  %d / %d" % [
 			_current_qi,
 			_current_qi_required,
 		]
 		qi_bar.modulate = Color.WHITE
 		qi_shield_status_label.hide()
+		return
+	if not shield_active:
+		qi_label.text = "灵气  %d / %d" % [
+			_current_qi,
+			_current_qi_required,
+		]
+		qi_bar.modulate = Color.WHITE
+		qi_shield_status_label.modulate = Color("9aa8b8")
+		qi_shield_status_label.text = (
+			"◇ 灵气护盾关闭  ·  灵体出窍时自动开启"
+			if bool(
+				_realm_ability_snapshot.get(
+					"spirit_projection_available",
+					false
+				)
+			)
+			else "◇ 灵气护盾关闭  ·  按 Space 开启"
+		)
+		qi_shield_status_label.show()
 		return
 	var efficiency := maxf(
 		float(
@@ -990,16 +987,10 @@ func _on_spirit_projection_changed(active: bool) -> void:
 			_player.realm_abilities.get_debug_snapshot()
 		)
 	level_up_message.text = (
-		"灵体出窍\n威力提升至 200%"
+		"灵体出窍\n伤害 ×2 · 承伤 ×1.5 · 灵盾开启"
 		if active
 		else "灵体归窍"
 	)
-	level_up_message.show()
-	level_up_timer.start()
-
-
-func _on_spirit_projection_broken() -> void:
-	level_up_message.text = "灵体受创\n境界跌落至金丹九层"
 	level_up_message.show()
 	level_up_timer.start()
 
@@ -1034,28 +1025,6 @@ func _on_universal_upgrade_applied(upgrade_type: int, level: int) -> void:
 	level_up_message.show()
 	level_up_timer.start()
 	_render_cultivation_tracks()
-
-
-func _on_echo_state_changed(
-	active_count: int,
-	cooldown_remaining: float
-) -> void:
-	echo_status_label.visible = (
-		_player != null
-		and _resources != null
-		and _resources.get_current_realm_index() == 2
-	)
-	if not echo_status_label.visible:
-		return
-	if active_count > 0:
-		echo_status_label.text = "金丹虚影：%d/2 战斗中" % active_count
-	elif cooldown_remaining > 0.0:
-		echo_status_label.text = (
-			"金丹虚影：%.1fs\n加速时连按 Space 可缩短冷却"
-			% cooldown_remaining
-		)
-	else:
-		echo_status_label.text = "金丹虚影：可按 Space 召唤"
 
 
 func _on_breakthrough_reward_granted(

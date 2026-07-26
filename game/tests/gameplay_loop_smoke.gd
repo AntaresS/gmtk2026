@@ -1747,12 +1747,17 @@ func _run() -> void:
 	)
 	_check(
 		not realm_config.get_realm(0).melee_weapons_only
-		and realm_config.get_realm(1).qi_shield_enabled
+		and not realm_config.get_realm(1).qi_shield_enabled
 		and realm_config.get_realm(1).locomotion_mode
 			== RealmDefinition.LocomotionMode.TEMPORARY_FLIGHT
 		and realm_config.get_realm(2).locomotion_mode
 			== RealmDefinition.LocomotionMode.FLIGHT
+		and realm_config.get_realm(2).qi_shield_enabled
 		and realm_config.get_realm(3).spirit_projection_enabled
+		and is_equal_approx(
+			realm_config.get_realm(3).spirit_incoming_damage_multiplier,
+			1.5
+		)
 		and realm_config.get_realm(3).fatal_breakthrough
 		and realm_config.get_realm(0).tribulation_strike_count == 3
 		and realm_config.get_realm(1).tribulation_strike_count == 6
@@ -1874,7 +1879,7 @@ func _run() -> void:
 		_check(
 			resources.get_current_realm_index() == 1
 			and resources.get_current_realm_layer() == 1
-			and player.realm_abilities.is_qi_shield_enabled()
+			and not player.realm_abilities.is_qi_shield_available()
 			and player.realm_abilities.is_temporary_flight_active(),
 			"Entering Foundation did not automatically demonstrate temporary flight."
 		)
@@ -1957,12 +1962,12 @@ func _run() -> void:
 		qi_refining_enemy.queue_free()
 		player.take_melee_damage(3.0)
 		_check(
-			resources.current_qi == 5
+			resources.current_qi == 8
 			and is_equal_approx(
 				resources.current_lifespan,
-				lifespan_before_shield
+				lifespan_before_shield - 3.0
 			),
-			"Foundation Qi shield did not spend Qi to absorb damage."
+			"Foundation unexpectedly used progression Qi as a shield."
 		)
 
 		for source_realm_index in [1, 2]:
@@ -2066,57 +2071,27 @@ func _run() -> void:
 			and is_equal_approx(
 				player.realm_abilities.get_outgoing_damage_multiplier(),
 				2.0
-			),
-			"Nascent Soul Space stance did not enable 200-percent power."
+			)
+			and is_equal_approx(
+				player.realm_abilities.get_incoming_damage_multiplier(),
+				1.5
+			)
+			and player.realm_abilities.is_qi_shield_active(),
+			"Nascent Soul Space stance did not enable its full risk/reward state."
 		)
 		resources.current_qi = 0
+		var nascent_lifespan_before_hit := resources.current_lifespan
 		player.take_melee_damage(1.0)
 		_check(
-			resources.get_current_realm_index() == 2
-			and resources.get_current_realm_layer() == 9
-			and not player.realm_abilities.is_spirit_projection_active(),
-			"Taking damage during spirit projection did not fall to Golden Core."
+			resources.get_current_realm_index() == 3
+			and resources.get_current_realm_layer() == 1
+			and player.realm_abilities.is_spirit_projection_active()
+			and is_equal_approx(
+				resources.current_lifespan,
+				nascent_lifespan_before_hit - 1.5
+			),
+			"Empty-Qi projection damage did not pass through at 150% without demotion."
 		)
-		resources.current_lifespan = 50.0
-		var repeated_nascent_soul_maximum_before := resources.max_lifespan
-		resources.add_qi(resources.get_current_qi_requirement())
-		await _wait_process_frames(2)
-		var repeated_nascent_soul_tribulation := (
-			game.get("_active_tribulation") as HeavenlyTribulation
-		)
-		_check(
-			repeated_nascent_soul_tribulation != null,
-			"Re-entering Nascent Soul did not request a tribulation."
-		)
-		if repeated_nascent_soul_tribulation != null:
-			repeated_nascent_soul_tribulation.cancel()
-			game.call("_on_heavenly_tribulation_completed")
-			await _wait_process_frames(2)
-			var expected_repeated_maximum := minf(
-				repeated_nascent_soul_maximum_before
-					+ resources.level_up_maxHP_increase
-					+ resources.breakthrough_max_lifespan_increase,
-				resources.maximum_lifespan_cap
-			)
-			var expected_repeated_lifespan := minf(
-				50.0
-					+ expected_repeated_maximum
-						* resources.breakthrough_lifespan_restore_ratio,
-				expected_repeated_maximum
-			)
-			_check(
-				resources.get_current_realm_index() == 3
-				and resources.breakthroughs_completed == 4
-				and is_equal_approx(
-					resources.max_lifespan,
-					expected_repeated_maximum
-				)
-				and absf(
-					resources.current_lifespan
-						- expected_repeated_lifespan
-				) < 0.25,
-				"Repeat Nascent Soul breakthrough did not grant its lifespan reward."
-			)
 
 		resources.demote_to_realm(3, 9)
 		resources.add_qi(resources.get_current_qi_requirement())

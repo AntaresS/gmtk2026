@@ -58,20 +58,46 @@ func _run() -> void:
 	await _wait_process_frames(2)
 	_check(
 		hud.active_ability_name_label.text == "跃起驭空"
-		and hud.qi_shield_status_label.visible,
-		"Foundation did not expose flight and the Qi shield on the HUD."
+		and not hud.qi_shield_status_label.visible,
+		"Foundation did not expose flight without the Golden Core Qi shield."
 	)
 
+	resources.demote_to_realm(2, 1)
 	resources.add_qi(50)
 	await _wait_process_frames(2)
 	_check(
-		is_equal_approx(player.get_qi_shield_capacity(), 50.0)
-		and hud.qi_label.text.contains("灵盾 50")
-		and hud.qi_shield_status_label.text.contains("50 点"),
-		"Qi shield capacity was not communicated as damage absorption."
+		hud.active_ability_name_label.text == "灵气护盾"
+		and hud.active_ability_status_label.text.contains("默认关闭")
+		and player.get_qi_shield_capacity() == 0.0
+		and hud.qi_shield_status_label.text.contains("护盾关闭"),
+		"Golden Core shield was not presented as default-off."
 	)
 
 	await _wait_physics_frames(40)
+	var unshielded_lifespan := resources.current_lifespan
+	player.take_melee_damage(3.0)
+	_check(
+		resources.current_qi == 50
+		and is_equal_approx(
+			resources.current_lifespan,
+			unshielded_lifespan - 3.0
+		),
+		"Default-off Golden Core shield consumed Qi or blocked health damage."
+	)
+	var shield_toggle_event := InputEventAction.new()
+	shield_toggle_event.action = &"spirit_projection"
+	shield_toggle_event.pressed = true
+	Input.parse_input_event(shield_toggle_event)
+	await _wait_process_frames(2)
+	shield_toggle_event.pressed = false
+	Input.parse_input_event(shield_toggle_event)
+	_check(
+		player.realm_abilities.is_qi_shield_active()
+		and is_equal_approx(player.get_qi_shield_capacity(), 50.0)
+		and hud.qi_label.text.contains("灵盾 50")
+		and hud.qi_shield_status_label.text.contains("50 点"),
+		"Space did not activate and present the Golden Core Qi shield."
+	)
 	player.take_melee_damage(12.0)
 	await _wait_process_frames(2)
 	_check(
@@ -83,19 +109,37 @@ func _run() -> void:
 		"Shield hit feedback did not show blocked damage, Qi cost, and remainder."
 	)
 
-	resources.demote_to_realm(2, 1)
-	await _wait_process_frames(2)
-	_check(
-		hud.active_ability_name_label.text == "双生虚影"
-		and hud.active_ability_status_label.text == "可用",
-		"Golden Core did not expose the echo active ability."
-	)
 	resources.demote_to_realm(3, 1)
 	await _wait_process_frames(2)
 	_check(
 		hud.active_ability_name_label.text == "灵体出窍"
 		and hud.active_ability_status_label.text == "可用",
 		"Nascent Soul did not expose spirit projection."
+	)
+	resources.add_qi(10)
+	_check(
+		player.realm_abilities.toggle_spirit_projection()
+		and player.realm_abilities.is_qi_shield_active()
+		and hud.active_ability_description_label.text.contains("承受 150%"),
+		"Nascent Soul projection did not activate its shield and risk text."
+	)
+	var projected_lifespan := resources.current_lifespan
+	player.take_melee_damage(4.0)
+	_check(
+		resources.current_qi == 4
+		and is_equal_approx(resources.current_lifespan, projected_lifespan),
+		"Nascent Soul shield did not absorb 150% incoming damage with Qi."
+	)
+	resources.current_qi = 0
+	player.take_melee_damage(2.0)
+	_check(
+		resources.get_current_realm_index() == 3
+		and player.realm_abilities.is_spirit_projection_active()
+		and is_equal_approx(
+			resources.current_lifespan,
+			projected_lifespan - 3.0
+		),
+		"Empty-Qi Nascent Soul damage did not reach health without demotion."
 	)
 
 	if _failures.is_empty():
