@@ -929,6 +929,161 @@ text = "Defeat an enhancement elite to reveal a choice of two fragments."
 vertical_alignment = 1
 autowrap_mode = 2
 
+[node name="RealmDetails" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 14
+
+[node name="RealmHeader" type="HBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="RealmGlyphCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmHeader"]
+custom_minimum_size = Vector2(112, 108)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_stat_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmHeader/RealmGlyphCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="RealmGlyphLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmHeader/RealmGlyphCard/Margin"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.67, 0.68, 1, 1)
+theme_override_font_sizes/font_size = 38
+text = "I"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="HeaderText" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+theme_override_constants/separation = 8
+
+[node name="RealmNameLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmHeader/HeaderText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.94, 0.98, 1)
+theme_override_font_sizes/font_size = 32
+text = "Qi Refining"
+
+[node name="RealmMetaLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmHeader/HeaderText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.57, 0.68, 1)
+theme_override_font_sizes/font_size = 15
+text = "STARTING REALM · LEVELS 1–9"
+uppercase = true
+
+[node name="RealmSkillCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBox_trait_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmSkillCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 18
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmSkillCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="RealmSkillTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmSkillCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.67, 0.68, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "UNIQUE SKILL"
+uppercase = true
+
+[node name="RealmSkillBody" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmSkillCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.91, 0.91, 0.97, 1)
+theme_override_font_sizes/font_size = 22
+text = "Invincible Roll"
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="RealmMechanicsCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBox_stat_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmMechanicsCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 18
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmMechanicsCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="RealmMechanicsTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmMechanicsCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.67, 0.68, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "HOW IT WORKS"
+uppercase = true
+
+[node name="RealmMechanicsBody" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmMechanicsCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.75, 0.76, 0.83, 1)
+theme_override_font_sizes/font_size = 17
+text = "Press Space to use this realm ability."
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="RealmBreakthroughCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBox_growth_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmBreakthroughCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 18
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmBreakthroughCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="RealmBreakthroughTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmBreakthroughCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.52, 0.78, 0.82, 1)
+theme_override_font_sizes/font_size = 16
+text = "BREAKTHROUGH STAGE"
+uppercase = true
+
+[node name="RealmBreakthroughBody" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/RealmDetails/RealmBreakthroughCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.74, 0.75, 0.82, 1)
+theme_override_font_sizes/font_size = 17
+text = "Starting realm."
+vertical_alignment = 1
+autowrap_mode = 2
+
 [node name="LeaderboardPanel" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout"]
 unique_name_in_owner = true
 visible = false

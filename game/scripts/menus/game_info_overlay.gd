@@ -21,6 +21,9 @@ const WEAPONS: Array[WeaponData] = [
 	preload("res://game/resources/weapon/thunder_hammer.tres"),
 	preload("res://game/resources/weapon/fantian_seal.tres"),
 ]
+const REALM_CONFIG = preload(
+	"res://game/resources/realm_progression_config.tres"
+)
 const FRAGMENT_EFFECT_KEYS: Array[String] = [
 	"fragment_effect_attack_speed",
 	"fragment_effect_damage",
@@ -94,6 +97,16 @@ const QUICK_SECTION_KEYS: Array[String] = [
 @onready var fragment_effect_body: Label = %FragmentEffectBody
 @onready var fragment_acquisition_title: Label = %FragmentAcquisitionTitle
 @onready var fragment_acquisition_body: Label = %FragmentAcquisitionBody
+@onready var realm_details: VBoxContainer = %RealmDetails
+@onready var realm_glyph_label: Label = %RealmGlyphLabel
+@onready var realm_name_label: Label = %RealmNameLabel
+@onready var realm_meta_label: Label = %RealmMetaLabel
+@onready var realm_skill_title: Label = %RealmSkillTitle
+@onready var realm_skill_body: Label = %RealmSkillBody
+@onready var realm_mechanics_title: Label = %RealmMechanicsTitle
+@onready var realm_mechanics_body: Label = %RealmMechanicsBody
+@onready var realm_breakthrough_title: Label = %RealmBreakthroughTitle
+@onready var realm_breakthrough_body: Label = %RealmBreakthroughBody
 
 var _current_page := Page.INSTRUCTIONS
 var _selected_weapon_index: int = 0
@@ -145,7 +158,11 @@ func _on_back_button_pressed() -> void:
 
 
 func _on_weapon_list_item_selected(index: int) -> void:
-	if index == WEAPONS.size():
+	if (
+		index < 0
+		or index >= weapon_list.item_count
+		or not weapon_list.is_item_selectable(index)
+	):
 		return
 	_selected_catalog_index = clampi(index, 0, weapon_list.item_count - 1)
 	_refresh_catalog_details()
@@ -187,6 +204,15 @@ func _refresh_language() -> void:
 	fragment_acquisition_body.text = LanguageManager.text(
 		"fragment_acquisition_body"
 	)
+	realm_skill_title.text = LanguageManager.text(
+		"realm_unique_skill"
+	).to_upper()
+	realm_mechanics_title.text = LanguageManager.text(
+		"realm_skill_mechanics"
+	).to_upper()
+	realm_breakthrough_title.text = LanguageManager.text(
+		"realm_breakthrough_stage"
+	).to_upper()
 	_refresh_weapon_list()
 	_refresh_page()
 
@@ -230,14 +256,47 @@ func _refresh_weapon_list() -> void:
 				).to_upper(),
 			]
 		)
-	var separator_index := weapon_list.item_count
+		weapon_list.set_item_metadata(
+			weapon_list.item_count - 1,
+			{"kind": &"weapon", "index": weapon_index}
+		)
+	var realm_separator_index := weapon_list.item_count
+	weapon_list.add_item(
+		LanguageManager.text("realm_skills_gallery_label").to_upper()
+	)
+	weapon_list.set_item_disabled(realm_separator_index, true)
+	weapon_list.set_item_selectable(realm_separator_index, false)
+	weapon_list.set_item_custom_fg_color(
+		realm_separator_index,
+		Color(0.55, 0.48, 0.82, 1.0)
+	)
+	for realm_index in REALM_CONFIG.get_realm_count():
+		var realm := REALM_CONFIG.get_realm(realm_index)
+		if realm == null:
+			continue
+		var item_index := weapon_list.item_count
+		var realm_id := String(realm.realm_id)
+		weapon_list.add_item(
+			"%s    %s · %s" % [
+				_roman_numeral(realm_index + 1),
+				LanguageManager.get_realm_name(realm.display_name).to_upper(),
+				LanguageManager.text(
+					_get_realm_ability_key(realm_id)
+				).to_upper(),
+			]
+		)
+		weapon_list.set_item_metadata(
+			item_index,
+			{"kind": &"realm", "index": realm_index}
+		)
+	var fragment_separator_index := weapon_list.item_count
 	weapon_list.add_item(
 		LanguageManager.text("fragment_gallery_label").to_upper()
 	)
-	weapon_list.set_item_disabled(separator_index, true)
-	weapon_list.set_item_selectable(separator_index, false)
+	weapon_list.set_item_disabled(fragment_separator_index, true)
+	weapon_list.set_item_selectable(fragment_separator_index, false)
 	weapon_list.set_item_custom_fg_color(
-		separator_index,
+		fragment_separator_index,
 		Color(0.34, 0.55, 0.64, 1.0)
 	)
 	for upgrade_type in UniversalUpgradeTypes.COUNT:
@@ -254,32 +313,60 @@ func _refresh_weapon_list() -> void:
 			item_index,
 			UniversalUpgradeTypes.get_color(upgrade_type)
 		)
+		weapon_list.set_item_metadata(
+			item_index,
+			{"kind": &"fragment", "index": upgrade_type}
+		)
 	_selected_catalog_index = clampi(
 		_selected_catalog_index,
 		0,
 		weapon_list.item_count - 1
 	)
-	if _selected_catalog_index == separator_index:
+	if not weapon_list.is_item_selectable(_selected_catalog_index):
 		_selected_catalog_index = 0
 	weapon_list.select(_selected_catalog_index)
 
 
 func _refresh_catalog_details() -> void:
-	if _selected_catalog_index < WEAPONS.size():
-		_selected_weapon_index = _selected_catalog_index
-		_show_weapon_details()
-		_refresh_weapon_details()
+	if (
+		_selected_catalog_index < 0
+		or _selected_catalog_index >= weapon_list.item_count
+	):
 		return
-	var fragment_index := (
-		_selected_catalog_index - WEAPONS.size() - 1
-	)
-	_refresh_fragment_details(
-		clampi(fragment_index, 0, UniversalUpgradeTypes.COUNT - 1)
-	)
+	var metadata = weapon_list.get_item_metadata(_selected_catalog_index)
+	if metadata is not Dictionary:
+		return
+	var entry := metadata as Dictionary
+	match StringName(entry.get("kind", &"")):
+		&"weapon":
+			_selected_weapon_index = clampi(
+				int(entry.get("index", 0)),
+				0,
+				WEAPONS.size() - 1
+			)
+			_show_weapon_details()
+			_refresh_weapon_details()
+		&"realm":
+			_refresh_realm_details(
+				clampi(
+					int(entry.get("index", 0)),
+					0,
+					REALM_CONFIG.get_realm_count() - 1
+				)
+			)
+		&"fragment":
+			_refresh_fragment_details(
+				clampi(
+					int(entry.get("index", 0)),
+					0,
+					UniversalUpgradeTypes.COUNT - 1
+				)
+			)
 
 
 func _show_weapon_details() -> void:
 	fragment_details.hide()
+	realm_details.hide()
 	for section in weapon_detail_sections:
 		section.show()
 
@@ -287,6 +374,7 @@ func _show_weapon_details() -> void:
 func _refresh_fragment_details(fragment_index: int) -> void:
 	for section in weapon_detail_sections:
 		section.hide()
+	realm_details.hide()
 	fragment_details.show()
 	fragment_glyph_label.text = (
 		LanguageManager.get_universal_upgrade_glyph(fragment_index)
@@ -301,6 +389,59 @@ func _refresh_fragment_details(fragment_index: int) -> void:
 	fragment_effect_body.text = LanguageManager.text(
 		FRAGMENT_EFFECT_KEYS[fragment_index]
 	)
+
+
+func _refresh_realm_details(realm_index: int) -> void:
+	for section in weapon_detail_sections:
+		section.hide()
+	fragment_details.hide()
+	realm_details.show()
+	var realm := REALM_CONFIG.get_realm(realm_index)
+	if realm == null:
+		return
+	var realm_id := String(realm.realm_id)
+	realm_glyph_label.text = _roman_numeral(realm_index + 1)
+	realm_name_label.text = LanguageManager.get_realm_name(
+		realm.display_name
+	)
+	realm_meta_label.text = LanguageManager.text(
+		"realm_stage_%s" % realm_id
+	).to_upper()
+	realm_skill_body.text = LanguageManager.text(
+		_get_realm_ability_key(realm_id)
+	)
+	realm_mechanics_body.text = LanguageManager.text(
+		"realm_skill_mechanics_%s" % realm_id
+	)
+	realm_breakthrough_body.text = LanguageManager.text(
+		"realm_breakthrough_%s" % realm_id
+	)
+
+
+func _get_realm_ability_key(realm_id: String) -> String:
+	match realm_id:
+		"qi_refining":
+			return "ability_roll"
+		"foundation":
+			return "ability_flight"
+		"golden_core":
+			return "ability_qi_shield"
+		"nascent_soul":
+			return "ability_spirit_projection"
+	return "ability_unknown"
+
+
+func _roman_numeral(value: int) -> String:
+	match value:
+		1:
+			return "I"
+		2:
+			return "II"
+		3:
+			return "III"
+		4:
+			return "IV"
+	return str(value)
 
 
 func _refresh_weapon_details() -> void:
