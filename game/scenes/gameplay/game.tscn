@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://dt3cq5k4og56r"]
+[gd_scene load_steps=12 format=3 uid="uid://dt3cq5k4og56r"]
 
 [ext_resource type="Script" uid="uid://8y3eqgopjr0k" path="res://game/scripts/gameplay/game.gd" id="1_script"]
 [ext_resource type="Script" path="res://game/scripts/audio/background_music_player.gd" id="2_bgm_script"]
@@ -10,6 +10,7 @@
 [ext_resource type="PackedScene" path="res://game/scenes/gameplay/run_ended_overlay.tscn" id="8_run_ended"]
 [ext_resource type="Script" uid="uid://busmi46k4retl" path="res://game/scripts/gameplay/enemy_spawner.gd" id="9_enemy_spawner"]
 [ext_resource type="Script" uid="uid://brpwd6i43a2mv" path="res://game/scripts/gameplay/road_fork_spawner.gd" id="10_fork_spawner"]
+[ext_resource type="Script" path="res://game/scripts/menus/logical_ui_scaler.gd" id="11_ui_scaler"]
 
 [node name="Game" type="Node2D" unique_id=666890130]
 script = ExtResource("1_script")
@@ -56,13 +57,25 @@ camera = NodePath("../Camera2D")
 [node name="DebugLayer" type="CanvasLayer" parent="." unique_id=1783769906]
 layer = 50
 
-[node name="MarginContainer" type="MarginContainer" parent="DebugLayer" unique_id=1357146757]
+[node name="DebugRoot" type="Control" parent="DebugLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="LogicalUiScaler" type="Node" parent="DebugLayer/DebugRoot"]
+script = ExtResource("11_ui_scaler")
+
+[node name="MarginContainer" type="MarginContainer" parent="DebugLayer/DebugRoot" unique_id=1357146757]
 offset_right = 120.0
-offset_bottom = 92.0
+offset_bottom = 128.0
 theme_override_constants/margin_left = 16
 theme_override_constants/margin_top = 16
 
-[node name="DebugLabel" type="Label" parent="DebugLayer/MarginContainer" unique_id=68522426]
+[node name="DebugLabel" type="Label" parent="DebugLayer/DebugRoot/MarginContainer" unique_id=68522426]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)

@@ -25,6 +25,7 @@ func _ready() -> void:
 	LanguageManager.language_changed.connect(_on_language_changed)
 	_apply_density_visuals()
 	_update_language()
+	set_process(false)
 
 
 func _process(delta: float) -> void:
@@ -97,6 +98,7 @@ func _complete_collection() -> void:
 	if _collected:
 		return
 	_collected = true
+	set_process(false)
 	_disable_collisions()
 	qi_collected.emit(get_qi_value())
 
@@ -150,3 +152,12 @@ func _on_language_changed(_locale: String) -> void:
 func _update_language() -> void:
 	glyph.text = LanguageManager.text("qi_glyph")
 	description_label.text = LanguageManager.text("qi_pickup")
+
+
+func _on_visibility_notifier_screen_entered() -> void:
+	if not _collected:
+		set_process(true)
+
+
+func _on_visibility_notifier_screen_exited() -> void:
+	set_process(false)

@@ -1,6 +1,8 @@
 class_name PlayerAbsorptionArea
 extends Area2D
 
+const ACTIVE_REDRAW_INTERVAL: float = 1.0 / 30.0
+
 ## World-space radius, in pixels, inside which qi may accumulate absorption
 ## progress. This component owns the radius so player movement remains focused.
 @export_range(24.0, 240.0, 1.0) var absorb_radius: float = 96.0:
@@ -13,17 +15,23 @@ extends Area2D
 
 var _overlapping_pickups: Dictionary[int, bool] = {}
 var _animation_phase: float = 0.0
+var _redraw_elapsed: float = 0.0
 var _absorption_enabled: bool = true
 
 
 func _ready() -> void:
 	_absorption_enabled = true
 	_apply_radius()
+	set_process(false)
 	queue_redraw()
 
 
 func _process(delta: float) -> void:
 	_animation_phase = fmod(_animation_phase + delta, TAU)
+	_redraw_elapsed += delta
+	if _redraw_elapsed < ACTIVE_REDRAW_INTERVAL:
+		return
+	_redraw_elapsed = 0.0
 	queue_redraw()
 
 
@@ -78,6 +86,9 @@ func set_absorption_enabled(enabled: bool) -> void:
 	set_deferred("monitorable", enabled)
 	if not enabled:
 		_overlapping_pickups.clear()
+		set_process(false)
+	_redraw_elapsed = 0.0
+	queue_redraw()
 
 
 func _apply_radius() -> void:
@@ -92,6 +103,9 @@ func _on_area_entered(area: Area2D) -> void:
 	if _overlapping_pickups.has(instance_id):
 		return
 	_overlapping_pickups[instance_id] = true
+	_redraw_elapsed = 0.0
+	set_process(_absorption_enabled)
+	queue_redraw()
 	var exit_callable := _on_pickup_tree_exited.bind(instance_id)
 	if not area.tree_exited.is_connected(exit_callable):
 		area.tree_exited.connect(exit_callable, CONNECT_ONE_SHOT)
@@ -106,4 +120,9 @@ func _on_pickup_tree_exited(instance_id: int) -> void:
 
 
 func _remove_overlap(instance_id: int) -> void:
-	_overlapping_pickups.erase(instance_id)
+	if not _overlapping_pickups.erase(instance_id):
+		return
+	if _overlapping_pickups.is_empty():
+		set_process(false)
+		_redraw_elapsed = 0.0
+	queue_redraw()

@@ -7,6 +7,9 @@ signal qi_collected(amount: int)
 const QI_PROFILE: QiDensityProfile = preload(
 	"res://game/resources/qi_profile.tres"
 )
+const StaticCanvasCacheResource = preload(
+	"res://game/scripts/gameplay/static_canvas_cache.gd"
+)
 
 @export_category("Chunk Definition")
 ## Shared source of chunk dimensions, road width, seed, TileSet, and tile IDs.
@@ -74,15 +77,23 @@ var _pickup_container: Node2D
 var _show_fallback: bool = true
 var _preview_update_queued: bool = false
 var _trial_hell_active: bool = false
+var _visual_cache: Node2D
+var _visual_cache_ready: bool = false
+var _is_visual_cache_painter: bool = false
+var _visual_cache_rebuild_queued: bool = false
 
 
 func _enter_tree() -> void:
+	if _is_visual_cache_painter:
+		return
 	_ensure_tile_map_layer()
 	_connect_config()
 	_request_editor_preview()
 
 
 func _exit_tree() -> void:
+	if _is_visual_cache_painter:
+		return
 	_disconnect_config()
 
 
@@ -107,6 +118,11 @@ func _ensure_tile_map_layer() -> void:
 
 func _build_terrain() -> void:
 	_ensure_tile_map_layer()
+	if not Engine.is_editor_hint():
+		_prepare_runtime_terrain()
+		_request_visual_cache_rebuild()
+		return
+
 	_tile_map_layer.clear()
 
 	if config == null:
@@ -128,6 +144,54 @@ func _build_terrain() -> void:
 
 	_tile_map_layer.visible = not _show_fallback
 	queue_redraw()
+
+
+## Runtime visuals are fully opaque, so the generated atlas layer beneath them
+## was invisible while still rebuilding and submitting all 4,096 tile cells.
+## Keep editor atlas previews intact and validate only the runtime source here.
+func _prepare_runtime_terrain() -> void:
+	_tile_map_layer.clear()
+	_tile_map_layer.visible = false
+	_tile_map_layer.tile_set = null
+
+	if config == null:
+		_show_fallback = true
+		queue_redraw()
+		return
+
+	if config.use_terrain_painting:
+		_show_fallback = not _terrain_definition_is_valid()
+	else:
+		_show_fallback = not (
+			_atlas_tile_exists(
+				config.road_source_id,
+				config.road_atlas_coordinates
+			)
+			and _atlas_tile_exists(
+				config.ground_source_id,
+				config.ground_atlas_coordinates
+			)
+		)
+	queue_redraw()
+
+
+func _terrain_definition_is_valid() -> bool:
+	if config.terrain_tileset == null:
+		return false
+	if (
+		config.terrain_set < 0
+		or config.terrain_set >= config.terrain_tileset.get_terrain_sets_count()
+	):
+		return false
+	var terrain_count := config.terrain_tileset.get_terrains_count(
+		config.terrain_set
+	)
+	return (
+		config.road_terrain >= 0
+		and config.road_terrain < terrain_count
+		and config.ground_terrain >= 0
+		and config.ground_terrain < terrain_count
+	)
 
 
 func _regenerate_pickups() -> void:
@@ -315,7 +379,11 @@ func get_road_half_width_at_local_y(local_y: float) -> float:
 ## Switches the runtime road between its normal palette and Trial Hell's
 ## dark volcanic surface without rebuilding deterministic contents.
 func set_trial_hell_active(active: bool) -> void:
+	if _trial_hell_active == active:
+		return
 	_trial_hell_active = active
+	if not Engine.is_editor_hint() and not _is_visual_cache_painter:
+		_request_visual_cache_rebuild()
 	queue_redraw()
 
 
@@ -447,6 +515,12 @@ func _draw() -> void:
 	if Engine.is_editor_hint():
 		_draw_editor_preview()
 		return
+	if not _is_visual_cache_painter and _visual_cache_ready:
+		return
+	_draw_runtime_visual()
+
+
+func _draw_runtime_visual() -> void:
 	if config == null:
 		return
 
@@ -464,6 +538,62 @@ func _draw() -> void:
 	_draw_fallback_terrain(chunk_size)
 	if _trial_hell_active:
 		_draw_trial_hell_overlay(chunk_size)
+
+
+func _request_visual_cache_rebuild() -> void:
+	if _visual_cache_rebuild_queued:
+		return
+	_visual_cache_rebuild_queued = true
+	call_deferred("_rebuild_visual_cache")
+
+
+func _rebuild_visual_cache() -> void:
+	_visual_cache_rebuild_queued = false
+	if Engine.is_editor_hint() or _is_visual_cache_painter or config == null:
+		return
+	_ensure_visual_cache()
+	_visual_cache_ready = false
+	queue_redraw()
+
+	var painter := WorldChunk.new()
+	painter._is_visual_cache_painter = true
+	painter.chunk_index = chunk_index
+	painter.config = config
+	painter._show_fallback = _show_fallback
+	painter._trial_hell_active = _trial_hell_active
+	var chunk_size := config.get_pixel_size()
+	_visual_cache.call(
+		"rebuild",
+		painter,
+		Rect2(-chunk_size * 0.5, chunk_size),
+		_get_visual_cache_raster_scale()
+	)
+
+
+func _ensure_visual_cache() -> void:
+	if is_instance_valid(_visual_cache):
+		return
+	_visual_cache = StaticCanvasCacheResource.new()
+	_visual_cache.name = "VisualCache"
+	_visual_cache.z_index = -1
+	add_child(_visual_cache, false, Node.INTERNAL_MODE_FRONT)
+	_visual_cache.cache_ready.connect(_on_visual_cache_ready)
+
+
+func _on_visual_cache_ready() -> void:
+	_visual_cache_ready = true
+	queue_redraw()
+
+
+func _get_visual_cache_raster_scale() -> float:
+	var active_camera := get_viewport().get_camera_2d()
+	if not is_instance_valid(active_camera):
+		return 1.0
+	return clampf(
+		minf(absf(active_camera.zoom.x), absf(active_camera.zoom.y)),
+		0.25,
+		2.0
+	)
 
 
 func _draw_trial_hell_overlay(chunk_size: Vector2) -> void:

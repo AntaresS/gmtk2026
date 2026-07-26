@@ -154,6 +154,7 @@ const DAO_IDLE_TRAIL_COLOR: Color = Color("e5bb50")
 const DAO_ATTACK_TRAIL_COLOR: Color = Color("ffc53d")
 const DAO_ATTACK_TRAIL_HIGHLIGHT: Color = Color("fff1a8")
 const DAO_MAX_ATTACK_TRAIL_COUNT: int = 24
+const VISUAL_TARGET_REFRESH_INTERVAL: float = 0.1
 
 @export_category("Forward Movement")
 ## Normal automatic forward travel speed in world pixels per second.
@@ -354,6 +355,7 @@ var _attack_cooldown_remaining: float = 0.0
 var _attack_flash_remaining: float = 0.0
 var _palm_attack_direction: Vector2 = Vector2.UP
 var _palm_aim_target: EnemyController
+var _palm_aim_refresh_remaining: float = 0.0
 var _palm_visual_state: int = PalmVisualState.HIDDEN
 var _palm_visual_equipped: bool = false
 var _palm_visual_elapsed: float = 0.0
@@ -386,6 +388,7 @@ var _flying_sword_orbit_phase: float = 0.0
 var _flying_sword_warning_strength: float = 0.0
 var _flying_sword_warning_pulse_elapsed: float = 0.0
 var _flying_sword_aim_target: EnemyController
+var _flying_sword_aim_refresh_remaining: float = 0.0
 var _fantian_seal_visual_equipped: bool = false
 var _fantian_seal_visual_state: int = FantianSealVisualState.HIDDEN
 var _fantian_seal_visual_elapsed: float = 0.0
@@ -781,7 +784,7 @@ func _draw_fantian_seal_switch_shadow(attack_range: float) -> void:
 		0.0,
 		1.0
 	)
-	var viewport_size := get_viewport_rect().size
+	var viewport_size := _get_visible_world_size()
 	var fullscreen_half_extent := (
 		maxf(viewport_size.x, viewport_size.y) * 0.75
 	)
@@ -2572,11 +2575,20 @@ func _attract_collectibles(delta: float) -> void:
 
 
 func _update_visual_state(delta: float) -> void:
-	_companion_phase = fmod(_companion_phase + delta * 1.6, TAU)
+	if _should_animate_qiankun_companion():
+		_companion_phase = fmod(_companion_phase + delta * 1.6, TAU)
 	_attack_flash_remaining = maxf(_attack_flash_remaining - delta, 0.0)
 	_damage_flash_remaining = maxf(_damage_flash_remaining - delta, 0.0)
 	_shield_flash_remaining = maxf(_shield_flash_remaining - delta, 0.0)
 	_dao_attack_remaining = maxf(_dao_attack_remaining - delta, 0.0)
+	_palm_aim_refresh_remaining = maxf(
+		_palm_aim_refresh_remaining - delta,
+		0.0
+	)
+	_flying_sword_aim_refresh_remaining = maxf(
+		_flying_sword_aim_refresh_remaining - delta,
+		0.0
+	)
 	_level_up_effect_remaining = maxf(
 		_level_up_effect_remaining - delta,
 		0.0
@@ -2593,7 +2605,40 @@ func _update_visual_state(delta: float) -> void:
 	_update_thunder_hammer_visual(delta)
 	_update_character_animation()
 	_update_damage_feedback_presentation()
-	queue_redraw()
+	if _has_continuous_custom_drawing():
+		queue_redraw()
+
+
+func _should_animate_qiankun_companion() -> bool:
+	return (
+		not _equipment_inventory.is_empty()
+		and _get_current_weapon_data().attack_kind
+			== WeaponDataResource.AttackKind.QIANKUN_RING
+		and not is_qiankun_ring_in_flight()
+	)
+
+
+func _has_continuous_custom_drawing() -> bool:
+	if (
+		_damage_flash_remaining > 0.0
+		or _level_up_effect_remaining > 0.0
+		or _breakthrough_effect_remaining > 0.0
+		or _fantian_seal_switch_shadow_active
+		or realm_abilities.is_qi_shield_active()
+	):
+		return true
+	if _palm_debug_geometry_visible and _is_palm_equipped():
+		return true
+	if _equipment_inventory.is_empty():
+		return false
+	match _get_current_weapon_data().attack_kind:
+		WeaponDataResource.AttackKind.DAO:
+			return true
+		WeaponDataResource.AttackKind.FLYING_SWORD:
+			return _flying_sword_reload_active
+		WeaponDataResource.AttackKind.QIANKUN_RING:
+			return not is_qiankun_ring_in_flight()
+	return false
 
 
 func _is_dao_equipped() -> bool:
@@ -3642,12 +3687,14 @@ func _refresh_flying_sword_visual_equipment() -> void:
 		_flying_sword_warning_strength = 0.0
 		_flying_sword_warning_pulse_elapsed = 0.0
 		_flying_sword_aim_target = null
+		_flying_sword_aim_refresh_remaining = 0.0
 		for sword_sprite in _flying_sword_visual_sprites:
 			sword_sprite.hide()
 		_set_flying_sword_readiness(0.0, 0.0)
 		return
 	var switching_to_sword := not _flying_sword_visual_equipped
 	_flying_sword_visual_equipped = true
+	_flying_sword_aim_refresh_remaining = 0.0
 	_ensure_flying_sword_visual_count(
 		get_flying_sword_projectile_count()
 	)
@@ -3853,7 +3900,15 @@ func _update_flying_sword_visuals(delta: float) -> void:
 	_ensure_flying_sword_visual_count(
 		get_flying_sword_projectile_count()
 	)
-	_flying_sword_aim_target = _get_nearest_flying_sword_target()
+	if (
+		not is_instance_valid(_flying_sword_aim_target)
+		or not _flying_sword_aim_target.is_combat_active()
+		or _flying_sword_aim_refresh_remaining <= 0.0
+	):
+		_flying_sword_aim_target = _get_nearest_flying_sword_target()
+		_flying_sword_aim_refresh_remaining = (
+			VISUAL_TARGET_REFRESH_INTERVAL
+		)
 	var nearest_distance := INF
 	var aim_direction := Vector2.UP
 	if is_instance_valid(_flying_sword_aim_target):
@@ -4084,7 +4139,7 @@ func _update_fantian_seal_visual(delta: float) -> void:
 			var ascent_eased := progress * progress
 			var ascent_target := Vector2(
 				FANTIAN_SEAL_IDLE_POSITION.x,
-				-get_viewport_rect().size.y * 0.78
+				-_get_visible_world_size().y * 0.78
 			)
 			fantian_seal_weapon.position = (
 				_fantian_seal_visual_start_position.lerp(
@@ -4214,6 +4269,17 @@ func _get_realm_airborne_animation() -> StringName:
 	return airborne_animation
 
 
+func _get_visible_world_size() -> Vector2:
+	var viewport_size := get_viewport_rect().size
+	var active_camera := get_viewport().get_camera_2d()
+	if not is_instance_valid(active_camera):
+		return viewport_size
+	return Vector2(
+		viewport_size.x / maxf(absf(active_camera.zoom.x), 0.01),
+		viewport_size.y / maxf(absf(active_camera.zoom.y), 0.01)
+	)
+
+
 func _update_palm_aim() -> void:
 	if (
 		_equipment_inventory.is_empty()
@@ -4221,6 +4287,13 @@ func _update_palm_aim() -> void:
 			!= WeaponDataResource.AttackKind.GREAT_STRENGTH_PALM
 	):
 		return
+	if (
+		is_instance_valid(_palm_aim_target)
+		and _palm_aim_target.is_combat_active()
+		and _palm_aim_refresh_remaining > 0.0
+	):
+		return
+	_palm_aim_refresh_remaining = VISUAL_TARGET_REFRESH_INTERVAL
 	var nearest_target: EnemyController = null
 	var nearest_distance_squared := INF
 	for enemy_node in get_tree().get_nodes_in_group("enemies"):
@@ -4934,6 +5007,7 @@ func _publish_equipment() -> void:
 
 
 func _apply_attack_range() -> void:
+	var next_shape: Shape2D
 	if (
 		not _equipment_inventory.is_empty()
 		and _get_current_weapon_data().attack_kind
@@ -4941,11 +5015,15 @@ func _apply_attack_range() -> void:
 	):
 		var square := RectangleShape2D.new()
 		square.size = Vector2.ONE * get_current_attack_range() * 2.0
-		attack_shape.shape = square
+		next_shape = square
 	else:
 		var circle := CircleShape2D.new()
 		circle.radius = get_current_attack_range()
-		attack_shape.shape = circle
+		next_shape = circle
+	if Engine.is_in_physics_frame():
+		attack_shape.set_deferred(&"shape", next_shape)
+	else:
+		attack_shape.shape = next_shape
 
 
 func _apply_attraction_range() -> void:

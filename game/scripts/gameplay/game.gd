@@ -7,13 +7,27 @@ const WeaponDataResource = preload(
 	"res://game/scripts/gameplay/weapon_data.gd"
 )
 
+@export_category("Camera")
+## Intended world-space coverage in pixels. The runtime camera derives a
+## uniform zoom from the configured render target so 1280x720 keeps the original
+## 1920x1080 gameplay area and spawn density.
+@export var camera_world_view_size: Vector2 = Vector2(1920.0, 1080.0)
 ## Vertical camera lead in world pixels. Larger values show more road ahead and
 ## place the player lower on screen; smaller values move the player upward.
 @export var camera_forward_look_ahead: float = 180.0
 ## Seconds used to ease the camera horizontally onto a committed branch.
 @export_range(0.1, 2.0, 0.05) var route_camera_pan_duration: float = 0.75
+
+@export_category("Performance Diagnostics")
 ## Shows the runtime speed, traveled distance, and active chunk count overlay.
 @export var show_debug_ui: bool = false
+## Prints one timestamped performance sample per interval in debug builds.
+## Release exports ignore this flag so diagnostics cannot add shipping overhead.
+@export var log_performance_samples: bool = false
+## Seconds between debug overlay and console performance samples.
+@export_range(0.25, 5.0, 0.25) var performance_sample_interval: float = 1.0
+
+@export_category("Run Flow")
 ## Configurable warning and lightning sequence used at non-fatal realm
 ## breakthrough milestones.
 @export var heavenly_tribulation_scene: PackedScene = preload(
@@ -93,6 +107,7 @@ var _total_damage_dealt: int = 0
 var _enemies_defeated: int = 0
 var _elite_enemies_defeated: int = 0
 var _weapon_damage_dealt: Dictionary = {}
+var _performance_sample_remaining: float = 0.0
 
 
 func _ready() -> void:
@@ -126,6 +141,8 @@ func _ready() -> void:
 	_enemies_defeated = 0
 	_elite_enemies_defeated = 0
 	_weapon_damage_dealt.clear()
+	_performance_sample_remaining = 0.0
+	_apply_camera_world_view_size()
 	player.set_movement_enabled(true)
 	infinite_world.set_progression_enabled(true)
 	enemy_spawner.set_road_half_width(infinite_world.chunk_config.road_half_width)
@@ -209,14 +226,94 @@ func request_camera_shake(strength: float) -> void:
 func _process(delta: float) -> void:
 	if not _run_ended:
 		_elapsed_run_time += maxf(delta, 0.0)
-	if not show_debug_ui:
+	if (
+		not OS.is_debug_build()
+		or (not show_debug_ui and not log_performance_samples)
+	):
 		return
-	debug_label.text = "Speed: %d\nDistance: %d\nChunks: %d\nEnemies: %d" % [
-		roundi(player.current_forward_speed),
-		roundi(player.distance_traveled),
+	_performance_sample_remaining -= maxf(delta, 0.0)
+	if _performance_sample_remaining > 0.0:
+		return
+	_performance_sample_remaining = maxf(
+		performance_sample_interval,
+		0.25
+	)
+	var sample_text := _build_performance_sample()
+	if show_debug_ui:
+		debug_label.text = sample_text
+	if log_performance_samples:
+		print("[PERF] ", sample_text.replace("\n", " | "))
+
+
+func _build_performance_sample() -> String:
+	var viewport_size := get_viewport_rect().size
+	var window_size := DisplayServer.window_get_size()
+	var world_view_size := Vector2(
+		viewport_size.x / maxf(absf(camera.zoom.x), 0.01),
+		viewport_size.y / maxf(absf(camera.zoom.y), 0.01)
+	)
+	var process_ms := (
+		Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+	)
+	var physics_ms := (
+		Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+	)
+	var video_memory_mib := (
+		Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED)
+		/ 1048576.0
+	)
+	return (
+		"Time %.1fs | FPS %d | Process %.2fms | Physics %.2fms\n"
+		+ "Draws %d | Primitives %d | VRAM %.1f MiB | Nodes %d\n"
+		+ "Chunks %d | Pickups %d | Enemies %d | Forks %d\n"
+		+ "Viewport %dx%d | World %dx%d | Zoom %.3f | Window %dx%d"
+	) % [
+		_elapsed_run_time,
+		roundi(Performance.get_monitor(Performance.TIME_FPS)),
+		process_ms,
+		physics_ms,
+		roundi(Performance.get_monitor(
+			Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME
+		)),
+		roundi(Performance.get_monitor(
+			Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME
+		)),
+		video_memory_mib,
+		roundi(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
 		infinite_world.get_active_chunk_count(),
+		infinite_world.get_active_pickup_count(),
 		enemy_spawner.get_active_enemy_count(),
+		get_tree().get_nodes_in_group("road_forks").size(),
+		roundi(viewport_size.x),
+		roundi(viewport_size.y),
+		roundi(world_view_size.x),
+		roundi(world_view_size.y),
+		camera.zoom.x,
+		window_size.x,
+		window_size.y,
 	]
+
+
+func _apply_camera_world_view_size() -> void:
+	var viewport_size := Vector2(
+		float(ProjectSettings.get_setting(
+			"display/window/size/viewport_width",
+			1280
+		)),
+		float(ProjectSettings.get_setting(
+			"display/window/size/viewport_height",
+			720
+		))
+	)
+	var safe_world_size := Vector2(
+		maxf(camera_world_view_size.x, 1.0),
+		maxf(camera_world_view_size.y, 1.0)
+	)
+	var uniform_zoom := minf(
+		viewport_size.x / safe_world_size.x,
+		viewport_size.y / safe_world_size.y
+	)
+	camera.zoom = Vector2.ONE * maxf(uniform_zoom, 0.01)
 
 
 func _get_camera_target() -> Vector2:

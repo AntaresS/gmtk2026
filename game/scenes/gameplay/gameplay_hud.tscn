@@ -1,9 +1,10 @@
-[gd_scene format=3 uid="uid://bbvlvsi3sds38"]
+[gd_scene load_steps=10 format=3 uid="uid://bbvlvsi3sds38"]
 
 [ext_resource type="Script" uid="uid://uur88os06aae" path="res://game/scripts/gameplay/gameplay_hud.gd" id="1_script"]
 [ext_resource type="Script" uid="uid://c5ice4cngoocd" path="res://game/scripts/gameplay/weapon_slot_icon.gd" id="2_weapon_slot"]
 [ext_resource type="Script" uid="uid://ckr7ji3bbprpw" path="res://game/scripts/gameplay/active_ability_icon.gd" id="3_ability_icon"]
 [ext_resource type="Script" path="res://game/scripts/gameplay/realm_progress_bar.gd" id="4_realm_progress"]
+[ext_resource type="Script" path="res://game/scripts/menus/logical_ui_scaler.gd" id="5_ui_scaler"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_top_status"]
 bg_color = Color(0, 0, 0, 0)
@@ -46,6 +47,9 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+
+[node name="LogicalUiScaler" type="Node" parent="HudRoot"]
+script = ExtResource("5_ui_scaler")
 
 [node name="DamageFlash" type="ColorRect" parent="HudRoot" unique_id=1911060052]
 unique_name_in_owner = true

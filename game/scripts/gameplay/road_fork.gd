@@ -5,6 +5,9 @@ signal branch_selected(branch_name: String)
 signal route_committed(route_center_x: float, branch_name: String)
 
 const MAIN_ROUTE_CHOICE := "继续当前主路"
+const StaticCanvasCacheResource = preload(
+	"res://game/scripts/gameplay/static_canvas_cache.gd"
+)
 
 ## Player allowed to leave the current infinite road while this full-width
 ## exterior branch is alongside it.
@@ -34,20 +37,32 @@ var _temporary_bounds_active: bool = false
 var _route_was_committed: bool = false
 var _world_config: WorldChunkConfig
 var _road_half_width_resolver: Callable
+var _visual_cache: Node2D
+var _visual_cache_ready: bool = false
+var _is_visual_cache_painter: bool = false
+var _visual_cache_world_origin: Vector2 = Vector2.ZERO
+var _visual_cache_world_width: float = 0.0
 
 
 func _ready() -> void:
+	if _is_visual_cache_painter:
+		return
 	add_to_group("road_forks")
 	LanguageManager.language_changed.connect(_on_language_changed)
 	_update_labels()
+	_rebuild_visual_cache()
 	queue_redraw()
 
 
 func _exit_tree() -> void:
+	if _is_visual_cache_painter:
+		return
 	_clear_player_bounds()
 
 
 func _physics_process(_delta: float) -> void:
+	if _is_visual_cache_painter:
+		return
 	if not _fork_enabled or not is_instance_valid(player):
 		return
 	var local_player := to_local(player.global_position)
@@ -79,6 +94,7 @@ func _physics_process(_delta: float) -> void:
 		) % LanguageManager.get_route_name(_selected_branch)
 		choice_label.show()
 		branch_selected.emit(_selected_branch)
+		_rebuild_visual_cache()
 		queue_redraw()
 
 	var cleanup_y := -half_length - 520.0
@@ -93,6 +109,15 @@ func _physics_process(_delta: float) -> void:
 
 
 func _draw() -> void:
+	if _is_visual_cache_painter:
+		_draw_static_surface()
+		return
+	if not _visual_cache_ready:
+		_draw_static_surface()
+	_draw_route_guidance()
+
+
+func _draw_static_surface() -> void:
 	var centerline := get_curve_centerline_points()
 	var visible_road_polygons := _get_visible_road_polygons()
 	var junction_polygons := _get_junction_road_polygons()
@@ -136,6 +161,9 @@ func _draw() -> void:
 			edge_points
 		)
 
+
+func _draw_route_guidance() -> void:
+	var centerline := get_curve_centerline_points()
 	var guide_color := (
 		Color(1.0, 0.20, 0.06, 0.98)
 		if trial_hell
@@ -180,10 +208,90 @@ func _draw() -> void:
 			)
 
 
+func _rebuild_visual_cache() -> void:
+	if _is_visual_cache_painter or not is_inside_tree():
+		return
+	_ensure_visual_cache()
+	_visual_cache_ready = false
+	queue_redraw()
+
+	var painter := RoadFork.new()
+	painter._is_visual_cache_painter = true
+	painter.set_physics_process(false)
+	for label_name in [&"LeftLabel", &"RightLabel", &"ChoiceLabel"]:
+		var placeholder_label := Label.new()
+		placeholder_label.name = label_name
+		painter.add_child(placeholder_label)
+	painter._visual_cache_world_origin = global_position
+	painter._visual_cache_world_width = _get_visible_world_width()
+	painter.branch_side = branch_side
+	painter.main_road_half_width = main_road_half_width
+	painter.branch_center_offset = branch_center_offset
+	painter.fork_length = fork_length
+	painter.curve_sample_count = curve_sample_count
+	painter.trial_hell = trial_hell
+	painter._selected_branch = _selected_branch
+	painter._world_config = _world_config
+	painter._road_half_width_resolver = _road_half_width_resolver
+	_visual_cache.call(
+		"rebuild",
+		painter,
+		_get_static_visual_bounds(),
+		_get_visual_cache_raster_scale()
+	)
+
+
+func _ensure_visual_cache() -> void:
+	if is_instance_valid(_visual_cache):
+		return
+	_visual_cache = StaticCanvasCacheResource.new()
+	_visual_cache.name = "VisualCache"
+	_visual_cache.z_index = -1
+	add_child(_visual_cache, false, Node.INTERNAL_MODE_FRONT)
+	_visual_cache.cache_ready.connect(_on_visual_cache_ready)
+
+
+func _on_visual_cache_ready() -> void:
+	_visual_cache_ready = true
+	queue_redraw()
+
+
+func _get_visual_cache_raster_scale() -> float:
+	var active_camera := get_viewport().get_camera_2d()
+	if not is_instance_valid(active_camera):
+		return 1.0
+	return clampf(
+		minf(absf(active_camera.zoom.x), absf(active_camera.zoom.y)),
+		0.25,
+		2.0
+	)
+
+
+func _get_static_visual_bounds() -> Rect2:
+	var polygons := _get_visible_road_polygons()
+	polygons.append_array(_get_junction_road_polygons())
+	if trial_hell:
+		polygons.append_array(_get_visible_road_polygons(-88.0))
+
+	var has_point := false
+	var bounds := Rect2()
+	for polygon in polygons:
+		for point in polygon:
+			if not has_point:
+				bounds = Rect2(point, Vector2.ZERO)
+				has_point = true
+			else:
+				bounds = bounds.expand(point)
+	if not has_point:
+		return Rect2(-Vector2.ONE * 64.0, Vector2.ONE * 128.0)
+	return bounds.grow(128.0)
+
+
 ## Supplies the same atlas definition used by generated world chunks so the
 ## branch is textured as part of the road instead of a flat-color overlay.
 func set_world_config(value: WorldChunkConfig) -> void:
 	_world_config = value
+	_rebuild_visual_cache()
 	queue_redraw()
 
 
@@ -191,6 +299,7 @@ func set_world_config(value: WorldChunkConfig) -> void:
 ## along the whole curve rather than freezing one width at its spawn point.
 func set_road_half_width_resolver(resolver: Callable) -> void:
 	_road_half_width_resolver = resolver
+	_rebuild_visual_cache()
 	queue_redraw()
 
 
@@ -198,6 +307,7 @@ func set_road_half_width_resolver(resolver: Callable) -> void:
 func refresh_visuals() -> void:
 	if is_node_ready():
 		_update_labels()
+	_rebuild_visual_cache()
 	queue_redraw()
 
 
@@ -214,6 +324,7 @@ func set_road_half_width(value: float) -> void:
 	)
 	if is_node_ready():
 		_update_labels()
+	_rebuild_visual_cache()
 	queue_redraw()
 
 
@@ -222,6 +333,7 @@ func configure_side(side: int) -> void:
 	branch_side = -1 if side < 0 else 1
 	if is_node_ready():
 		_update_labels()
+	_rebuild_visual_cache()
 	queue_redraw()
 
 
@@ -230,6 +342,7 @@ func configure_trial_hell(enabled: bool) -> void:
 	trial_hell = enabled
 	if is_node_ready():
 		_update_labels()
+	_rebuild_visual_cache()
 	queue_redraw()
 
 
@@ -289,7 +402,7 @@ func _append_rejected_branch_exit(
 	bend_start: Vector2
 ) -> void:
 	var side := float(branch_side)
-	var viewport_width := maxf(get_viewport_rect().size.x, 960.0)
+	var viewport_width := maxf(_get_visible_world_width(), 960.0)
 	var exit_x := side * (
 		branch_center_offset
 		+ viewport_width
@@ -310,6 +423,16 @@ func _append_rejected_branch_exit(
 			+ end_control * 3.0 * inverse * ratio * ratio
 			+ exit_end * ratio * ratio * ratio
 		)
+
+
+func _get_visible_world_width() -> float:
+	if _is_visual_cache_painter and _visual_cache_world_width > 0.0:
+		return _visual_cache_world_width
+	var viewport_width := get_viewport_rect().size.x
+	var active_camera := get_viewport().get_camera_2d()
+	if not is_instance_valid(active_camera):
+		return viewport_width
+	return viewport_width / maxf(absf(active_camera.zoom.x), 0.01)
 
 
 func _get_parallel_extension_end_y() -> float:
@@ -339,6 +462,7 @@ func _commit_route() -> void:
 	branch_selected.emit(_selected_branch)
 	route_committed.emit(new_route_center, _selected_branch)
 	_clear_player_bounds()
+	_rebuild_visual_cache()
 	queue_redraw()
 
 
@@ -518,9 +642,10 @@ func _draw_bluestone_road_texture(
 	if visible_polygons.is_empty():
 		return
 	var rng := RandomNumberGenerator.new()
+	var visual_world_origin := _get_visual_world_origin()
 	rng.seed = hash(Vector3i(
-		roundi(global_position.x),
-		roundi(global_position.y),
+		roundi(visual_world_origin.x),
+		roundi(visual_world_origin.y),
 		31469
 	))
 	for polygon in visible_polygons:
@@ -702,9 +827,10 @@ func _draw_trial_hell_surface(
 	visible_polygons: Array[PackedVector2Array]
 ) -> void:
 	var rng := RandomNumberGenerator.new()
+	var visual_world_origin := _get_visual_world_origin()
 	rng.seed = hash(Vector3i(
-		roundi(global_position.x),
-		roundi(global_position.y),
+		roundi(visual_world_origin.x),
+		roundi(visual_world_origin.y),
 		84011
 	))
 	for polygon in visible_polygons:
@@ -811,9 +937,10 @@ func _draw_branch_edge_decorations(
 	edge_points: Array[PackedVector2Array]
 ) -> void:
 	var rng := RandomNumberGenerator.new()
+	var visual_world_origin := _get_visual_world_origin()
 	rng.seed = hash(Vector3i(
-		roundi(global_position.x),
-		roundi(global_position.y),
+		roundi(visual_world_origin.x),
+		roundi(visual_world_origin.y),
 		57203
 	))
 	for edge_index in 2:
@@ -942,9 +1069,10 @@ func _draw_branch_surface_wear(
 	visible_polygons: Array[PackedVector2Array]
 ) -> void:
 	var rng := RandomNumberGenerator.new()
+	var visual_world_origin := _get_visual_world_origin()
 	rng.seed = hash(Vector3i(
-		roundi(global_position.x),
-		roundi(global_position.y),
+		roundi(visual_world_origin.x),
+		roundi(visual_world_origin.y),
 		64709
 	))
 	for polygon in visible_polygons:
@@ -1014,11 +1142,12 @@ func _draw_irregular_branch_edges(
 	centerline: PackedVector2Array,
 	edge_points: Array[PackedVector2Array]
 ) -> void:
+	var visual_world_origin := _get_visual_world_origin()
 	for edge_index in 2:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = hash(Vector3i(
-			roundi(global_position.x),
-			roundi(global_position.y),
+			roundi(visual_world_origin.x),
+			roundi(visual_world_origin.y),
 			66103 + edge_index * 997
 		))
 		var distance_until_next := rng.randf_range(7.0, 24.0)
@@ -1169,10 +1298,13 @@ func _draw_single_rock(
 
 
 func _get_road_half_width_at_local_y(local_y: float) -> float:
+	var visual_world_origin := _get_visual_world_origin()
 	if _road_half_width_resolver.is_valid():
 		return maxf(
 			float(
-				_road_half_width_resolver.call(global_position.y + local_y)
+				_road_half_width_resolver.call(
+					visual_world_origin.y + local_y
+				)
 			),
 			64.0
 		)
@@ -1183,7 +1315,7 @@ func _get_visual_edge_delta(local_y: float, side_index: int) -> float:
 	var world_seed := (
 		_world_config.world_seed if _world_config != null else 20260722
 	)
-	var generated_world_y := global_position.y + local_y
+	var generated_world_y := _get_visual_world_origin().y + local_y
 	var segment_length := 64.0
 	var coordinate := generated_world_y / segment_length
 	var anchor_index := floori(coordinate)
@@ -1200,6 +1332,12 @@ func _get_visual_edge_delta(local_y: float, side_index: int) -> float:
 		side_index
 	)
 	return lerpf(first, second, smooth_ratio)
+
+
+func _get_visual_world_origin() -> Vector2:
+	if _is_visual_cache_painter:
+		return _visual_cache_world_origin
+	return global_position
 
 
 func _get_visual_edge_anchor(

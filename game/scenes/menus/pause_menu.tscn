@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3 uid="uid://cs0urbmqtpj4t"]
+[gd_scene load_steps=4 format=3 uid="uid://cs0urbmqtpj4t"]
 
 [ext_resource type="Script" uid="uid://c84dnjbys00wq" path="res://game/scripts/menus/pause_menu.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://game/scenes/menus/game_info_overlay.tscn" id="2_info"]
+[ext_resource type="Script" path="res://game/scripts/menus/logical_ui_scaler.gd" id="3_ui_scaler"]
 
 [node name="PauseMenu" type="CanvasLayer" unique_id=191119153]
 process_mode = 3
@@ -15,6 +16,9 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="LogicalUiScaler" type="Node" parent="Overlay"]
+script = ExtResource("3_ui_scaler")
 
 [node name="Dim" type="ColorRect" parent="Overlay" unique_id=53143664]
 layout_mode = 1

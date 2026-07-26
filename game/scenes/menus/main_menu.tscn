@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3 uid="uid://cw1yv0lixgcpj"]
+[gd_scene load_steps=7 format=3 uid="uid://cw1yv0lixgcpj"]
 
 [ext_resource type="Script" uid="uid://dulv23u5i7dx8" path="res://game/scripts/menus/main_menu.gd" id="1_script"]
 [ext_resource type="Script" uid="uid://saekbmlj3h6b" path="res://game/scripts/audio/background_music_player.gd" id="2_bgm_script"]
 [ext_resource type="AudioStream" uid="uid://di3kaxm6ajmjr" path="res://assets/sound/track/stage_1.wav" id="3_stage_1"]
 [ext_resource type="PackedScene" path="res://game/scenes/menus/game_info_overlay.tscn" id="4_info"]
 [ext_resource type="Texture2D" path="res://BG/ChatGPT Image 2026年7月26日 15_16_09.png" id="5_background"]
+[ext_resource type="Script" path="res://game/scripts/menus/logical_ui_scaler.gd" id="6_ui_scaler"]
 
 [node name="MainMenu" type="Control" unique_id=259486953]
 layout_mode = 3
@@ -14,6 +15,9 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
+
+[node name="LogicalUiScaler" type="Node" parent="."]
+script = ExtResource("6_ui_scaler")
 
 [node name="BackgroundMusic" type="AudioStreamPlayer" parent="." unique_id=2061960211]
 stream = ExtResource("3_stage_1")
