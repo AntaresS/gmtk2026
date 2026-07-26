@@ -126,6 +126,7 @@ const FANTIAN_SEAL_IDLE_SCALE: float = 0.052
 const FANTIAN_SEAL_IDLE_POSITION: Vector2 = Vector2(54.0, -8.0)
 const FANTIAN_SEAL_SUMMON_DURATION: float = 0.18
 const FANTIAN_SEAL_ASCENT_DURATION: float = 0.48
+const FANTIAN_SEAL_ASCENT_SCALE_MULTIPLIER: float = 4.65
 const FANTIAN_SEAL_SWITCH_SHADOW_DELAY: float = 0.3
 const FANTIAN_SEAL_SWITCH_SHADOW_DURATION: float = 0.3
 const FANTIAN_SEAL_RANGE_FILL_COLOR := Color(0.055, 0.09, 0.055, 0.025)
@@ -3946,8 +3947,11 @@ func _update_fantian_seal_visual(delta: float) -> void:
 			)
 			fantian_seal_weapon.scale = Vector2.ONE * lerpf(
 				FANTIAN_SEAL_IDLE_SCALE,
-				FANTIAN_SEAL_IDLE_SCALE * 0.72,
-				progress
+				(
+					FANTIAN_SEAL_IDLE_SCALE
+					* FANTIAN_SEAL_ASCENT_SCALE_MULTIPLIER
+				),
+				ascent_eased
 			)
 			fantian_seal_weapon.rotation = 0.0
 			fantian_seal_weapon.modulate = Color(

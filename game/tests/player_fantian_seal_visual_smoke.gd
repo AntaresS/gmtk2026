@@ -67,7 +67,16 @@ func _run() -> void:
 		and is_zero_approx(held_seal.rotation),
 		"Fantian Seal did not leave its fixed side position by flying upward."
 	)
-	await _wait_seconds(0.48)
+	var early_ascent_position := held_seal.position
+	var early_ascent_scale := held_seal.scale.x
+	await _wait_seconds(0.18)
+	_check(
+		player.get_fantian_seal_visual_state() == 2
+		and held_seal.position.y < early_ascent_position.y
+		and held_seal.scale.x > early_ascent_scale,
+		"Fantian Seal did not grow gradually while rising."
+	)
+	await _wait_seconds(0.30)
 	_check(
 		player.get_fantian_seal_visual_state() == 4
 		and not held_seal.visible

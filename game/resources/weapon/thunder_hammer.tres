@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="WeaponData" format=3]
+[gd_resource type="Resource" script_class="WeaponData" format=3 uid="uid://c5kh4e8ftxhmy"]
 
-[ext_resource type="Script" path="res://game/scripts/gameplay/weapon_data.gd" id="1_data"]
+[ext_resource type="Script" uid="uid://ddr0tj47oo4w8" path="res://game/scripts/gameplay/weapon_data.gd" id="1_data"]
 [ext_resource type="PackedScene" path="res://game/scenes/gameplay/thunder_cloud_projectile.tscn" id="2_projectile"]
 
 [resource]

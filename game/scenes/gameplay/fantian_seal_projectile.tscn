@@ -1,15 +1,13 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene format=3 uid="uid://br8038udk7ta1"]
 
-[ext_resource type="Script" path="res://game/scripts/gameplay/fantian_seal_projectile.gd" id="1_script"]
-[ext_resource type="Texture2D" path="res://assets/player_weapons/fantian_seal.png" id="2_seal"]
+[ext_resource type="Script" uid="uid://3w8npi60387u" path="res://game/scripts/gameplay/fantian_seal_projectile.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://dpgbpim51tdl8" path="res://assets/player_weapons/fantian_seal.png" id="2_seal"]
 
-[node name="FantianSealProjectile" type="Node2D"]
+[node name="FantianSealProjectile" type="Node2D" unique_id=363184101]
 z_index = 2
 script = ExtResource("1_script")
-landed_hold_duration = 0.08
-landed_fade_duration = 0.14
 
-[node name="SealSprite" type="Sprite2D" parent="."]
-z_as_relative = false
+[node name="SealSprite" type="Sprite2D" parent="." unique_id=1583378273]
 z_index = 20
+z_as_relative = false
 texture = ExtResource("2_seal")
