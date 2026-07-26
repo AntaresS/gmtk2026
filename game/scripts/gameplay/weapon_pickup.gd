@@ -41,6 +41,7 @@ var _choice_dimmed: bool = false
 
 
 func _ready() -> void:
+	LanguageManager.language_changed.connect(_on_language_changed)
 	_update_description()
 	queue_redraw()
 
@@ -80,17 +81,22 @@ func _draw() -> void:
 	if weapon_data == null:
 		return
 	var weapon_color := weapon_data.pickup_color
-	draw_circle(Vector2.ZERO, channel_radius, Color(weapon_color, 0.055))
-	draw_arc(
+	draw_circle(
 		Vector2.ZERO,
 		channel_radius,
-		0.0,
-		TAU,
-		64,
-		Color(weapon_color, 0.72),
-		2.0,
-		true
+		Color(weapon_color, 0.2 if _exclusive_choice else 0.055)
 	)
+	if not _exclusive_choice:
+		draw_arc(
+			Vector2.ZERO,
+			channel_radius,
+			0.0,
+			TAU,
+			64,
+			Color(weapon_color, 0.72),
+			2.0,
+			true
+		)
 	if _channeling:
 		draw_arc(
 			Vector2.ZERO,
@@ -102,6 +108,11 @@ func _draw() -> void:
 			6.0,
 			true
 		)
+	if _exclusive_choice and weapon_data.icon_texture != null:
+		_draw_choice_texture_icon(
+			weapon_data.icon_texture
+		)
+		return
 	if weapon_data.attack_kind == WeaponDataResource.AttackKind.GOLDEN_BELL:
 		draw_circle(Vector2.ZERO, 19.0, Color(weapon_color, 0.1))
 		for ring_index in 3:
@@ -118,26 +129,12 @@ func _draw() -> void:
 		return
 	if weapon_data.attack_kind == WeaponDataResource.AttackKind.QIANKUN_RING:
 		draw_circle(Vector2.ZERO, 19.0, Color(weapon_color, 0.14))
-		draw_arc(
-			Vector2.ZERO,
-			11.0,
-			0.0,
-			TAU,
-			36,
-			weapon_color,
-			5.0,
-			true
-		)
-		draw_arc(
-			Vector2.ZERO,
-			6.0,
-			0.0,
-			TAU,
-			30,
-			Color("ffe9a8"),
-			2.0,
-			true
-		)
+		if weapon_data.icon_texture != null:
+			draw_texture_rect(
+				weapon_data.icon_texture,
+				Rect2(-18.0, -18.0, 36.0, 36.0),
+				false
+			)
 		return
 	if weapon_data.attack_kind == WeaponDataResource.AttackKind.THUNDER_HAMMER:
 		draw_circle(Vector2.ZERO, 19.0, Color(weapon_color, 0.14))
@@ -181,6 +178,26 @@ func _draw() -> void:
 			Color.WHITE,
 			3.0
 		)
+
+
+func _draw_choice_texture_icon(
+	texture: Texture2D
+) -> void:
+	var texture_size := texture.get_size()
+	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
+		return
+	var maximum_size := Vector2(44.0, 44.0)
+	var scale_factor := minf(
+		maximum_size.x / texture_size.x,
+		maximum_size.y / texture_size.y
+	)
+	var draw_size := texture_size * scale_factor
+	draw_texture_rect(
+		texture,
+		Rect2(-draw_size * 0.5, draw_size),
+		false,
+		Color.WHITE
+	)
 
 
 ## Configures one enemy drop before it enters the scene tree.
@@ -338,10 +355,17 @@ func _update_description() -> void:
 	if not is_instance_valid(description_label):
 		return
 	var weapon_name := (
-		weapon_data.display_name if weapon_data != null else "无效武器"
+		LanguageManager.get_weapon_name(
+			weapon_data.weapon_id,
+			weapon_data.display_name
+		)
+		if weapon_data != null
+		else LanguageManager.text("invalid_weapon")
 	)
 	if _channeling:
-		description_label.text = "%s%s  %d\n同步 %.1f / %.1f秒" % [
+		description_label.text = LanguageManager.text(
+			"weapon_channeling_format"
+		) % [
 			"▶ " if _exclusive_choice else "",
 			weapon_name,
 			weapon_damage,
@@ -349,17 +373,27 @@ func _update_description() -> void:
 			channel_duration,
 		]
 	elif _exclusive_choice and _choice_dimmed:
-		description_label.text = "%s  %d\n另一项选择中" % [
+		description_label.text = LanguageManager.text(
+			"weapon_choice_dimmed_format"
+		) % [
 			weapon_name,
 			weapon_damage,
 		]
 	elif _exclusive_choice:
-		description_label.text = "%s  %d\n停留1秒（二选一）" % [
+		description_label.text = LanguageManager.text(
+			"weapon_choice_idle_format"
+		) % [
 			weapon_name,
 			weapon_damage,
 		]
 	else:
-		description_label.text = "%s  %d\n圈内同步1秒" % [
+		description_label.text = LanguageManager.text(
+			"weapon_pickup_idle_format"
+		) % [
 			weapon_name,
 			weapon_damage,
 		]
+
+
+func _on_language_changed(_locale: String) -> void:
+	_update_description()

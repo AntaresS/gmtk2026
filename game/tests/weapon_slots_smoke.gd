@@ -12,11 +12,17 @@ const FLYING_SWORD_DATA: WeaponDataResource = preload(
 const QIANKUN_RING_DATA: WeaponDataResource = preload(
 	"res://game/resources/weapon/qiankun_ring.tres"
 )
+const QIANKUN_RING_TEXTURE: Texture2D = preload(
+	"res://assets/player_weapons/qiankun_ring.png"
+)
 const GOLDEN_BELL_DATA: WeaponDataResource = preload(
 	"res://game/resources/weapon/golden_bell.tres"
 )
 const THUNDER_HAMMER_DATA: WeaponDataResource = preload(
 	"res://game/resources/weapon/thunder_hammer.tres"
+)
+const THUNDER_HAMMER_TEXTURE: Texture2D = preload(
+	"res://assets/player_weapons/thunder_hammer.png"
 )
 const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 	"res://game/resources/weapon/fantian_seal.tres"
@@ -74,13 +80,16 @@ func _run() -> void:
 	_check(
 		slots_layout != null
 		and slots_layout.anchor_top == 1.0
-		and slots_layout.offset_left < 800.0,
-		"Weapon layout was not anchored near the lower-left/mid HUD."
+		and slots_layout.anchor_left == 0.0
+		and slots_layout.anchor_right == 0.0
+		and slots_layout.offset_left > 0.0,
+		"Weapon layout was not anchored to the lower-left ARPG quickbar."
 	)
 	_check(
 		hud.palm_weapon_slot.selected
-		and hud.palm_weapon_slot.get_weapon_id() == &"great_strength_palm",
-		"Great Strength Palm did not start in its separate selected slot."
+		and hud.palm_weapon_slot.get_weapon_id() == &"great_strength_palm"
+		and hud.palm_weapon_slot.weapon_data.icon_texture != null,
+		"Great Strength Palm did not start with its real icon selected."
 	)
 	for slot_index in 6:
 		_check(
@@ -154,6 +163,26 @@ func _run() -> void:
 			"Weapon acquisition order mismatch in slot %d."
 				% (slot_index + 1)
 		)
+	_check(
+		hud.get_weapon_slot_control(0).weapon_data.icon_texture != null
+		and hud.get_weapon_slot_control(1).weapon_data.icon_texture != null
+		and hud.get_weapon_slot_control(2).weapon_data.icon_texture
+			== QIANKUN_RING_TEXTURE
+		and hud.get_weapon_slot_control(4).weapon_data.icon_texture
+			== THUNDER_HAMMER_TEXTURE
+		and hud.get_weapon_slot_control(5).weapon_data.icon_texture != null,
+		"One or more weapon slots did not use their authored artwork."
+	)
+	var ring_projectile := (
+		QIANKUN_RING_DATA.projectile_scene.instantiate()
+		as QiankunRingProjectile
+	)
+	var ring_sprite := ring_projectile.get_node("RingSprite") as Sprite2D
+	_check(
+		ring_sprite.texture == QIANKUN_RING_TEXTURE,
+		"Qiankun Ring projectile did not use the new authored artwork."
+	)
+	ring_projectile.free()
 
 	await _send_key(54)
 	_check(

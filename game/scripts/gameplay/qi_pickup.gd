@@ -14,6 +14,7 @@ signal qi_collected(amount: int)
 @onready var core: Polygon2D = $Visual/Core
 @onready var orbit_dot: Polygon2D = $Visual/OrbitDot
 @onready var glyph: Label = $Visual/Glyph
+@onready var description_label: Label = $DescriptionLabel
 
 var _animation_phase: float = 0.0
 var _collected: bool = false
@@ -21,7 +22,9 @@ var _qi_value_override: int = -1
 
 
 func _ready() -> void:
+	LanguageManager.language_changed.connect(_on_language_changed)
 	_apply_density_visuals()
+	_update_language()
 
 
 func _process(delta: float) -> void:
@@ -138,3 +141,12 @@ func _get_profile_color() -> Color:
 	if density_profile == null:
 		return Color("7dffd8")
 	return density_profile.color
+
+
+func _on_language_changed(_locale: String) -> void:
+	_update_language()
+
+
+func _update_language() -> void:
+	glyph.text = LanguageManager.text("qi_glyph")
+	description_label.text = LanguageManager.text("qi_pickup")

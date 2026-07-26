@@ -363,9 +363,9 @@ func _run() -> void:
 	palm_outside_target.queue_free()
 	resources.demote_to_realm(1, 1)
 	_check(
-		int(player.call("_get_palm_direction_count")) == 2
+		int(player.call("_get_palm_direction_count")) == 1
 		and not bool(player.call("_is_palm_full_circle")),
-		"Foundation Palm did not use two opposite directional sectors."
+		"Foundation Palm did not keep one nearest-target direction."
 	)
 	var foundation_visual_target := _make_enemy(
 		player,
@@ -377,10 +377,10 @@ func _run() -> void:
 		AttackDamageResult.new(2, false)
 	)
 	_check(
-		player.get_visible_palm_sprite_count() == 2,
-		"Foundation Palm did not launch two opposite visual palms."
+		player.get_visible_palm_sprite_count() == 1,
+		"Foundation Palm did not begin its nearest-target palms sequentially."
 	)
-	await _wait_physics_frames(20)
+	await _wait_physics_frames(30)
 	foundation_visual_target.queue_free()
 	var foundation_target := _make_enemy(
 		player,
@@ -406,15 +406,15 @@ func _run() -> void:
 	resources.demote_to_realm(2, 1)
 	_check(
 		int(player.call("_get_palm_direction_count")) == 1
-		and bool(player.call("_is_palm_full_circle"))
-		and bool(
+		and not bool(player.call("_is_palm_full_circle"))
+		and not bool(
 			player.call(
 				"_is_offset_in_palm_coverage",
 				Vector2(0.0, player.get_current_attack_range() - 1.0),
 				Vector2.UP
 			)
 		),
-		"Golden Core Palm did not resolve as one full-circle cast."
+		"Golden Core Palm did not keep nearest-target directional coverage."
 	)
 	var golden_high_target := _make_enemy(
 		player,
@@ -458,7 +458,7 @@ func _run() -> void:
 	)
 	var golden_rear_target := _make_enemy(
 		player,
-		player.get_combat_anchor_position() + Vector2(-50.0, 0.0),
+		player.get_combat_anchor_position() + Vector2(-70.0, 0.0),
 		100
 	)
 	golden_front_target.set_physics_process(false)
@@ -474,22 +474,28 @@ func _run() -> void:
 		"Golden Core Palm applied area damage before the hand impact."
 	)
 	_check(
-		player.get_visible_palm_sprite_count() == 6,
-		"Golden Core Palm did not launch six radial visual echoes."
+		player.get_visible_palm_sprite_count() == 1,
+		"Golden Core Palm did not begin its nearest-target sequence one palm at a time."
 	)
 	await _wait_physics_frames(10)
 	_check(
 		golden_front_target.current_health == 70
+		and golden_rear_target.current_health == 100,
+		"Golden Core Palm's first hand did not hit only the nearest enemy."
+	)
+	await _wait_physics_frames(50)
+	_check(
+		not golden_front_target.is_combat_active()
 		and golden_rear_target.current_health == 70,
-		"Golden Core Palm did not hit each full-circle target exactly once."
+		"Later Golden Core palms did not retarget after defeating the nearest enemy."
 	)
 	golden_front_target.queue_free()
 	golden_rear_target.queue_free()
 	resources.demote_to_realm(3, 1)
 	_check(
 		int(player.call("_get_palm_direction_count")) == 1
-		and bool(player.call("_is_palm_full_circle")),
-		"Nascent Soul Palm did not preserve one full-circle cast."
+		and not bool(player.call("_is_palm_full_circle")),
+		"Nascent Soul Palm did not keep one nearest-target direction."
 	)
 	var nascent_visual_target := _make_enemy(
 		player,
@@ -503,10 +509,10 @@ func _run() -> void:
 		AttackDamageResult.new(1, false)
 	)
 	_check(
-		player.get_visible_palm_sprite_count() == 8,
-		"Nascent Soul Palm did not launch eight radial visual echoes."
+		player.get_visible_palm_sprite_count() == 1,
+		"Nascent Soul Palm did not begin its nearest-target sequence one palm at a time."
 	)
-	await _wait_physics_frames(20)
+	await _wait_physics_frames(80)
 	nascent_visual_target.queue_free()
 	var execute_resources := RunResources.new()
 	root.add_child(execute_resources)

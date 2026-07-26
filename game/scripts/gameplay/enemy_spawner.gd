@@ -3,6 +3,10 @@ extends Node2D
 
 signal qi_collected(amount: int)
 signal universal_upgrade_collected(upgrade_type: int, amount: int)
+## Relays actual enemy health removed for the current run summary.
+signal player_damage_recorded(source_id: StringName, amount: int)
+## Relays one confirmed enemy defeat, including whether it was elite.
+signal enemy_defeat_recorded(is_elite: bool)
 
 enum EliteRoadWidthBand {
 	VERY_NARROW,
@@ -845,6 +849,7 @@ func _spawn_enemy(
 	enemy.defeated.connect(
 		_on_enemy_defeated.bind(enemy, qi_reward)
 	)
+	enemy.damage_recorded.connect(_on_enemy_damage_recorded)
 
 	if from_behind:
 		enemy.cruise_speed = maxf(rear_enemy_forward_speed, 1.0)
@@ -1011,6 +1016,10 @@ func _on_enemy_defeated(
 	defeated_enemy: EnemyController,
 	qi_reward: int
 ) -> void:
+	enemy_defeat_recorded.emit(
+		is_instance_valid(defeated_enemy)
+			and defeated_enemy.is_elite_enemy()
+	)
 	_drop_qi(drop_position, qi_reward)
 	if (
 		is_instance_valid(defeated_enemy)
@@ -1021,6 +1030,13 @@ func _on_enemy_defeated(
 				_drop_weapon_choice(drop_position)
 			EnemyController.EliteRewardType.POWER_FRAGMENT:
 				_drop_weapon_power_fragment_choice(drop_position)
+
+
+func _on_enemy_damage_recorded(
+	source_id: StringName,
+	amount: int
+) -> void:
+	player_damage_recorded.emit(source_id, amount)
 
 
 func _drop_qi(drop_position: Vector2, qi_reward: int) -> void:

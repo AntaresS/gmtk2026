@@ -1,6 +1,7 @@
-[gd_scene format=3 uid="uid://cs0urbmqtpj4t"]
+[gd_scene load_steps=3 format=3 uid="uid://cs0urbmqtpj4t"]
 
 [ext_resource type="Script" uid="uid://c84dnjbys00wq" path="res://game/scripts/menus/pause_menu.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://game/scenes/menus/game_info_overlay.tscn" id="2_info"]
 
 [node name="PauseMenu" type="CanvasLayer" unique_id=191119153]
 process_mode = 3
@@ -26,10 +27,10 @@ color = Color(0, 0, 0, 0.68)
 
 [node name="CenterContainer" type="CenterContainer" parent="Overlay" unique_id=903815627]
 layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
+anchors_preset = 0
 anchor_bottom = 1.0
-grow_horizontal = 2
+offset_left = 64.0
+offset_right = 384.0
 grow_vertical = 2
 
 [node name="Menu" type="VBoxContainer" parent="Overlay/CenterContainer" unique_id=2103797881]
@@ -38,21 +39,58 @@ layout_mode = 2
 theme_override_constants/separation = 18
 
 [node name="Title" type="Label" parent="Overlay/CenterContainer/Menu" unique_id=1921818038]
+unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 38
 text = "Paused"
-horizontal_alignment = 1
+horizontal_alignment = 0
 
 [node name="ResumeButton" type="Button" parent="Overlay/CenterContainer/Menu" unique_id=1331008376]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 text = "Resume"
+alignment = 0
+
+[node name="InstructionsButton" type="Button" parent="Overlay/CenterContainer/Menu"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+text = "Quick Start"
+alignment = 0
+
+[node name="WeaponGalleryButton" type="Button" parent="Overlay/CenterContainer/Menu"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+text = "Weapon Gallery"
+alignment = 0
+
+[node name="LanguageRow" type="HBoxContainer" parent="Overlay/CenterContainer/Menu"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="LanguageLabel" type="Label" parent="Overlay/CenterContainer/Menu/LanguageRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 18
+text = "Language"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="LanguageOption" type="OptionButton" parent="Overlay/CenterContainer/Menu/LanguageRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(170, 46)
+layout_mode = 2
+alignment = 0
 
 [node name="MainMenuButton" type="Button" parent="Overlay/CenterContainer/Menu" unique_id=1331381600]
+unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 text = "Main Menu"
+alignment = 0
 
 [node name="DebugPanel" type="PanelContainer" parent="Overlay"]
 layout_mode = 1
@@ -199,7 +237,13 @@ prefix = "纵向加速度 "
 layout_mode = 2
 text = "应用基础数值"
 
+[node name="GameInfoOverlay" parent="Overlay" instance=ExtResource("2_info")]
+unique_name_in_owner = true
+
 [connection signal="pressed" from="Overlay/CenterContainer/Menu/ResumeButton" to="." method="_on_resume_pressed"]
+[connection signal="pressed" from="Overlay/CenterContainer/Menu/InstructionsButton" to="." method="_on_instructions_pressed"]
+[connection signal="pressed" from="Overlay/CenterContainer/Menu/WeaponGalleryButton" to="." method="_on_weapon_gallery_pressed"]
+[connection signal="item_selected" from="Overlay/CenterContainer/Menu/LanguageRow/LanguageOption" to="." method="_on_language_selected"]
 [connection signal="pressed" from="Overlay/CenterContainer/Menu/MainMenuButton" to="." method="_on_main_menu_pressed"]
 [connection signal="toggled" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/PalmGeometryCheck" to="." method="_on_palm_geometry_toggled"]
 [connection signal="pressed" from="Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/ProgressButtons/AddQi" to="." method="_on_debug_add_qi_pressed"]

@@ -22,6 +22,7 @@ var _started: bool = false
 
 func _ready() -> void:
 	add_to_group("palm_execute_vfx")
+	LanguageManager.language_changed.connect(_on_language_changed)
 	_label_origin_position = execute_label.position
 	execute_label.hide()
 	set_process(false)
@@ -32,7 +33,7 @@ func _ready() -> void:
 func play() -> void:
 	_elapsed = 0.0
 	_started = true
-	execute_label.text = "破体!"
+	execute_label.text = LanguageManager.text("body_break")
 	execute_label.modulate = execute_color
 	execute_label.show()
 	modulate = Color.WHITE
@@ -56,6 +57,11 @@ func _process(delta: float) -> void:
 	queue_redraw()
 	if progress >= 1.0:
 		queue_free()
+
+
+func _on_language_changed(_locale: String) -> void:
+	if _started:
+		execute_label.text = LanguageManager.text("body_break")
 
 
 func _draw() -> void:

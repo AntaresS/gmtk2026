@@ -38,6 +38,7 @@ var _road_half_width_resolver: Callable
 
 func _ready() -> void:
 	add_to_group("road_forks")
+	LanguageManager.language_changed.connect(_on_language_changed)
 	_update_labels()
 	queue_redraw()
 
@@ -73,7 +74,9 @@ func _physics_process(_delta: float) -> void:
 		else:
 			_selected_branch = MAIN_ROUTE_CHOICE
 			_clear_player_bounds()
-		choice_label.text = "已选择：%s" % _selected_branch
+		choice_label.text = LanguageManager.text(
+			"route_selected_format"
+		) % LanguageManager.get_route_name(_selected_branch)
 		choice_label.show()
 		branch_selected.emit(_selected_branch)
 		queue_redraw()
@@ -329,7 +332,9 @@ func _commit_route() -> void:
 		return
 	_route_was_committed = true
 	var new_route_center := get_branch_center_x()
-	choice_label.text = "进入：%s" % _selected_branch
+	choice_label.text = LanguageManager.text(
+		"route_entering_format"
+	) % LanguageManager.get_route_name(_selected_branch)
 	choice_label.show()
 	branch_selected.emit(_selected_branch)
 	route_committed.emit(new_route_center, _selected_branch)
@@ -1243,9 +1248,13 @@ func _update_labels() -> void:
 	left_label.visible = branch_side < 0
 	right_label.visible = branch_side > 0
 	var label_text := (
-		"试炼地狱\n高压战斗区域"
+		LanguageManager.text("route_trial_description")
 		if trial_hell
-		else "左侧无尽岔路" if branch_side < 0 else "右侧无尽岔路"
+		else (
+			LanguageManager.text("route_left")
+			if branch_side < 0
+			else LanguageManager.text("route_right")
+		)
 	)
 	left_label.text = label_text
 	right_label.text = label_text
@@ -1259,3 +1268,14 @@ func _update_labels() -> void:
 	left_label.position = Vector2(branch_x - 70.0, 30.0)
 	right_label.position = Vector2(branch_x - 70.0, 30.0)
 	choice_label.position = Vector2(branch_x - 105.0, 145.0)
+
+
+func _on_language_changed(_locale: String) -> void:
+	_update_labels()
+	if not choice_label.visible or _selected_branch.is_empty():
+		return
+	choice_label.text = LanguageManager.text(
+		"route_entering_format"
+		if _route_was_committed
+		else "route_selected_format"
+	) % LanguageManager.get_route_name(_selected_branch)

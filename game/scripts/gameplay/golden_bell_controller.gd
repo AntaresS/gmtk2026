@@ -183,7 +183,7 @@ func _try_impact_enemy(enemy: EnemyController) -> void:
 				* clampf(ordinary_enemy_damage_ratio, 0.0, 1.0)
 		)
 	)
-	enemy.take_melee_damage(impact_damage)
+	enemy.take_melee_damage(impact_damage, false, &"golden_bell")
 	enemy_hit.emit(enemy)
 	_layers[ready_layer_index]["phase"] = LayerPhase.FLASHING
 	_layers[ready_layer_index]["remaining"] = maxf(flash_duration, 0.01)

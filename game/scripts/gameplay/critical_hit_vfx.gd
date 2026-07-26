@@ -18,10 +18,12 @@ extends Node2D
 var _elapsed: float = 0.0
 var _label_origin_position: Vector2 = Vector2.ZERO
 var _started: bool = false
+var _damage: int = 1
 
 
 func _ready() -> void:
 	add_to_group("critical_hit_vfx")
+	LanguageManager.language_changed.connect(_on_language_changed)
 	_label_origin_position = critical_hit_label.position
 	critical_hit_label.hide()
 	set_process(false)
@@ -32,7 +34,8 @@ func _ready() -> void:
 func play(damage: int) -> void:
 	_elapsed = 0.0
 	_started = true
-	critical_hit_label.text = "暴击!  -%d" % maxi(damage, 1)
+	_damage = maxi(damage, 1)
+	_update_label()
 	critical_hit_label.modulate = critical_color
 	critical_hit_label.show()
 	modulate = Color.WHITE
@@ -56,6 +59,17 @@ func _process(delta: float) -> void:
 	queue_redraw()
 	if progress >= 1.0:
 		queue_free()
+
+
+func _on_language_changed(_locale: String) -> void:
+	if _started:
+		_update_label()
+
+
+func _update_label() -> void:
+	critical_hit_label.text = LanguageManager.text(
+		"critical_hit_format"
+	) % _damage
 
 
 func _draw() -> void:

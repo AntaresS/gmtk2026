@@ -1,0 +1,214 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://game/scripts/menus/game_info_overlay.gd" id="1_script"]
+[ext_resource type="Script" path="res://game/scripts/gameplay/weapon_slot_icon.gd" id="2_weapon_icon"]
+
+[node name="GameInfoOverlay" type="Control"]
+visible = false
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+script = ExtResource("1_script")
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.015, 0.025, 0.04, 0.94)
+
+[node name="OuterMargin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 120
+theme_override_constants/margin_top = 70
+theme_override_constants/margin_right = 120
+theme_override_constants/margin_bottom = 70
+
+[node name="Panel" type="PanelContainer" parent="OuterMargin"]
+layout_mode = 2
+
+[node name="PanelMargin" type="MarginContainer" parent="OuterMargin/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 34
+theme_override_constants/margin_top = 26
+theme_override_constants/margin_right = 34
+theme_override_constants/margin_bottom = 30
+
+[node name="Layout" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Header" type="HBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="TitleLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.65, 1, 0.86, 1)
+theme_override_font_sizes/font_size = 38
+text = "武器画廊"
+
+[node name="BackButton" type="Button" parent="OuterMargin/Panel/PanelMargin/Layout/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(150, 52)
+layout_mode = 2
+text = "返回"
+
+[node name="Separator" type="HSeparator" parent="OuterMargin/Panel/PanelMargin/Layout"]
+layout_mode = 2
+
+[node name="InstructionsPanel" type="ScrollContainer" parent="OuterMargin/Panel/PanelMargin/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="InstructionsText" type="RichTextLabel" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 720)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/default_color = Color(0.9, 0.93, 0.98, 1)
+theme_override_font_sizes/normal_font_size = 22
+theme_override_font_sizes/bold_font_size = 22
+bbcode_enabled = true
+fit_content = true
+text = "玩法说明"
+
+[node name="GalleryPanel" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 14
+
+[node name="GalleryHint" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.77, 0.86, 1)
+theme_override_font_sizes/font_size = 18
+text = "选择武器查看真实基础属性与战斗特性"
+
+[node name="GalleryContent" type="HBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 26
+
+[node name="WeaponList" type="ItemList" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+
+[node name="DetailsPanel" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="DetailsMargin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 24
+
+[node name="Details" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="WeaponHeader" type="HBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
+layout_mode = 2
+theme_override_constants/separation = 22
+
+[node name="WeaponIcon" type="Control" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/WeaponHeader"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(108, 104)
+layout_mode = 2
+script = ExtResource("2_weapon_icon")
+
+[node name="HeaderText" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/WeaponHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+
+[node name="WeaponNameLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/WeaponHeader/HeaderText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 34
+text = "大力掌"
+
+[node name="WeaponMetaLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/WeaponHeader/HeaderText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.67, 0.84, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "类型：近战 · 修炼倾向：无"
+
+[node name="WeaponStatsLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.89, 0.56, 1)
+theme_override_font_sizes/font_size = 20
+text = "基础属性"
+
+[node name="TraitTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 1, 0.86, 1)
+theme_override_font_sizes/font_size = 24
+text = "战斗特性"
+
+[node name="TraitBody" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "武器说明"
+autowrap_mode = 2
+
+[node name="GrowthTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.72, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "重复获得"
+
+[node name="GrowthBody" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "升级说明"
+autowrap_mode = 2
+
+[node name="LeaderboardPanel" type="ScrollContainer" parent="OuterMargin/Panel/PanelMargin/Layout"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="LeaderboardText" type="RichTextLabel" parent="OuterMargin/Panel/PanelMargin/Layout/LeaderboardPanel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 720)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/default_color = Color(0.9, 0.93, 0.98, 1)
+theme_override_font_sizes/normal_font_size = 22
+theme_override_font_sizes/bold_font_size = 22
+bbcode_enabled = true
+fit_content = true
+text = "排行榜"
+
+[connection signal="pressed" from="OuterMargin/Panel/PanelMargin/Layout/Header/BackButton" to="." method="_on_back_button_pressed"]
+[connection signal="item_selected" from="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/WeaponList" to="." method="_on_weapon_list_item_selected"]

@@ -52,7 +52,8 @@ func configure(
 
 
 func _ready() -> void:
-	power_glyph.text = UniversalUpgradeTypes.get_display_name(upgrade_type)
+	LanguageManager.language_changed.connect(_on_language_changed)
+	power_glyph.text = LanguageManager.get_universal_upgrade_glyph(upgrade_type)
 	_update_label()
 
 
@@ -104,17 +105,22 @@ func _draw() -> void:
 	var color := UniversalUpgradeTypes.get_color(upgrade_type)
 	var radius := maxf(pickup_radius, 1.0)
 	var pulse := 0.9 + sin(_visual_phase) * 0.08
-	draw_circle(Vector2.ZERO, radius, Color(color, 0.08))
-	draw_arc(
+	draw_circle(
 		Vector2.ZERO,
 		radius,
-		0.0,
-		TAU,
-		80,
-		Color(color, 0.88),
-		3.0,
-		true
+		Color(color, 0.2 if _exclusive_choice else 0.08)
 	)
+	if not _exclusive_choice:
+		draw_arc(
+			Vector2.ZERO,
+			radius,
+			0.0,
+			TAU,
+			80,
+			Color(color, 0.88),
+			3.0,
+			true
+		)
 	if _channeling:
 		draw_arc(
 			Vector2.ZERO,
@@ -173,25 +179,44 @@ func _complete_channel() -> void:
 func _update_label() -> void:
 	if not is_instance_valid(description_label):
 		return
+	var upgrade_name := LanguageManager.get_universal_upgrade_name(
+		upgrade_type
+	)
 	if _channeling:
-		description_label.text = "%s%s强化碎片\n引导 %.1f / %.1f秒" % [
+		description_label.text = LanguageManager.text(
+			"fragment_channeling_format"
+		) % [
 			"▶ " if _exclusive_choice else "",
-			UniversalUpgradeTypes.get_display_name(upgrade_type),
+			upgrade_name,
 			minf(_channel_elapsed, channel_duration),
 			channel_duration,
 		]
 	elif _exclusive_choice and _choice_dimmed:
-		description_label.text = "%s强化碎片\n另一项选择中" % (
-			UniversalUpgradeTypes.get_display_name(upgrade_type)
+		description_label.text = LanguageManager.text(
+			"fragment_choice_dimmed_format"
+		) % (
+			upgrade_name
 		)
 	elif _exclusive_choice:
-		description_label.text = "%s强化碎片\n停留1秒（二选一）" % (
-			UniversalUpgradeTypes.get_display_name(upgrade_type)
+		description_label.text = LanguageManager.text(
+			"fragment_choice_idle_format"
+		) % (
+			upgrade_name
 		)
 	else:
-		description_label.text = "%s强化碎片\n靠近并持续停留" % (
-			UniversalUpgradeTypes.get_display_name(upgrade_type)
+		description_label.text = LanguageManager.text(
+			"fragment_pickup_idle_format"
+		) % (
+			upgrade_name
 		)
+
+
+func _on_language_changed(_locale: String) -> void:
+	if is_instance_valid(power_glyph):
+		power_glyph.text = LanguageManager.get_universal_upgrade_glyph(
+			upgrade_type
+		)
+	_update_label()
 
 
 func get_channel_progress() -> float:

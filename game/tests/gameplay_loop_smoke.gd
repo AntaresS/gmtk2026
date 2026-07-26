@@ -30,6 +30,8 @@ var _last_pickup_value: int = 0
 var _depletion_emissions: int = 0
 var _thunder_strikes_landed: int = 0
 var _thunder_strikes_hit: int = 0
+var _tribulation_shake_requests: int = 0
+var _tribulation_shake_strength: float = 0.0
 var _tribulation_completions: int = 0
 var _test_narrowing_boundary_y: float = 0.0
 
@@ -258,7 +260,7 @@ func _run() -> void:
 		),
 		"Resetting cultivation did not restore initial attraction range."
 	)
-	_check(InputMap.has_action("switch_equipment"), "Tab switch action is missing.")
+	_check(InputMap.has_action("show_details"), "Tab detail action is missing.")
 	_check(
 		is_equal_approx(FLYING_SWORD_DATA.attack_interval, 0.9)
 		and FLYING_SWORD_DATA.attack_interval > DAO_DATA.attack_interval,
@@ -1784,20 +1786,27 @@ func _run() -> void:
 	)
 	await _wait_process_frames(2)
 
+	var weapon_name_before_details := player.get_weapon_name()
 	var tab_press := InputEventKey.new()
 	tab_press.keycode = KEY_TAB
 	tab_press.physical_keycode = KEY_TAB
 	tab_press.pressed = true
 	Input.parse_input_event(tab_press)
 	await _wait_process_frames(2)
+	_check(
+		hud.is_detail_drawer_visible(),
+		"Holding Tab did not reveal the character detail drawer."
+	)
 	var tab_release := InputEventKey.new()
 	tab_release.keycode = KEY_TAB
 	tab_release.physical_keycode = KEY_TAB
 	tab_release.pressed = false
 	Input.parse_input_event(tab_release)
+	await _wait_process_frames(1)
 	_check(
-		player.get_weapon_name() == "大力掌",
-		"Tab did not cycle to the next equipment-library entry."
+		not hud.is_detail_drawer_visible()
+		and player.get_weapon_name() == weapon_name_before_details,
+		"Releasing Tab did not close details or changed equipment."
 	)
 	_check(
 		hud.equipment_library_label.text.contains("刀 ×1  伤害 4")
@@ -1869,6 +1878,13 @@ func _run() -> void:
 		_check(
 			tribulation.strike_count == 3
 			and tribulation.warning_label.visible
+			and hud.is_tribulation_warning_active()
+			and hud.tribulation_warning_label.text.contains(
+				"准备渡劫"
+			)
+			and hud.tribulation_warning_label.text.contains(
+				"进阶雷劫已来临"
+			)
 			and is_equal_approx(qi_tribulation_warning_min, 2.1)
 			and is_equal_approx(qi_tribulation_warning_max, 3.0),
 			"Qi Refining tribulation did not use three strikes and triple warning time."
@@ -1901,15 +1917,25 @@ func _run() -> void:
 		tribulation.set("_phase_time_remaining", 0.03)
 		_thunder_strikes_landed = 0
 		_thunder_strikes_hit = 0
+		_tribulation_shake_requests = 0
+		_tribulation_shake_strength = 0.0
 		_tribulation_completions = 0
 		tribulation.strike_landed.connect(_on_thunder_strike_landed)
+		tribulation.camera_shake_requested.connect(
+			_on_tribulation_shake_requested
+		)
 		tribulation.tribulation_completed.connect(
 			_on_test_tribulation_completed
 		)
 		await _wait_physics_frames(150)
 		_check(
 			_thunder_strikes_landed == 3
-			and _thunder_strikes_hit == 3,
+			and _thunder_strikes_hit == 3
+			and _tribulation_shake_requests == 3
+			and is_equal_approx(
+				_tribulation_shake_strength,
+				tribulation.camera_shake_strength
+			),
 			"Standing on the predicted path did not receive all three strikes."
 		)
 		_check(
@@ -2261,6 +2287,14 @@ func _on_thunder_strike_landed(
 	_thunder_strikes_landed += 1
 	if hit_player:
 		_thunder_strikes_hit += 1
+
+
+func _on_tribulation_shake_requested(strength: float) -> void:
+	_tribulation_shake_requests += 1
+	_tribulation_shake_strength = maxf(
+		_tribulation_shake_strength,
+		strength
+	)
 
 
 func _on_test_tribulation_completed() -> void:

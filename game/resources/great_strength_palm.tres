@@ -2,12 +2,14 @@
 
 [ext_resource type="Script" uid="uid://ddr0tj47oo4w8" path="res://game/scripts/gameplay/weapon_data.gd" id="1_weapon_data"]
 [ext_resource type="AudioStream" uid="uid://tpixp25ras2a" path="res://assets/sound/sfx/palm.mp3" id="2_sfx"]
+[ext_resource type="Texture2D" path="res://assets/player_weapons/great_strength_palm.png" id="3_icon"]
 
 [resource]
 script = ExtResource("1_weapon_data")
 weapon_id = &"great_strength_palm"
 display_name = "大力掌"
 display_color = Color(0.490196, 1, 0.847059, 1)
+icon_texture = ExtResource("3_icon")
 minimum_damage = 5
 maximum_damage = 5
 attack_range = 108.0

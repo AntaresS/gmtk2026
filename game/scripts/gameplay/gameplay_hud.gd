@@ -1,6 +1,8 @@
 class_name GameplayHud
 extends CanvasLayer
 
+signal pause_requested
+
 const DAMAGE_FLASH_DURATION: float = 0.38
 const CultivationTypesResource = preload(
 	"res://game/scripts/gameplay/cultivation_types.gd"
@@ -30,12 +32,17 @@ const SHIELD_FEEDBACK_DURATION: float = 1.1
 @export_range(0.01, 0.5, 0.01) var danger_lifespan_ratio: float = 0.15
 
 @onready var damage_flash: ColorRect = %DamageFlash
+@onready var pause_button: Button = %PauseButton
+@onready var detail_drawer: PanelContainer = %DetailDrawer
+@onready var detail_title_label: Label = %DetailTitleLabel
+@onready var detail_hint_label: Label = %DetailHintLabel
 @onready var danger_border: Control = %DangerBorder
 @onready var danger_warning_label: Label = %DangerWarningLabel
 @onready var lifespan_label: Label = %LifespanLabel
 @onready var lifespan_bar: ProgressBar = %LifespanBar
 @onready var lifespan_rate_label: Label = %LifespanRateLabel
 @onready var cultivation_label: Label = %CultivationLabel
+@onready var realm_progress_bar: RealmProgressBar = %RealmProgressBar
 @onready var realm_ability_label: Label = %RealmAbilityLabel
 @onready var qi_label: Label = %QiLabel
 @onready var qi_bar: ProgressBar = %QiBar
@@ -65,6 +72,8 @@ const SHIELD_FEEDBACK_DURATION: float = 1.1
 @onready var active_ability_status_label: Label = %ActiveAbilityStatusLabel
 @onready var level_up_message: Label = %LevelUpMessage
 @onready var level_up_timer: Timer = %LevelUpTimer
+@onready var tribulation_warning_label: Label = %TribulationWarningLabel
+@onready var tribulation_warning_timer: Timer = %TribulationWarningTimer
 @onready var channel_feedback: VBoxContainer = %ChannelFeedback
 @onready var channel_label: Label = %ChannelLabel
 @onready var channel_progress: ProgressBar = %ChannelProgress
@@ -87,16 +96,81 @@ var _current_qi: int = 0
 var _current_qi_required: int = 1
 var _realm_ability_snapshot: Dictionary = {}
 var _shield_feedback_remaining: float = 0.0
+var _pending_qi_presentation: Vector2i = Vector2i.ZERO
+var _has_pending_qi_presentation: bool = false
 
 
 func _ready() -> void:
+	LanguageManager.language_changed.connect(_on_language_changed)
+	pause_button.text = LanguageManager.text("pause")
+	detail_title_label.text = LanguageManager.text("character_details")
+	detail_hint_label.text = LanguageManager.text("release_tab_to_close")
+	danger_warning_label.text = LanguageManager.text("danger_lifespan")
 	damage_flash.color.a = 0.0
+	detail_drawer.hide()
 	danger_border.hide()
 	danger_warning_label.hide()
+	tribulation_warning_label.hide()
 	channel_feedback.hide()
 	qi_shield_status_label.hide()
 	cultivation_tracks_label.show()
+	realm_progress_bar.infusion_finished.connect(
+		_on_realm_infusion_finished
+	)
 	set_process(false)
+
+
+func _on_pause_button_pressed() -> void:
+	pause_requested.emit()
+
+
+func _input(event: InputEvent) -> void:
+	var is_tab_key := false
+	if event is InputEventKey:
+		var key_event := event as InputEventKey
+		is_tab_key = (
+			key_event.keycode == KEY_TAB
+			or key_event.physical_keycode == KEY_TAB
+		)
+	if is_tab_key:
+		if event.pressed and not event.is_echo():
+			detail_drawer.show()
+		elif not event.pressed:
+			detail_drawer.hide()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("show_details"):
+		detail_drawer.show()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_released("show_details"):
+		detail_drawer.hide()
+		get_viewport().set_input_as_handled()
+
+
+func _on_language_changed(_locale: String) -> void:
+	pause_button.text = LanguageManager.text("pause")
+	detail_title_label.text = LanguageManager.text("character_details")
+	detail_hint_label.text = LanguageManager.text("release_tab_to_close")
+	danger_warning_label.text = LanguageManager.text("danger_lifespan")
+	if _resources != null:
+		_sync_all()
+	if _player != null:
+		_on_equipment_changed(
+			_player.get_technique_name(),
+			_player.get_weapon_name(),
+			_player.get_current_weapon_damage()
+		)
+		_on_combat_stats_changed(
+			_player.get_global_combat_stats(),
+			_player.get_current_weapon_combat_stats()
+		)
+		_on_equipment_inventory_changed(
+			_player.get_equipment_inventory_entries(),
+			_player.get_current_equipment_index()
+		)
+		_on_realm_ability_state_changed(
+			_player.realm_abilities.get_debug_snapshot()
+		)
+	_refresh_active_ability_card()
 
 
 func _process(delta: float) -> void:
@@ -142,14 +216,15 @@ func _process(delta: float) -> void:
 			shield_pulse
 		)
 		qi_bar.modulate = Color(
-			0.72 + shield_pulse * 0.28,
-			0.95,
 			1.0,
-			1.0
+			1.0,
+			1.0,
+			0.76 + shield_pulse * 0.24
 		)
 		if _shield_feedback_remaining <= 0.0:
 			_update_qi_shield_presentation()
 
+	_update_qi_infusion_opacity()
 	_refresh_processing()
 
 
@@ -172,6 +247,9 @@ func bind_resources(resources: RunResources) -> void:
 		_on_cultivation_level_changed
 	)
 	_resources.realm_state_changed.connect(_on_realm_state_changed)
+	_resources.breakthrough_pending_changed.connect(
+		_on_breakthrough_pending_changed
+	)
 	_resources.level_up_occurred.connect(_on_level_up_occurred)
 	_resources.cultivation_fragment_progress_changed.connect(
 		_on_cultivation_fragment_progress_changed
@@ -303,6 +381,12 @@ func _disconnect_resources() -> void:
 		)
 	if _resources.realm_state_changed.is_connected(_on_realm_state_changed):
 		_resources.realm_state_changed.disconnect(_on_realm_state_changed)
+	if _resources.breakthrough_pending_changed.is_connected(
+		_on_breakthrough_pending_changed
+	):
+		_resources.breakthrough_pending_changed.disconnect(
+			_on_breakthrough_pending_changed
+		)
 	if _resources.level_up_occurred.is_connected(_on_level_up_occurred):
 		_resources.level_up_occurred.disconnect(_on_level_up_occurred)
 	if _resources.cultivation_fragment_progress_changed.is_connected(
@@ -343,6 +427,7 @@ func _sync_all() -> void:
 		_resources.get_current_qi_requirement()
 	)
 	_on_cultivation_level_changed(_resources.cultivation_level)
+	_sync_realm_progress()
 	_cultivation_required = _resources.get_cultivation_fragments_required()
 	for cultivation_type in CultivationTypesResource.ORDER:
 		_cultivation_levels[cultivation_type] = (
@@ -355,7 +440,10 @@ func _sync_all() -> void:
 
 
 func _on_lifespan_changed(current: float, maximum: float) -> void:
-	lifespan_label.text = "寿元  %.1fs / %.1fs" % [current, maximum]
+	lifespan_label.text = LanguageManager.text("lifespan_format") % [
+		current,
+		maximum,
+	]
 	lifespan_bar.max_value = maximum
 	lifespan_bar.value = current
 	var lifespan_ratio := (
@@ -370,22 +458,41 @@ func _on_lifespan_changed(current: float, maximum: float) -> void:
 
 
 func _on_lifespan_decay_rate_changed(rate_per_second: float) -> void:
-	lifespan_rate_label.text = "寿元消耗  -%.2f / 秒" % rate_per_second
+	lifespan_rate_label.text = (
+		LanguageManager.text("lifespan_drain_format") % rate_per_second
+	)
 
 
 func _on_qi_changed(current: int, required: int) -> void:
 	_current_qi = maxi(current, 0)
 	_current_qi_required = maxi(required, 1)
-	qi_bar.max_value = required
-	qi_bar.value = current
+	if realm_progress_bar.is_infusion_active():
+		_pending_qi_presentation = Vector2i(
+			_current_qi,
+			_current_qi_required
+		)
+		_has_pending_qi_presentation = true
+		return
+	_apply_qi_presentation(_current_qi, _current_qi_required)
 	_update_qi_shield_presentation()
 
 
 func _on_cultivation_level_changed(level: int) -> void:
 	if _resources != null:
-		cultivation_label.text = _resources.get_realm_display_text()
+		var realm := _resources.get_current_realm_definition()
+		cultivation_label.text = LanguageManager.text(
+			"realm_layer_format"
+		) % [
+			LanguageManager.get_realm_name(
+				realm.display_name if realm != null else ""
+			),
+			_resources.get_current_realm_layer(),
+			maxi(realm.layer_count, 1) if realm != null else 1,
+		]
 	else:
-		cultivation_label.text = "境界 %d" % level
+		cultivation_label.text = (
+			LanguageManager.text("realm_format") % level
+		)
 
 
 func _on_realm_state_changed(
@@ -394,11 +501,126 @@ func _on_realm_state_changed(
 	layer: int,
 	layer_count: int
 ) -> void:
-	cultivation_label.text = "%s %d/%d层" % [
-		realm_name,
+	cultivation_label.text = LanguageManager.text("realm_layer_format") % [
+		LanguageManager.get_realm_name(realm_name),
 		layer,
 		layer_count,
 	]
+	realm_progress_bar.configure_state(
+		realm_index,
+		_format_realm_stage_name(realm_name),
+		layer,
+		layer_count
+	)
+	if not realm_progress_bar.is_infusion_active():
+		_apply_realm_qi_color()
+
+
+func _sync_realm_progress() -> void:
+	if _resources == null:
+		return
+	var realm := _resources.get_current_realm_definition()
+	_on_realm_state_changed(
+		_resources.get_current_realm_index(),
+		realm.display_name
+		if realm != null
+		else LanguageManager.text("realm_default"),
+		_resources.get_current_realm_layer(),
+		maxi(realm.layer_count, 1) if realm != null else 1
+	)
+
+
+func _format_realm_stage_name(realm_name: String) -> String:
+	return LanguageManager.text("realm_stage_format") % (
+		LanguageManager.get_realm_name(realm_name)
+	)
+
+
+func _get_localized_realm_display_text(level: int = 1) -> String:
+	if _resources == null:
+		return LanguageManager.text("realm_level_format") % level
+	var realm := _resources.get_current_realm_definition()
+	if realm == null:
+		return LanguageManager.text("realm_level_format") % level
+	return LanguageManager.format_realm_display(
+		realm.display_name,
+		_resources.get_current_realm_layer()
+	)
+
+
+func _apply_qi_presentation(current: int, required: int) -> void:
+	qi_bar.max_value = maxi(required, 1)
+	qi_bar.value = maxi(current, 0)
+
+
+func _apply_realm_qi_color() -> void:
+	var realm_color := realm_progress_bar.get_current_realm_color()
+	var fill_style := StyleBoxFlat.new()
+	fill_style.bg_color = realm_color
+	fill_style.corner_radius_top_left = 5
+	fill_style.corner_radius_top_right = 5
+	fill_style.corner_radius_bottom_right = 5
+	fill_style.corner_radius_bottom_left = 5
+	fill_style.shadow_color = Color(realm_color, 0.3)
+	fill_style.shadow_size = 4
+	var background_style := StyleBoxFlat.new()
+	background_style.bg_color = Color(0.015, 0.025, 0.045, 0.46)
+	background_style.border_width_left = 1
+	background_style.border_width_top = 1
+	background_style.border_width_right = 1
+	background_style.border_width_bottom = 1
+	background_style.border_color = Color(realm_color, 0.48)
+	background_style.corner_radius_top_left = 5
+	background_style.corner_radius_top_right = 5
+	background_style.corner_radius_bottom_right = 5
+	background_style.corner_radius_bottom_left = 5
+	qi_bar.add_theme_stylebox_override("fill", fill_style)
+	qi_bar.add_theme_stylebox_override("background", background_style)
+
+
+func _update_qi_infusion_opacity() -> void:
+	if not realm_progress_bar.is_infusion_active():
+		if _shield_feedback_remaining <= 0.0:
+			qi_bar.modulate = Color.WHITE
+		return
+	var progress := realm_progress_bar.get_infusion_progress()
+	var gather := clampf(progress / 0.3, 0.0, 1.0)
+	gather = gather * gather * (3.0 - 2.0 * gather)
+	qi_bar.modulate = Color(1.0, 1.0, 1.0, lerpf(1.0, 0.08, gather))
+
+
+func _start_qi_infusion() -> void:
+	if realm_progress_bar.is_infusion_active():
+		return
+	qi_bar.max_value = maxi(_current_qi_required, 1)
+	qi_bar.value = qi_bar.max_value
+	qi_label.text = LanguageManager.text("qi_format") % [
+		_current_qi_required,
+		_current_qi_required,
+	]
+	realm_progress_bar.play_qi_infusion()
+	_refresh_processing()
+
+
+func _on_realm_infusion_finished() -> void:
+	if _has_pending_qi_presentation:
+		_apply_qi_presentation(
+			_pending_qi_presentation.x,
+			_pending_qi_presentation.y
+		)
+		_has_pending_qi_presentation = false
+	_apply_realm_qi_color()
+	_update_qi_shield_presentation()
+	qi_bar.modulate = Color.WHITE
+	_refresh_processing()
+
+
+func _on_breakthrough_pending_changed(
+	active: bool,
+	_fatal: bool
+) -> void:
+	if active:
+		_start_qi_infusion()
 
 
 func _on_cultivation_fragment_progress_changed(
@@ -460,9 +682,27 @@ func _on_equipment_changed(
 	equipment_name: String,
 	damage: int
 ) -> void:
-	technique_label.text = "功法  %s" % technique_name
-	weapon_label.text = "当前装备  %s  · 伤害 %d" % [
-		equipment_name,
+	var localized_technique := (
+		LanguageManager.get_weapon_name(
+			_player.starting_weapon_data.weapon_id,
+			technique_name
+		)
+		if _player != null and _player.starting_weapon_data != null
+		else technique_name
+	)
+	var localized_equipment := (
+		LanguageManager.get_weapon_name(
+			_player.get_current_weapon_data().weapon_id,
+			equipment_name
+		)
+		if _player != null
+		else equipment_name
+	)
+	technique_label.text = (
+		LanguageManager.text("technique_format") % localized_technique
+	)
+	weapon_label.text = LanguageManager.text("equipped_format") % [
+		localized_equipment,
 		damage,
 	]
 
@@ -472,24 +712,29 @@ func _on_combat_stats_changed(
 	weapon_stats: WeaponCombatStatsResource
 ) -> void:
 	if global_stats == null or weapon_stats == null:
-		player_stats_label.text = "角色属性\n暂无战斗数据"
+		player_stats_label.text = LanguageManager.text("player_stats_empty")
 		return
+	var localized_weapon_name := weapon_stats.display_name
+	if _player != null and _player.get_current_weapon_data() != null:
+		var current_weapon_data := _player.get_current_weapon_data()
+		localized_weapon_name = LanguageManager.get_weapon_name(
+			current_weapon_data.weapon_id,
+			current_weapon_data.display_name
+		)
 	var lines: Array[String] = [
-		"[b]角色属性[/b]",
-		"基础  %s · 全局伤害 +%.1f / +%s · %s伤害 %d" % [
-			(
-				_resources.get_realm_display_text()
-				if _resources != null
-				else "境界 Lv.%d" % global_stats.overall_cultivation_level
+		"[b]%s[/b]" % LanguageManager.text("player_stats_title"),
+		LanguageManager.text("stats_base_format") % [
+			_get_localized_realm_display_text(
+				global_stats.overall_cultivation_level
 			),
 			global_stats.global_damage_bonus,
 			_format_percent(global_stats.overall_level_damage_ratio),
-			weapon_stats.display_name,
+			localized_weapon_name,
 			_player.get_current_weapon_damage()
 			if _player != null
 			else weapon_stats.resolved_damage,
 		],
-		"总览  暴击 %s / %s · 攻速 %s" % [
+		LanguageManager.text("stats_overview_format") % [
 			_format_percent(global_stats.critical_chance, false),
 			_format_percent(
 				global_stats.critical_damage_multiplier,
@@ -497,7 +742,7 @@ func _on_combat_stats_changed(
 			),
 			_format_percent(global_stats.attack_speed_bonus),
 		],
-		"投射  弹速 ×%.2f · 当前武器 ×%d · 范围 %s · 索敌 %s" % [
+		LanguageManager.text("stats_projectile_format") % [
 			global_stats.projectile_speed_multiplier,
 			weapon_stats.delivery_count,
 			_format_percent(global_stats.aoe_radius_bonus),
@@ -507,8 +752,7 @@ func _on_combat_stats_changed(
 	if _player != null:
 		var levels := _player.get_universal_upgrade_snapshot()
 		lines.append(
-			"碎片  攻速 %d · 伤害 %d · 身法 %d · 范围 %d · 加减速 %d"
-			% [
+			LanguageManager.text("stats_fragments_format") % [
 				int(levels.get("攻速", 0)),
 				int(levels.get("伤害", 0)),
 				int(levels.get("身法", 0)),
@@ -517,8 +761,7 @@ func _on_combat_stats_changed(
 			]
 		)
 		lines.append(
-			"移动  横向 %.0f · 纵向加速度 %.0f · 减速目标 %.0f"
-			% [
+			LanguageManager.text("stats_movement_format") % [
 				_player.get_effective_lateral_speed(),
 				_player.get_effective_forward_acceleration(),
 				_player.get_slowed_speed_target(),
@@ -648,6 +891,7 @@ func _refresh_processing() -> void:
 		or _danger_active
 		or _damage_flash_remaining > 0.0
 		or _shield_feedback_remaining > 0.0
+		or realm_progress_bar.is_infusion_active()
 	)
 
 
@@ -661,9 +905,17 @@ func is_damage_flash_active() -> bool:
 	return _damage_flash_remaining > 0.0
 
 
+## Returns whether the hold-to-inspect character drawer is currently visible.
+func is_detail_drawer_visible() -> bool:
+	return detail_drawer.visible
+
+
 func _render_equipment_library() -> void:
 	equipment_library_label.text = (
-		"装备库（Tab / 1–6 / ` 切换）\n%s" % "\n".join(_equipment_entries)
+		"%s\n%s" % [
+			LanguageManager.text("complete_weapon_data"),
+			"\n".join(_equipment_entries),
+		]
 	)
 
 
@@ -693,7 +945,7 @@ func _sync_weapon_slots(
 		palm_weapon_slot.configure(
 			palm_data,
 			int(palm_snapshot["quantity"]),
-			"`",
+			"Q",
 			int(palm_snapshot["inventory_index"]) == current_index,
 			not bool(palm_snapshot["available"]),
 			false
@@ -732,7 +984,7 @@ func _sync_weapon_slots(
 
 
 func _clear_weapon_slots() -> void:
-	palm_weapon_slot.configure(null, 0, "`", false, false, false)
+	palm_weapon_slot.configure(null, 0, "Q", false, false, false)
 	for slot_index in weapon_slots.size():
 		weapon_slots[slot_index].configure(
 			null,
@@ -753,16 +1005,13 @@ func get_weapon_slot_control(slot_index: int) -> WeaponSlotIconControl:
 
 func _render_cultivation_tracks() -> void:
 	if _player == null:
-		cultivation_tracks_label.text = "通用碎片：尚未绑定"
+		cultivation_tracks_label.text = LanguageManager.text(
+			"fragments_unbound"
+		)
 		return
 	var levels := _player.get_universal_upgrade_snapshot()
-	cultivation_tracks_label.text = (
-		"通用碎片\n"
-		+ "攻速 Lv.%d：每级 +%.0f%%\n"
-		+ "伤害 Lv.%d：常规武器 +%d / 乾坤圈弹射 +1\n"
-		+ "身法 Lv.%d：横移 +%.0f / 纵向加速度 +%.0f\n"
-		+ "范围 Lv.%d：每级全武器 +%.0f%%\n"
-		+ "加减速 Lv.%d：加速 +%.0f / 减速目标 -%.0f（最低 %.0f）"
+	cultivation_tracks_label.text = LanguageManager.text(
+		"fragments_details_format"
 	) % [
 		int(levels.get("攻速", 0)),
 		_player.attack_speed_bonus_per_fragment * 100.0,
@@ -781,12 +1030,9 @@ func _render_cultivation_tracks() -> void:
 
 
 func _on_level_up_occurred(level: int, restored_lifespan: float) -> void:
-	var realm_text := (
-		_resources.get_realm_display_text()
-		if _resources != null
-		else "境界 %d" % level
-	)
-	level_up_message.text = "%s\n寿元 +%.0f" % [
+	_start_qi_infusion()
+	var realm_text := _get_localized_realm_display_text(level)
+	level_up_message.text = LanguageManager.text("level_up_format") % [
 		realm_text,
 		restored_lifespan,
 	]
@@ -798,38 +1044,38 @@ func _on_realm_ability_state_changed(snapshot: Dictionary) -> void:
 	_realm_ability_snapshot = snapshot.duplicate()
 	var entries: Array[String] = []
 	if StringName(snapshot.get("realm_id", &"")) == &"qi_refining":
-		entries.append("Space 翻滚无敌 · CD 0.8s")
+		entries.append(LanguageManager.text("ability_roll_summary"))
 	var shield_active := bool(snapshot.get("qi_shield_active", false))
 	if bool(snapshot.get("temporary_flight_available", false)):
 		var flight_phase := StringName(
 			snapshot.get("temporary_flight_phase", &"grounded")
 		)
 		var phase_text: String = str({
-			&"ascending": "上升",
-			&"holding": "驭空滑行",
-			&"descending": "下降",
+			&"ascending": LanguageManager.text("flight_ascending"),
+			&"holding": LanguageManager.text("flight_holding"),
+			&"descending": LanguageManager.text("flight_descending"),
 		}.get(flight_phase, ""))
 		entries.append(
-			"驭空%s" % phase_text
+			LanguageManager.text("flight_active_format") % phase_text
 			if bool(snapshot.get("temporary_flight_active", false))
-			else "Space 跃起驭空"
+			else LanguageManager.text("flight_prompt")
 		)
 	elif float(snapshot.get("flight_height", 0.0)) > 0.0:
-		entries.append("御空飞行")
+		entries.append(LanguageManager.text("flight_permanent"))
 	if StringName(snapshot.get("realm_id", &"")) == &"golden_core":
 		entries.append(
-			"灵气护盾已开启 [Space]"
+			LanguageManager.text("shield_active_summary")
 			if shield_active
-			else "Space 开启灵气护盾"
+			else LanguageManager.text("shield_prompt")
 		)
 	if bool(snapshot.get("spirit_projection_available", false)):
 		entries.append(
-			"灵体出窍 ×2伤害 / ×1.5承伤 / 灵盾开启 [Space]"
+			LanguageManager.text("projection_active_summary")
 			if bool(snapshot.get("spirit_projection_active", false))
-			else "Space 灵体出窍"
+			else LanguageManager.text("projection_prompt")
 		)
 	if entries.is_empty():
-		entries.append("地上修行")
+		entries.append(LanguageManager.text("ability_ground_training"))
 	realm_ability_label.text = " · ".join(entries)
 	_update_qi_shield_presentation()
 	_refresh_active_ability_card()
@@ -846,39 +1092,53 @@ func _refresh_active_ability_card() -> void:
 	var cooldown_remaining := float(
 		snapshot.get("cooldown_remaining", 0.0)
 	)
-	var ability_name := "尚未领悟"
-	var description := "突破境界后解锁主动能力"
-	var status := "不可用"
+	var ability_name := LanguageManager.text("ability_unknown")
+	var description := LanguageManager.text("ability_unlock_hint")
+	var status := LanguageManager.text("status_unavailable")
 	match ability_id:
 		&"roll":
-			ability_name = "翻滚无敌"
-			description = "向前翻滚并短暂无视伤害"
+			ability_name = LanguageManager.text("ability_roll")
+			description = LanguageManager.text("ability_roll_description")
 			status = (
-				"翻滚中"
+				LanguageManager.text("status_rolling")
 				if is_active
 				else (
-					"冷却 %.1fs" % cooldown_remaining
+					LanguageManager.text("cooldown_format") % cooldown_remaining
 					if cooldown_remaining > 0.0
-					else "可用"
+					else LanguageManager.text("status_ready")
 				)
 			)
 		&"temporary_flight":
-			ability_name = "跃起驭空"
-			description = "短暂升空，避开地面威胁"
+			ability_name = LanguageManager.text("ability_flight")
+			description = LanguageManager.text("ability_flight_description")
 			var phase := StringName(snapshot.get("phase", &"grounded"))
 			status = str({
-				&"ascending": "正在上升",
-				&"holding": "驭空滑行",
-				&"descending": "正在落地",
-			}.get(phase, "可用"))
+				&"ascending": LanguageManager.text("status_ascending"),
+				&"holding": LanguageManager.text("status_holding"),
+				&"descending": LanguageManager.text("status_descending"),
+			}.get(phase, LanguageManager.text("status_ready")))
 		&"qi_shield":
-			ability_name = "灵气护盾"
-			description = "开启时消耗灵气抵挡伤害，灵气耗尽后伤害穿透"
-			status = "护盾已开启 · 再按关闭" if is_active else "默认关闭 · 可开启"
+			ability_name = LanguageManager.text("ability_qi_shield")
+			description = LanguageManager.text(
+				"ability_qi_shield_description"
+			)
+			status = (
+				LanguageManager.text("status_shield_active")
+				if is_active
+				else LanguageManager.text("status_shield_inactive")
+			)
 		&"spirit_projection":
-			ability_name = "灵体出窍"
-			description = "开启灵盾并造成 200% 伤害，同时承受 150% 伤害"
-			status = "灵体已出窍 · 再按收回" if is_active else "可用"
+			ability_name = LanguageManager.text(
+				"ability_spirit_projection"
+			)
+			description = LanguageManager.text(
+				"ability_spirit_projection_description"
+			)
+			status = (
+				LanguageManager.text("status_projection_active")
+				if is_active
+				else LanguageManager.text("status_ready")
+			)
 	active_ability_name_label.text = ability_name
 	active_ability_description_label.text = description
 	active_ability_status_label.text = status
@@ -909,29 +1169,31 @@ func _update_qi_shield_presentation() -> void:
 		_realm_ability_snapshot.get("qi_shield_active", false)
 	)
 	if not shield_available:
-		qi_label.text = "灵气  %d / %d" % [
+		qi_label.text = LanguageManager.text("qi_format") % [
 			_current_qi,
 			_current_qi_required,
 		]
-		qi_bar.modulate = Color.WHITE
+		if not realm_progress_bar.is_infusion_active():
+			qi_bar.modulate = Color.WHITE
 		qi_shield_status_label.hide()
 		return
 	if not shield_active:
-		qi_label.text = "灵气  %d / %d" % [
+		qi_label.text = LanguageManager.text("qi_format") % [
 			_current_qi,
 			_current_qi_required,
 		]
-		qi_bar.modulate = Color.WHITE
+		if not realm_progress_bar.is_infusion_active():
+			qi_bar.modulate = Color.WHITE
 		qi_shield_status_label.modulate = Color("9aa8b8")
 		qi_shield_status_label.text = (
-			"◇ 灵气护盾关闭  ·  灵体出窍时自动开启"
+			LanguageManager.text("shield_off_projection")
 			if bool(
 				_realm_ability_snapshot.get(
 					"spirit_projection_available",
 					false
 				)
 			)
-			else "◇ 灵气护盾关闭  ·  按 Space 开启"
+			else LanguageManager.text("shield_off_prompt")
 		)
 		qi_shield_status_label.show()
 		return
@@ -942,21 +1204,21 @@ func _update_qi_shield_presentation() -> void:
 		0.01
 	)
 	var capacity := float(_current_qi) * efficiency
-	qi_label.text = "灵气  %d / %d  ·  灵盾 %.0f" % [
+	qi_label.text = LanguageManager.text("qi_shield_capacity_format") % [
 		_current_qi,
 		_current_qi_required,
 		capacity,
 	]
-	qi_bar.modulate = Color("72e8ff")
+	if not realm_progress_bar.is_infusion_active():
+		qi_bar.modulate = Color.WHITE
 	qi_shield_status_label.show()
 	if _shield_feedback_remaining > 0.0:
 		return
 	qi_shield_status_label.modulate = Color.WHITE
 	qi_shield_status_label.text = (
-		"◉ 灵气护盾  %.0f 点  ·  1 灵气抵挡 %.1f 伤害"
-		% [capacity, efficiency]
+		LanguageManager.text("shield_status_format") % [capacity, efficiency]
 		if capacity > 0.0
-		else "◇ 灵气护盾耗尽  ·  收集灵气即可恢复"
+		else LanguageManager.text("shield_depleted")
 	)
 
 
@@ -971,12 +1233,13 @@ func _on_qi_shield_absorbed(
 		if _player != null
 		else 0.0
 	)
-	qi_shield_status_label.text = (
-		"护盾吸收 %.0f  ·  消耗 %d 灵气  ·  剩余 %.0f"
-		% [blocked_damage, qi_spent, capacity]
-	)
+	qi_shield_status_label.text = LanguageManager.text(
+		"shield_absorbed_format"
+	) % [blocked_damage, qi_spent, capacity]
 	if remaining_damage > 0.0:
-		qi_shield_status_label.text += "  ·  穿透 %.1f" % remaining_damage
+		qi_shield_status_label.text += LanguageManager.text(
+			"shield_penetrated_format"
+		) % remaining_damage
 	qi_shield_status_label.show()
 	_refresh_processing()
 
@@ -987,17 +1250,17 @@ func _on_spirit_projection_changed(active: bool) -> void:
 			_player.realm_abilities.get_debug_snapshot()
 		)
 	level_up_message.text = (
-		"灵体出窍\n伤害 ×2 · 承伤 ×1.5 · 灵盾开启"
+		LanguageManager.text("projection_entered")
 		if active
-		else "灵体归窍"
+		else LanguageManager.text("projection_returned")
 	)
 	level_up_message.show()
 	level_up_timer.start()
 
 
 func _on_weapon_power_upgraded(level: int, total_damage_bonus: int) -> void:
-	level_up_message.text = (
-		"伤害强化 %d级\n常规武器伤害 +%d · 乾坤圈弹射 +%d"
+	level_up_message.text = LanguageManager.text(
+		"damage_upgrade_format"
 	) % [
 		level,
 		total_damage_bonus,
@@ -1009,17 +1272,18 @@ func _on_weapon_power_upgraded(level: int, total_damage_bonus: int) -> void:
 
 func _on_universal_upgrade_applied(upgrade_type: int, level: int) -> void:
 	if upgrade_type == UniversalUpgradeTypes.UpgradeType.DAMAGE:
-		level_up_message.text = (
-			"伤害强化 %d级\n常规武器伤害 +%d · 乾坤圈弹射 +%d"
-			% [
-				level,
-				level * _player.damage_bonus_per_fragment,
-				level,
-			]
-		)
+		level_up_message.text = LanguageManager.text(
+			"damage_upgrade_format"
+		) % [
+			level,
+			level * _player.damage_bonus_per_fragment,
+			level,
+		]
 	else:
-		level_up_message.text = "%s强化 %d级\n全局生效" % [
-			UniversalUpgradeTypes.get_display_name(upgrade_type),
+		level_up_message.text = LanguageManager.text(
+			"generic_upgrade_format"
+		) % [
+			LanguageManager.get_universal_upgrade_name(upgrade_type),
 			level,
 		]
 	level_up_message.show()
@@ -1031,13 +1295,32 @@ func _on_breakthrough_reward_granted(
 	_current: float,
 	_maximum: float
 ) -> void:
-	level_up_message.text = "渡劫成功\n寿元上限提升"
+	level_up_message.text = LanguageManager.text("tribulation_success")
 	level_up_message.show()
 	level_up_timer.start()
 
 
+## Shows the dedicated two-line realm-advance warning without replacing level
+## rewards or the later successful-tribulation message.
+func show_tribulation_warning() -> void:
+	tribulation_warning_label.text = LanguageManager.text(
+		"tribulation_warning"
+	)
+	tribulation_warning_label.show()
+	tribulation_warning_timer.start()
+
+
+## Returns whether the realm-advance lightning warning is currently visible.
+func is_tribulation_warning_active() -> bool:
+	return tribulation_warning_label.visible
+
+
 func _on_level_up_timer_timeout() -> void:
 	level_up_message.hide()
+
+
+func _on_tribulation_warning_timer_timeout() -> void:
+	tribulation_warning_label.hide()
 
 
 func _on_channel_feedback_timer_timeout() -> void:

@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://ddr0tj47oo4w8" path="res://game/scripts/gameplay/weapon_data.gd" id="1_data"]
 [ext_resource type="PackedScene" path="res://game/scenes/gameplay/thunder_cloud_projectile.tscn" id="2_projectile"]
 [ext_resource type="AudioStream" uid="uid://cibgvwvur52ry" path="res://assets/sound/sfx/thunder_hammer.mp3" id="3_sfx"]
+[ext_resource type="Texture2D" path="res://assets/player_weapons/thunder_hammer.png" id="4_icon"]
 
 [resource]
 script = ExtResource("1_data")
@@ -12,6 +13,7 @@ attack_kind = 5
 attack_domain = 1
 display_color = Color(0.55, 0.78, 1, 1)
 pickup_color = Color(0.42, 0.72, 1, 1)
+icon_texture = ExtResource("4_icon")
 minimum_damage = 5
 maximum_damage = 5
 attack_range = 260.0

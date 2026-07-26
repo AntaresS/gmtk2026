@@ -1,16 +1,21 @@
 class_name ThunderHammerVisual
 extends Node2D
 
+const HAMMER_ENERGY_CENTER: Vector2 = Vector2(0.0, -18.0)
+const HAMMER_BOLT_ORIGIN: Vector2 = Vector2(18.0, -18.0)
+
 ## Local position, in world pixels, relative to the player's visible character.
 @export var equipped_offset: Vector2 = Vector2(46.0, -8.0)
 ## Base blue-white energy color used for charged outlines and lightning arcs.
 @export var lightning_color: Color = Color("8fd8ff")
 ## Brighter critical-discharge color used to distinguish a critical volley.
 @export var critical_lightning_color: Color = Color("f3c8ff")
-## Dark metal color of the hammer head at zero charge.
-@export var hammer_idle_color: Color = Color("4d6078")
-## Fully charged metal color of the hammer head.
-@export var hammer_charged_color: Color = Color("b9e8ff")
+## Neutral texture modulation at zero charge. Keep this near white to preserve
+## the authored hammer artwork.
+@export var hammer_idle_modulate: Color = Color.WHITE
+## Subtle texture modulation at full charge. Brighter values make the hammer
+## artwork itself participate in the readiness feedback.
+@export var hammer_charged_modulate: Color = Color("d8f4ff")
 ## Maximum radius, in world pixels, of the readiness glow around the hammer head.
 @export_range(8.0, 48.0, 1.0) var maximum_glow_radius: float = 25.0
 ## Number of deterministic lightning-shape refreshes per second while charged.
@@ -21,8 +26,7 @@ extends Node2D
 ## drawing a misleading hitscan line all the way to the selected enemy.
 @export_range(12.0, 96.0, 1.0) var target_bolt_length: float = 46.0
 
-@onready var hammer_head: Polygon2D = $HammerPivot/HammerHead
-@onready var hammer_handle: Polygon2D = $HammerPivot/HammerHandle
+@onready var hammer_sprite: Sprite2D = $HammerPivot/HammerSprite
 @onready var charge_arc: Line2D = $ChargeArc
 @onready var target_arc: Line2D = $TargetArc
 
@@ -124,8 +128,10 @@ func _update_presentation() -> void:
 	)
 	var ready_boost := 0.18 if _target_ready else 0.0
 	var energy := clampf(_charge_ratio + ready_boost * pulse, 0.0, 1.0)
-	hammer_head.color = hammer_idle_color.lerp(hammer_charged_color, energy)
-	hammer_handle.color = Color("9a7b54").lerp(Color("ead6a9"), energy * 0.55)
+	hammer_sprite.modulate = hammer_idle_modulate.lerp(
+		hammer_charged_modulate,
+		energy
+	)
 	var flash_strength := get_discharge_flash_strength()
 	target_arc.visible = _target_ready or flash_strength > 0.0
 	target_arc.width = 1.8 + energy * 1.4 + flash_strength * 2.6
@@ -153,7 +159,6 @@ func _refresh_lightning_geometry() -> void:
 	)
 	var perpendicular := direction.orthogonal()
 	var bolt_points := PackedVector2Array()
-	var bolt_origin := Vector2(9.0, -9.0)
 	for point_index in 5:
 		var progress := float(point_index) / 4.0
 		var jitter := (
@@ -165,7 +170,7 @@ func _refresh_lightning_geometry() -> void:
 			* 7.0
 		)
 		bolt_points.append(
-			bolt_origin
+			HAMMER_BOLT_ORIGIN
 				+ direction * bolt_length * progress
 				+ perpendicular * jitter
 		)
@@ -185,7 +190,7 @@ func _refresh_lightning_geometry() -> void:
 				+ float(segment_index) * 3.7
 		) * 1.5
 		arc_points.append(
-			Vector2(5.0, -5.0)
+			HAMMER_ENERGY_CENTER
 				+ Vector2.from_angle(angle) * (19.0 + radius_jitter)
 		)
 	charge_arc.points = arc_points
@@ -202,7 +207,7 @@ func _draw() -> void:
 		1.0
 	)
 	draw_circle(
-		Vector2(5.0, -5.0),
+		HAMMER_ENERGY_CENTER,
 		lerpf(9.0, maximum_glow_radius, glow_strength),
 		Color(lightning_color, 0.05 + glow_strength * 0.16)
 	)
@@ -213,7 +218,7 @@ func _draw() -> void:
 				+ float(_lightning_shape_serial) * 0.73
 			)
 			var start := (
-				Vector2(5.0, -5.0)
+				HAMMER_ENERGY_CENTER
 				+ Vector2.from_angle(spark_angle) * 19.0
 			)
 			draw_line(

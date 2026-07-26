@@ -173,6 +173,8 @@ func _run() -> void:
 		and dissolve_material.shader.resource_path
 			== "res://game/shaders/enemy_dissolve.gdshader"
 		and ally.current_health > 20
+		and healer.get_active_healing_icon_count()
+			== EnemyController.HEALING_ICON_COUNT
 		and not healer.is_flying
 		and healer.archetype == EnemyController.EnemyArchetype.HEALER
 		and rejected_elite_healer.archetype
