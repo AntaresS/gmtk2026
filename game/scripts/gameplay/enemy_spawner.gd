@@ -246,9 +246,9 @@ const FANTIAN_SEAL_DATA: WeaponDataResource = preload(
 ## Clearance in world pixels retained between either reward circle and the
 ## generated road edge after accounting for the pair's full horizontal extent.
 @export_range(0.0, 80.0, 1.0) var reward_road_edge_clearance: float = 8.0
-## Default forward speed in world pixels per second for every unselected reward
-## pair. All pairs temporarily match the player's vertical speed during a
-## channel, then return to this shared speed without inheriting lateral motion.
+## Independent forward speed in world pixels per second for every reward pair.
+## Focus never changes this speed; players synchronize by regulating their own
+## movement while remaining inside one option's channel radius.
 @export_range(40.0, 400.0, 5.0) var reward_vertical_drift_speed: float = 140.0
 ## Extra world pixels beyond each camera edge allowed before an unclaimed
 ## reward-choice group's center is removed.
@@ -958,7 +958,6 @@ func _create_reward_choice_group(
 	var choice_group := EliteRewardChoiceResource.new()
 	choice_group.reward_kind = reward_kind
 	choice_group.configure_motion(
-		player,
 		reward_vertical_drift_speed,
 		Callable(self, "_clamp_reward_group_x")
 	)

@@ -970,17 +970,18 @@ func _run() -> void:
 				"res://game/scenes/gameplay/player.tscn"
 			).instantiate() as PlayerController
 			get_root().add_child(choice_player)
+			choice_player.set_movement_enabled(false)
 			player.set_movement_enabled(false)
 			weapon_choice.configure_motion(
-				choice_player,
 				enemy_spawner.reward_vertical_drift_speed,
 				Callable(enemy_spawner, "_clamp_reward_group_x")
 			)
 			fragment_choice.configure_motion(
-				choice_player,
 				enemy_spawner.reward_vertical_drift_speed,
 				Callable(enemy_spawner, "_clamp_reward_group_x")
 			)
+			weapon_choice.configure_lifecycle(camera, 1000000.0, 0.0)
+			fragment_choice.configure_lifecycle(camera, 1000000.0, 0.0)
 			for option in weapon_options:
 				var weapon_option := option as WeaponPickup
 				weapon_option.configure(
@@ -1011,6 +1012,30 @@ func _run() -> void:
 					+ "and dimming its counterpart."
 				)
 			)
+			choice_player.velocity.y = -900.0
+			var focused_weapon_y := weapon_choice.global_position.y
+			var unfocused_fragment_y := fragment_choice.global_position.y
+			var motion_sample_seconds := 0.25
+			weapon_choice._physics_process(motion_sample_seconds)
+			fragment_choice._physics_process(motion_sample_seconds)
+			var expected_reward_drift := (
+				enemy_spawner.reward_vertical_drift_speed
+				* motion_sample_seconds
+			)
+			_check(
+				is_equal_approx(
+					focused_weapon_y - weapon_choice.global_position.y,
+					expected_reward_drift
+				)
+				and is_equal_approx(
+					unfocused_fragment_y - fragment_choice.global_position.y,
+					expected_reward_drift
+				),
+				(
+					"Reward focus inherited player velocity or changed another "
+					+ "pair's independent drift."
+				)
+			)
 			choice_player.global_position = (
 				weapon_choice.global_position + Vector2(0.0, 220.0)
 			)
@@ -1025,7 +1050,57 @@ func _run() -> void:
 				weapon_options[0].global_position
 				+ Vector2.DOWN * reward_test_flight_elevation
 			)
-			await _wait_physics_frames(75)
+			var reward_motion_step := 1.0 / 60.0
+			for _frame in 75:
+				choice_player.global_position.y -= 260.0 * reward_motion_step
+				weapon_choice._physics_process(reward_motion_step)
+				fragment_choice._physics_process(reward_motion_step)
+				(weapon_options[0] as WeaponPickup)._process(
+					reward_motion_step
+				)
+			_check(
+				choice_player.get_equipment_inventory_entries().size()
+					== choice_inventory_before
+				and not weapon_choice.is_committed()
+				and not (weapon_options[0] as WeaponPickup).is_choice_focused(),
+				(
+					"Passing a reward at normal speed moved it with the player "
+					+ "or completed synchronization."
+				)
+			)
+			choice_player.global_position = (
+				weapon_options[0].global_position
+				+ Vector2.DOWN * reward_test_flight_elevation
+			)
+			for _frame in 75:
+				choice_player.global_position.y -= 420.0 * reward_motion_step
+				weapon_choice._physics_process(reward_motion_step)
+				fragment_choice._physics_process(reward_motion_step)
+				(weapon_options[0] as WeaponPickup)._process(
+					reward_motion_step
+				)
+			_check(
+				choice_player.get_equipment_inventory_entries().size()
+					== choice_inventory_before
+				and not weapon_choice.is_committed()
+				and not (weapon_options[0] as WeaponPickup).is_choice_focused(),
+				(
+					"Accelerating through a reward moved it with the player or "
+					+ "completed synchronization."
+				)
+			)
+			choice_player.global_position = (
+				weapon_options[0].global_position
+				+ Vector2.DOWN * reward_test_flight_elevation
+			)
+			for _frame in 75:
+				choice_player.global_position.y -= 110.0 * reward_motion_step
+				weapon_choice._physics_process(reward_motion_step)
+				fragment_choice._physics_process(reward_motion_step)
+				(weapon_options[0] as WeaponPickup)._process(
+					reward_motion_step
+				)
+			await _wait_physics_frames(15)
 			_check(
 				choice_player.get_equipment_inventory_entries().size()
 					== choice_inventory_before + 1

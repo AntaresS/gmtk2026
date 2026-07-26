@@ -13,7 +13,6 @@ var _options: Array[Node2D] = []
 var _focused_option: Node2D
 var _committed: bool = false
 var _initialized: bool = false
-var _collecting_player: PlayerController
 var _vertical_drift_speed: float = 140.0
 var _road_x_clamp: Callable
 var _link_phase: float = 0.0
@@ -136,30 +135,22 @@ func _draw() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	var vertical_velocity := -maxf(_vertical_drift_speed, 1.0)
-	for group_node in get_tree().get_nodes_in_group("elite_reward_choices"):
-		if group_node is not EliteRewardChoice:
-			continue
-		var choice_group := group_node as EliteRewardChoice
-		if choice_group.has_focused_option():
-			vertical_velocity = choice_group.get_player_vertical_velocity()
-			break
-	global_position.y += vertical_velocity * maxf(delta, 0.0)
+	global_position.y -= (
+		maxf(_vertical_drift_speed, 1.0) * maxf(delta, 0.0)
+	)
 	if _road_x_clamp.is_valid():
 		global_position.x = float(
 			_road_x_clamp.call(global_position.x, global_position.y)
 		)
 
 
-## Configures shared forward motion for this pair. Every active pair adopts the
-## collecting player's live vertical velocity while any option is focused,
-## preserving inter-pair spacing throughout the one-second channel.
+## Configures this pair's independent forward drift and road clamping. Focus
+## affects only selection feedback and never inherits player or sibling-pair
+## motion, so the player must regulate their own speed to synchronize.
 func configure_motion(
-	player: PlayerController,
 	vertical_drift_speed: float,
 	road_x_clamp: Callable
 ) -> void:
-	_collecting_player = player
 	_vertical_drift_speed = maxf(vertical_drift_speed, 1.0)
 	_road_x_clamp = road_x_clamp
 
@@ -220,19 +211,6 @@ func get_pair_link_span() -> float:
 	if not is_instance_valid(_options[0]) or not is_instance_valid(_options[1]):
 		return 0.0
 	return absf(_options[0].position.x - _options[1].position.x)
-
-
-## Reports whether the player is currently channeling either option.
-func has_focused_option() -> bool:
-	return is_instance_valid(_focused_option)
-
-
-## Returns the collecting player's forward-only vertical velocity in world
-## pixels per second. Zero pauses all pairs if the player is momentarily still.
-func get_player_vertical_velocity() -> float:
-	if not is_instance_valid(_collecting_player):
-		return -maxf(_vertical_drift_speed, 1.0)
-	return minf(_collecting_player.velocity.y, 0.0)
 
 
 ## Returns the remaining timer life in seconds, or -1 when timer cleanup is
