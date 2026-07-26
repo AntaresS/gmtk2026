@@ -553,6 +553,7 @@ func _on_enemy_defeat_recorded(is_elite: bool) -> void:
 
 
 func _build_run_summary() -> Dictionary:
+	var final_realm := run_resources.get_current_realm_definition()
 	var weapon_levels: Array[Dictionary] = []
 	var weapon_names: Dictionary = {}
 	for equipment in player.get_equipment_inventory_snapshot():
@@ -601,6 +602,10 @@ func _build_run_summary() -> Dictionary:
 		"elite_enemies_defeated": _elite_enemies_defeated,
 		"weapon_damage_ranking": damage_ranking,
 		"fatal_breakthrough": _fatal_breakthrough_triggered,
+		"realm_name": (
+			final_realm.display_name if final_realm != null else "境界"
+		),
+		"realm_layer": run_resources.get_current_realm_layer(),
 	}
 
 

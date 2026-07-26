@@ -1293,7 +1293,6 @@ func _run() -> void:
 	for old_fork_node in get_nodes_in_group("road_forks"):
 		old_fork_node.queue_free()
 	await _wait_process_frames(2)
-	road_fork_spawner.set("_next_is_trial_hell", false)
 	road_fork_spawner.call("_spawn_fork")
 	await _wait_process_frames(2)
 	var fork_nodes := get_nodes_in_group("road_forks")
@@ -1301,6 +1300,11 @@ func _run() -> void:
 	if not fork_nodes.is_empty():
 		var road_fork := fork_nodes[0] as RoadFork
 		road_fork.configure_side(-1)
+		_check(
+			is_equal_approx(road_fork_spawner.spawn_interval, 28.0)
+			and road_fork.is_trial_hell_branch(),
+			"Road forks were not fixed to the 28-second Trial Hell schedule."
+		)
 		var fork_camera_top_y := (
 			road_fork_spawner.camera.global_position.y
 			- road_fork_spawner.get_viewport_rect().size.y
@@ -1371,6 +1375,17 @@ func _run() -> void:
 		road_fork.set_fork_enabled(true)
 		await _wait_physics_frames(2)
 		var committed_center := road_fork.get_branch_center_x()
+		var normal_enemy_cap := enemy_spawner.get_current_max_active_enemies()
+		var normal_spawn_interval := (
+			enemy_spawner.get_current_spawn_interval(false)
+		)
+		var normal_difficulty_enemy := preload(
+			"res://game/scenes/gameplay/enemy.tscn"
+		).instantiate() as EnemyController
+		enemy_spawner.call(
+			"_apply_current_difficulty",
+			normal_difficulty_enemy
+		)
 		var old_route_enemy := preload(
 			"res://game/scenes/gameplay/enemy.tscn"
 		).instantiate() as EnemyController
@@ -1387,8 +1402,8 @@ func _run() -> void:
 		player.global_position.y = road_fork.global_position.y + 50.0
 		await _wait_physics_frames(2)
 		_check(
-			road_fork.get_selected_branch() == "左侧无尽岔路",
-			"Player could not commit to the full-width exterior branch."
+			road_fork.get_selected_branch() == "试炼地狱",
+			"Player could not commit to the Trial Hell branch."
 		)
 		_check(
 			is_equal_approx(world.get_route_center_x(), committed_center)
@@ -1461,20 +1476,8 @@ func _run() -> void:
 				trial_fork.left_label.text.contains("试炼地狱")
 				or trial_fork.right_label.text.contains("试炼地狱")
 			),
-			"Normal branch was not followed by a distinct Trial Hell branch."
+			"Nested road forks did not remain Trial Hell branches."
 		)
-		var normal_enemy_cap := enemy_spawner.get_current_max_active_enemies()
-		var normal_spawn_interval := (
-			enemy_spawner.get_current_spawn_interval(false)
-		)
-		var normal_difficulty_enemy := preload(
-			"res://game/scenes/gameplay/enemy.tscn"
-		).instantiate() as EnemyController
-		enemy_spawner.call(
-			"_apply_current_difficulty",
-			normal_difficulty_enemy
-		)
-		game.call("_on_route_committed", committed_center, "试炼地狱")
 		var trial_difficulty_enemy := preload(
 			"res://game/scenes/gameplay/enemy.tscn"
 		).instantiate() as EnemyController
@@ -1511,12 +1514,12 @@ func _run() -> void:
 		game.call(
 			"_on_route_committed",
 			committed_center,
-			"左侧无尽岔路"
+			"试炼地狱"
 		)
 		_check(
-			not world.is_trial_hell_active()
-			and not enemy_spawner.is_trial_hell_active(),
-			"Returning to a normal branch did not clear Trial Hell modifiers."
+			world.is_trial_hell_active()
+			and enemy_spawner.is_trial_hell_active(),
+			"Committing another fork unexpectedly cleared Trial Hell."
 		)
 		if trial_fork != null:
 			trial_fork.queue_free()

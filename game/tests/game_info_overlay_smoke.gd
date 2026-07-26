@@ -34,6 +34,26 @@ func _run() -> void:
 	var overlay := OVERLAY_SCENE.instantiate() as GameInfoOverlay
 	add_child(overlay)
 	await _wait_process_frames(2)
+	overlay.open_instructions()
+	await _wait_process_frames(2)
+	_check(
+		overlay.quick_section_titles[3].text == "Realm Advancement"
+		and overlay.quick_section_bodies[3].text.contains("9 layers")
+		and overlay.quick_section_bodies[3].text.contains("60s")
+		and overlay.quick_section_titles[4].text == "Unique Realm Abilities"
+		and overlay.quick_section_bodies[4].text.contains("Qi Refining")
+		and overlay.quick_section_bodies[4].text.contains("Foundation")
+		and overlay.quick_section_bodies[4].text.contains("Golden Core")
+		and overlay.quick_section_bodies[4].text.contains("Nascent Soul"),
+		"Quick Start did not explain realm advancement and every unique ability."
+	)
+	_check(
+		overlay.quick_section_bodies[3].get_content_height()
+			<= overlay.quick_section_bodies[3].size.y
+		and overlay.quick_section_bodies[4].get_content_height()
+			<= overlay.quick_section_bodies[4].size.y,
+		"English realm guidance overflowed its Quick Start cards."
+	)
 	overlay.open_weapon_gallery()
 
 	var expected_item_count := (
@@ -95,6 +115,26 @@ func _run() -> void:
 	)
 
 	_set_test_locale("zh")
+	overlay.open_instructions()
+	await _wait_process_frames(2)
+	_check(
+		overlay.quick_section_titles[3].text == "境界升级"
+		and overlay.quick_section_bodies[3].text.contains("每个境界共 9 层")
+		and overlay.quick_section_titles[4].text == "境界独有能力"
+		and overlay.quick_section_bodies[4].text.contains("练气")
+		and overlay.quick_section_bodies[4].text.contains("筑基")
+		and overlay.quick_section_bodies[4].text.contains("金丹")
+		and overlay.quick_section_bodies[4].text.contains("元婴"),
+		"快速入门没有完整介绍境界升级与各境界独有能力。"
+	)
+	_check(
+		overlay.quick_section_bodies[3].get_content_height()
+			<= overlay.quick_section_bodies[3].size.y
+		and overlay.quick_section_bodies[4].get_content_height()
+			<= overlay.quick_section_bodies[4].size.y,
+		"中文境界介绍超出了快速入门卡片。"
+	)
+	overlay.open_weapon_gallery()
 	var nascent_soul_index := (
 		realm_section_index + overlay.REALM_CONFIG.get_realm_count()
 	)

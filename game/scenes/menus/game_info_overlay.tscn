@@ -400,7 +400,7 @@ scroll_active = false
 text = "Weapons attack automatically. Defeat elites and absorb their drops."
 
 [node name="GrowthCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid"]
-custom_minimum_size = Vector2(0, 220)
+custom_minimum_size = Vector2(0, 300)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/panel = SubResource("StyleBox_quick_card")
@@ -434,15 +434,15 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_colors/default_color = Color(0.69, 0.71, 0.79, 1)
-theme_override_constants/line_separation = 5
-theme_override_font_sizes/normal_font_size = 17
-theme_override_font_sizes/bold_font_size = 17
+theme_override_constants/line_separation = 4
+theme_override_font_sizes/normal_font_size = 15
+theme_override_font_sizes/bold_font_size = 15
 bbcode_enabled = true
 scroll_active = false
 text = "Collect Spiritual Qi, advance layers, and build a stronger loadout."
 
 [node name="TribulationCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid"]
-custom_minimum_size = Vector2(0, 220)
+custom_minimum_size = Vector2(0, 300)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/panel = SubResource("StyleBox_quick_card")
@@ -476,9 +476,9 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_colors/default_color = Color(0.69, 0.71, 0.79, 1)
-theme_override_constants/line_separation = 5
-theme_override_font_sizes/normal_font_size = 17
-theme_override_font_sizes/bold_font_size = 17
+theme_override_constants/line_separation = 4
+theme_override_font_sizes/normal_font_size = 15
+theme_override_font_sizes/bold_font_size = 15
 bbcode_enabled = true
 scroll_active = false
 text = "Read danger markers and survive every strike during a breakthrough."

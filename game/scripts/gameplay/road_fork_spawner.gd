@@ -15,7 +15,7 @@ signal route_committed(route_center_x: float, branch_name: String)
 ## Delay in seconds before the first fork is generated.
 @export_range(0.0, 30.0, 0.5) var initial_spawn_delay: float = 4.0
 ## Seconds between generated fork choices.
-@export_range(4.0, 60.0, 0.5) var spawn_interval: float = 14.0
+@export_range(4.0, 60.0, 0.5) var spawn_interval: float = 28.0
 ## Extra world pixels beyond the camera top reserved for the fork artwork.
 @export_range(100.0, 600.0, 1.0) var spawn_ahead_margin: float = 280.0
 ## Maximum simultaneous fork events retained in the scene.
@@ -25,7 +25,6 @@ var road_half_width: float = 200.0
 var _spawn_time_remaining: float = 0.0
 var _forks_enabled: bool = true
 var _next_branch_side: int = -1
-var _next_is_trial_hell: bool = false
 var _route_center_x: float = 0.0
 var _road_half_width_resolver: Callable
 var _world_config: WorldChunkConfig
@@ -101,9 +100,8 @@ func _spawn_fork() -> void:
 	)
 	road_fork.set_road_half_width(_get_road_half_width_at(spawn_y))
 	road_fork.configure_side(_next_branch_side)
-	road_fork.configure_trial_hell(_next_is_trial_hell)
+	road_fork.configure_trial_hell(true)
 	_next_branch_side *= -1
-	_next_is_trial_hell = not _next_is_trial_hell
 	road_fork.branch_selected.connect(_on_branch_selected)
 	road_fork.route_committed.connect(_on_route_committed)
 	road_fork.position = to_local(Vector2(

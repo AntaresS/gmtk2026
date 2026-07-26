@@ -119,6 +119,64 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.008, 0.009, 0.013, 0.9)
 
+[node name="EpitaphStage" type="Control" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="EpitaphCenter" type="CenterContainer" parent="Overlay/EpitaphStage"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Epitaph" type="Label" parent="Overlay/EpitaphStage/EpitaphCenter"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(1280, 120)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.91, 0.82, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.92)
+theme_override_constants/shadow_offset_x = 4
+theme_override_constants/shadow_offset_y = 6
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 54
+text = "寿元 00:00，境至元婴九层，终陨于雷劫"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="SkipHint" type="Label" parent="Overlay/EpitaphStage"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -180.0
+offset_top = -84.0
+offset_right = 180.0
+offset_bottom = -42.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.69, 0.69, 0.76, 0.9)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 18
+text = "点击跳过"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="OuterMargin" type="MarginContainer" parent="Overlay"]
 layout_mode = 1
 anchors_preset = 15
@@ -135,6 +193,7 @@ theme_override_constants/margin_bottom = 58
 layout_mode = 2
 
 [node name="Panel" type="PanelContainer" parent="Overlay/OuterMargin/CenterContainer"]
+unique_name_in_owner = true
 custom_minimum_size = Vector2(1320, 0)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBox_outer")
