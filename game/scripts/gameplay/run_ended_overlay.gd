@@ -7,7 +7,16 @@ signal main_menu_requested
 @onready var title_label: Label = %Title
 @onready var outcome_message_label: Label = %OutcomeMessage
 @onready var summary_title_label: Label = %SummaryTitle
-@onready var summary_label: RichTextLabel = %Summary
+@onready var duration_caption_label: Label = %DurationCaption
+@onready var duration_value_label: Label = %DurationValue
+@onready var damage_caption_label: Label = %DamageCaption
+@onready var damage_value_label: Label = %DamageValue
+@onready var enemies_caption_label: Label = %EnemiesCaption
+@onready var enemies_value_label: Label = %EnemiesValue
+@onready var loadout_title_label: Label = %LoadoutTitle
+@onready var loadout_value_label: Label = %LoadoutValue
+@onready var ranking_title_label: Label = %RankingTitle
+@onready var ranking_label: RichTextLabel = %Ranking
 @onready var leaderboard_title_label: Label = %LeaderboardTitle
 @onready var leaderboard_label: RichTextLabel = %Leaderboard
 @onready var restart_button: Button = %RestartButton
@@ -70,6 +79,13 @@ func _refresh_language() -> void:
 		else LanguageManager.text("ordinary_run_ended")
 	)
 	summary_title_label.text = LanguageManager.text("run_summary")
+	duration_caption_label.text = LanguageManager.text("result_duration")
+	damage_caption_label.text = LanguageManager.text("result_damage")
+	enemies_caption_label.text = LanguageManager.text("result_enemies")
+	loadout_title_label.text = LanguageManager.text("result_loadout")
+	ranking_title_label.text = LanguageManager.text(
+		"result_damage_breakdown"
+	)
 	leaderboard_title_label.text = LanguageManager.text(
 		"local_survival_leaderboard"
 	)
@@ -79,8 +95,25 @@ func _refresh_language() -> void:
 
 func _refresh_summary_text() -> void:
 	if _summary.is_empty():
-		summary_label.text = ""
+		duration_value_label.text = "—"
+		damage_value_label.text = "—"
+		enemies_value_label.text = "—"
+		loadout_value_label.text = "—"
+		ranking_label.text = ""
 		return
+
+	duration_value_label.text = _format_duration(
+		float(_summary.get("duration_seconds", 0.0))
+	)
+	damage_value_label.text = "%d" % int(
+		_summary.get("total_damage", 0)
+	)
+	enemies_value_label.text = "%d  ·  %s %d" % [
+		int(_summary.get("enemies_defeated", 0)),
+		LanguageManager.text("elite").to_upper(),
+		int(_summary.get("elite_enemies_defeated", 0)),
+	]
+
 	var weapon_level_parts: PackedStringArray = []
 	for weapon_variant in _summary.get("weapon_levels", []):
 		var weapon := weapon_variant as Dictionary
@@ -90,40 +123,36 @@ func _refresh_summary_text() -> void:
 				int(weapon.get("level", 1)),
 			]
 		)
-	var ranking_lines: PackedStringArray = []
+	loadout_value_label.text = (
+		"  ·  ".join(weapon_level_parts)
+		if not weapon_level_parts.is_empty()
+		else "—"
+	)
+
+	var ranking_cells := PackedStringArray(["[table=2]"])
 	var ranking_index := 1
 	for ranking_variant in _summary.get("weapon_damage_ranking", []):
 		var ranking := ranking_variant as Dictionary
-		ranking_lines.append(
-			"%d. %s  —  %d" % [
+		ranking_cells.append(
+			(
+				"[cell][color=#77798a]%02d[/color]  "
+				+ "[color=#d4d5df]%s[/color][/cell]"
+			) % [
 				ranking_index,
 				_get_source_name(ranking),
-				int(ranking.get("damage", 0)),
 			]
 		)
+		ranking_cells.append(
+			"[cell][right][color=#aeb0ff][b]%d[/b][/color][/right][/cell]"
+			% int(ranking.get("damage", 0))
+		)
 		ranking_index += 1
-	if ranking_lines.is_empty():
-		ranking_lines.append(LanguageManager.text("no_damage_recorded"))
-	summary_label.text = (
-		"[b]%s[/b]  %s\n"
-		+ "[b]%s[/b]  %s\n"
-		+ "[b]%s[/b]  %d\n"
-		+ "[b]%s[/b]  %d  (%s %d)\n\n"
-		+ "[b]%s[/b]\n%s"
-	) % [
-		LanguageManager.text("survival_duration"),
-		_format_duration(float(_summary.get("duration_seconds", 0.0))),
-		LanguageManager.text("weapon_levels"),
-		", ".join(weapon_level_parts),
-		LanguageManager.text("total_damage_dealt"),
-		int(_summary.get("total_damage", 0)),
-		LanguageManager.text("enemies_defeated"),
-		int(_summary.get("enemies_defeated", 0)),
-		LanguageManager.text("elite"),
-		int(_summary.get("elite_enemies_defeated", 0)),
-		LanguageManager.text("weapon_damage_ranking"),
-		"\n".join(ranking_lines),
-	]
+	ranking_cells.append("[/table]")
+	ranking_label.text = (
+		"\n".join(ranking_cells)
+		if ranking_index > 1
+		else LanguageManager.text("no_damage_recorded")
+	)
 
 
 func _get_source_name(entry: Dictionary) -> String:
@@ -149,39 +178,66 @@ func _record_leaderboard_entry() -> void:
 
 
 func _refresh_leaderboard_text() -> void:
-	var lines := PackedStringArray([
-		"[color=#91a4bd]%s[/color]"
-		% LanguageManager.text("leaderboard_columns")
-	])
+	if _leaderboard_entries.is_empty():
+		leaderboard_label.text = (
+			"[center][color=#77798a]%s[/color][/center]"
+			% LanguageManager.text("no_local_records")
+		)
+		return
+
+	var lines := PackedStringArray(["[table=5]"])
+	for heading_key in [
+		"leaderboard_rank",
+		"leaderboard_cycle",
+		"leaderboard_survival",
+		"leaderboard_damage",
+		"leaderboard_top_weapon",
+	]:
+		lines.append(_table_cell(
+			LanguageManager.text(heading_key).to_upper(),
+			"#77798a",
+			true
+		))
 	for entry_index in _leaderboard_entries.size():
 		var entry := _leaderboard_entries[entry_index]
 		var is_current := str(entry.get("run_id", "")) == _current_run_id
-		var prefix := "[color=#ffd978]▶[/color] " if is_current else ""
-		lines.append(
-			"%s%d.  %s  ·  %s  ·  %s  ·  %s%s" % [
-				prefix,
-				entry_index + 1,
-				LanguageManager.text("cycle_number_format") % int(
-					entry.get("cycle_number", entry_index + 1)
-				),
-				_format_duration(
-					float(entry.get("duration_seconds", 0.0))
-				),
-				LanguageManager.text("damage_value_format") % int(
-					entry.get("total_damage", 0)
-				),
-				_get_entry_top_weapon_name(entry),
-				(
-					"  ·  %s"
-					% LanguageManager.text("heaven_suppressed")
-					if bool(entry.get("fatal_breakthrough", false))
-					else ""
-				),
-			]
+		var row_color := "#b8b9ff" if is_current else "#c8c9d3"
+		var rank_text := (
+			"▶ %02d" % (entry_index + 1)
+			if is_current
+			else "%02d" % (entry_index + 1)
 		)
-	if _leaderboard_entries.is_empty():
-		lines.append(LanguageManager.text("no_local_records"))
-	leaderboard_label.text = "\n".join(lines)
+		lines.append(_table_cell(rank_text, row_color, is_current))
+		var cycle_text := LanguageManager.text("cycle_number_format") % int(
+			entry.get("cycle_number", entry_index + 1)
+		)
+		if bool(entry.get("fatal_breakthrough", false)):
+			cycle_text += "\n[color=#c88f87][font_size=11]%s[/font_size][/color]" % (
+				LanguageManager.text("heaven_suppressed").to_upper()
+			)
+		lines.append(_table_cell(cycle_text, row_color, false))
+		lines.append(_table_cell(
+			_format_duration(float(entry.get("duration_seconds", 0.0))),
+			"#aeb0ff" if is_current else "#d6d7df",
+			true
+		))
+		lines.append(_table_cell(
+			"%d" % int(entry.get("total_damage", 0)),
+			row_color,
+			false
+		))
+		lines.append(_table_cell(
+			_get_entry_top_weapon_name(entry),
+			row_color,
+			false
+		))
+	lines.append("[/table]")
+	leaderboard_label.text = "".join(lines)
+
+
+func _table_cell(value: String, color: String, bold: bool) -> String:
+	var content := "[b]%s[/b]" % value if bold else value
+	return "[cell][color=%s]%s[/color][/cell]" % [color, content]
 
 
 func _get_entry_top_weapon_name(entry: Dictionary) -> String:

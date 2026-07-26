@@ -9,16 +9,27 @@
 bg_color = Color(0, 0, 0, 0)
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_drawer"]
-bg_color = Color(0.018, 0.027, 0.04, 0.72)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.36, 0.52, 0.66, 0.75)
+bg_color = Color(0.018, 0.027, 0.04, 0.55)
 corner_radius_top_left = 10
 corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_detail_stat"]
+bg_color = Color(0.045, 0.075, 0.105, 0.48)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_fragment_level"]
+content_margin_left = 14.0
+content_margin_right = 14.0
+bg_color = Color(0.07, 0.05, 0.09, 0.44)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_quickbar"]
 bg_color = Color(0, 0, 0, 0)
@@ -244,14 +255,35 @@ theme_override_constants/outline_size = 2
 theme_override_font_sizes/font_size = 14
 text = "◉ 灵气护盾  0 点  ·  1 灵气抵挡 1.0 伤害"
 
+[node name="DetailShortcutHint" type="Label" parent="HudRoot"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 24.0
+offset_top = -18.0
+offset_right = 270.0
+offset_bottom = 18.0
+grow_horizontal = 1
+grow_vertical = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.82, 0.88, 0.94, 0.9)
+theme_override_colors/font_outline_color = Color(0.01, 0.02, 0.035, 0.95)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 17
+text = "按住 Tab 查看具体信息"
+horizontal_alignment = 0
+vertical_alignment = 1
+
 [node name="DetailDrawer" type="PanelContainer" parent="HudRoot"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
 offset_left = 24.0
-offset_top = 200.0
-offset_right = 524.0
-offset_bottom = 704.0
+offset_top = 210.0
+offset_right = 474.0
+offset_bottom = 660.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBox_drawer")
 
@@ -272,6 +304,7 @@ theme_override_constants/separation = 12
 
 [node name="DetailTitleLabel" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailHeader"]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.78, 0.94, 1, 1)
@@ -281,30 +314,269 @@ text = "角色详情"
 [node name="DetailHintLabel" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailHeader"]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.72, 0.78, 0.86, 1)
 theme_override_font_sizes/font_size = 15
 text = "松开 Tab 关闭"
+horizontal_alignment = 2
 vertical_alignment = 1
 
 [node name="RealmAbilityLabel" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn" unique_id=158156319]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(0.66, 0.9, 1, 1)
 theme_override_font_sizes/font_size = 17
 text = "地上修行"
 
-[node name="DetailScroll" type="ScrollContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn"]
+[node name="DetailScroll" type="MarginContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn"]
 layout_mode = 2
 size_flags_vertical = 3
-horizontal_scroll_mode = 0
 
 [node name="DetailContent" type="VBoxContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 12
+theme_override_constants/separation = 16
+
+[node name="CoreStatsRow" type="HBoxContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent"]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="DamageStatPanel" type="PanelContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/CoreStatsRow"]
+custom_minimum_size = Vector2(120, 84)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_detail_stat")
+
+[node name="DamageStatColumn" type="VBoxContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/CoreStatsRow/DamageStatPanel"]
+layout_mode = 2
+alignment = 1
+
+[node name="DamageStatTitle" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/CoreStatsRow/DamageStatPanel/DamageStatColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.64, 0.78, 0.88, 1)
+theme_override_font_sizes/font_size = 15
+text = "当前伤害"
+horizontal_alignment = 1
+
+[node name="DamageStatValue" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/CoreStatsRow/DamageStatPanel/DamageStatColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.78, 0.38, 1)
+theme_override_font_sizes/font_size = 31
+text = "5"
+horizontal_alignment = 1
+
+[node name="MovementStatPanel" type="PanelContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/CoreStatsRow"]
+custom_minimum_size = Vector2(120, 84)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_detail_stat")
+
+[node name="MovementStatColumn" type="VBoxContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/CoreStatsRow/MovementStatPanel"]
+layout_mode = 2
+alignment = 1
+
+[node name="MovementStatTitle" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/CoreStatsRow/MovementStatPanel/MovementStatColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.64, 0.78, 0.88, 1)
+theme_override_font_sizes/font_size = 15
+text = "移动速度"
+horizontal_alignment = 1
+
+[node name="MovementStatValue" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/CoreStatsRow/MovementStatPanel/MovementStatColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.46, 0.92, 1, 1)
+theme_override_font_sizes/font_size = 31
+text = "260"
+horizontal_alignment = 1
+
+[node name="RangeStatPanel" type="PanelContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/CoreStatsRow"]
+custom_minimum_size = Vector2(120, 84)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_detail_stat")
+
+[node name="RangeStatColumn" type="VBoxContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/CoreStatsRow/RangeStatPanel"]
+layout_mode = 2
+alignment = 1
+
+[node name="RangeStatTitle" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/CoreStatsRow/RangeStatPanel/RangeStatColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.64, 0.78, 0.88, 1)
+theme_override_font_sizes/font_size = 15
+text = "攻击范围"
+horizontal_alignment = 1
+
+[node name="RangeStatValue" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/CoreStatsRow/RangeStatPanel/RangeStatColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 1, 0.66, 1)
+theme_override_font_sizes/font_size = 31
+text = "108"
+horizontal_alignment = 1
+
+[node name="FragmentSectionLabel" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.72, 0.8, 1)
+theme_override_font_sizes/font_size = 14
+text = "强化等级"
+
+[node name="FragmentLevelsGrid" type="GridContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent"]
+layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 12
+columns = 1
+
+[node name="AttackSpeedLevelPanel" type="PanelContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_fragment_level")
+
+[node name="AttackSpeedLevelRow" type="HBoxContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid/AttackSpeedLevelPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="AttackSpeedLevelName" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid/AttackSpeedLevelPanel/AttackSpeedLevelRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.84, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 17
+text = "攻速"
+vertical_alignment = 1
+
+[node name="AttackSpeedLevelLabel" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid/AttackSpeedLevelPanel/AttackSpeedLevelRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.86, 1, 1)
+theme_override_font_sizes/font_size = 17
+text = "Lv.0"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="DamageLevelPanel" type="PanelContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_fragment_level")
+
+[node name="DamageLevelRow" type="HBoxContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid/DamageLevelPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="DamageLevelName" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid/DamageLevelPanel/DamageLevelRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.84, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 17
+text = "伤害"
+vertical_alignment = 1
+
+[node name="DamageLevelLabel" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid/DamageLevelPanel/DamageLevelRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.86, 1, 1)
+theme_override_font_sizes/font_size = 17
+text = "Lv.0"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="MovementLevelPanel" type="PanelContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_fragment_level")
+
+[node name="MovementLevelRow" type="HBoxContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid/MovementLevelPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="MovementLevelName" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid/MovementLevelPanel/MovementLevelRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.84, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 17
+text = "身法"
+vertical_alignment = 1
+
+[node name="MovementLevelLabel" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid/MovementLevelPanel/MovementLevelRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.86, 1, 1)
+theme_override_font_sizes/font_size = 17
+text = "Lv.0"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="RangeLevelPanel" type="PanelContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_fragment_level")
+
+[node name="RangeLevelRow" type="HBoxContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid/RangeLevelPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="RangeLevelName" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid/RangeLevelPanel/RangeLevelRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.84, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 17
+text = "范围"
+vertical_alignment = 1
+
+[node name="RangeLevelLabel" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid/RangeLevelPanel/RangeLevelRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.86, 1, 1)
+theme_override_font_sizes/font_size = 17
+text = "Lv.0"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="SpeedControlLevelPanel" type="PanelContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_fragment_level")
+
+[node name="SpeedControlLevelRow" type="HBoxContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid/SpeedControlLevelPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="SpeedControlLevelName" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid/SpeedControlLevelPanel/SpeedControlLevelRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.84, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 17
+text = "加减速"
+vertical_alignment = 1
+
+[node name="SpeedControlLevelLabel" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/FragmentLevelsGrid/SpeedControlLevelPanel/SpeedControlLevelRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.86, 1, 1)
+theme_override_font_sizes/font_size = 17
+text = "Lv.0"
+horizontal_alignment = 2
+vertical_alignment = 1
 
 [node name="CultivationTracksLabel" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent" unique_id=257700474]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(0.94, 0.86, 1, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.75)
@@ -320,17 +592,20 @@ text = "通用碎片
 
 [node name="TechniqueLabel" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent" unique_id=245853218]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "功法  大力掌"
 
 [node name="WeaponLabel" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent" unique_id=190685731]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "当前装备  大力掌  · 伤害 1"
 
 [node name="PlayerStatsPanel" type="PanelContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent" unique_id=673812860]
+visible = false
 layout_mode = 2
 
 [node name="PlayerStatsMargin" type="MarginContainer" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/PlayerStatsPanel" unique_id=1062161246]
@@ -342,6 +617,7 @@ theme_override_constants/margin_bottom = 8
 
 [node name="PlayerStatsLabel" type="RichTextLabel" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent/PlayerStatsPanel/PlayerStatsMargin" unique_id=605031080]
 unique_name_in_owner = true
+visible = false
 custom_minimum_size = Vector2(0, 150)
 layout_mode = 2
 theme_override_colors/default_color = Color(0.94, 0.95, 0.98, 1)
@@ -359,6 +635,7 @@ scroll_active = false
 
 [node name="EquipmentLibraryLabel" type="Label" parent="HudRoot/DetailDrawer/DetailMargin/DetailColumn/DetailScroll/DetailContent" unique_id=1477914355]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.9, 1, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
@@ -558,6 +835,26 @@ max_value = 1.0
 step = 0.001
 show_percentage = false
 
+[node name="StartPromptCenter" type="CenterContainer" parent="HudRoot"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 235.0
+offset_bottom = 345.0
+grow_horizontal = 2
+mouse_filter = 2
+
+[node name="StartPromptLabel" type="Label" parent="HudRoot/StartPromptCenter"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.86, 0.48, 1)
+theme_override_colors/font_outline_color = Color(0.12, 0.025, 0.015, 0.98)
+theme_override_constants/outline_size = 7
+theme_override_font_sizes/font_size = 34
+text = "快跑，挺住攻击活下去！"
+horizontal_alignment = 1
+
 [node name="LevelMessageCenter" type="CenterContainer" parent="HudRoot" unique_id=751695654]
 layout_mode = 1
 anchors_preset = 10
@@ -619,7 +916,13 @@ unique_name_in_owner = true
 wait_time = 0.8
 one_shot = true
 
+[node name="StartPromptTimer" type="Timer" parent="."]
+unique_name_in_owner = true
+wait_time = 3.2
+one_shot = true
+
 [connection signal="timeout" from="LevelUpTimer" to="." method="_on_level_up_timer_timeout"]
 [connection signal="timeout" from="TribulationWarningTimer" to="." method="_on_tribulation_warning_timer_timeout"]
 [connection signal="timeout" from="ChannelFeedbackTimer" to="." method="_on_channel_feedback_timer_timeout"]
+[connection signal="timeout" from="StartPromptTimer" to="." method="_on_start_prompt_timer_timeout"]
 [connection signal="pressed" from="HudRoot/PauseButton" to="." method="_on_pause_button_pressed"]

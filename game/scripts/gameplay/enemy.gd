@@ -74,7 +74,11 @@ const NORMAL_MELEE_WEAPON_TEXTURE: Texture2D = preload(
 const ELITE_MELEE_WEAPON_TEXTURE: Texture2D = preload(
 	"res://assets/enemy_weapons/elite_knife.png"
 )
-const ENEMY_SPRITE_FRAME_SIZE: int = 544
+const ENEMY_SPRITE_FRAME_SIZE: int = 120
+const ENEMY_OUTLINE_TEXTURE_WIDTH: float = 1.985294
+const ENEMY_DISSOLVE_NOISE_DENSITY: float = 0.294667
+const MELEE_WEAPON_DISSOLVE_NOISE_DENSITY: float = 1.664
+const RANGED_WEAPON_DISSOLVE_NOISE_DENSITY: float = 1.751579
 const ENEMY_MOVE_FRAME_COUNT: int = 6
 const FLY_BOOMER_MOVE_FRAME_COUNT: int = 9
 const BOOMER_BOOM_FRAME_COUNT: int = 9
@@ -92,8 +96,8 @@ const HEALING_ICON_COUNT: int = 7
 const HEALING_ICON_STAGGER: float = 0.045
 const HEALING_ICON_FLOAT_DURATION: float = 0.68
 const HEALING_ICON_FLOAT_DISTANCE: float = 46.0
-const MELEE_WEAPON_TIP_OFFSET_PIXELS: float = 720.0
-const MELEE_WEAPON_SCALE: float = 0.04
+const MELEE_WEAPON_TIP_OFFSET_PIXELS: float = 28.125
+const MELEE_WEAPON_SCALE: float = 1.024
 const MELEE_WEAPON_SUMMON_DURATION: float = 0.2
 const MELEE_WEAPON_RETURN_DURATION: float = 0.18
 const MELEE_WEAPON_HOVER_POSITION: Vector2 = Vector2(34.0, -12.0)
@@ -104,7 +108,9 @@ const MELEE_WEAPON_TRAIL_ANGLE_STEP: float = 0.16
 const MELEE_WEAPON_DARK_OUTLINE: Color = Color("681018")
 const MELEE_WEAPON_BRIGHT_OUTLINE: Color = Color("ffb347")
 const RANGED_WEAPON_HOVER_POSITION: Vector2 = Vector2(42.0, -10.0)
-const RANGED_WEAPON_SCALE: float = 0.038
+const RANGED_WEAPON_SCALE: float = 1.024
+const RANGED_WEAPON_OUTLINE_TEXTURE_WIDTH: float = 0.742188
+const RANGED_WEAPON_GLOW_TEXTURE_WIDTH: float = 2.375
 const RANGED_WEAPON_BACKSTEP_DISTANCE: float = 9.0
 const RANGED_WEAPON_SHAKE_START: float = 0.62
 const RANGED_WEAPON_NORMAL_SPEED: float = 900.0
@@ -529,6 +535,10 @@ func _update_enemy_outline() -> void:
 	if _enemy_outline_material == null:
 		_enemy_outline_material = ShaderMaterial.new()
 		_enemy_outline_material.shader = ENEMY_OUTLINE_SHADER
+		_enemy_outline_material.set_shader_parameter(
+			&"outline_width",
+			ENEMY_OUTLINE_TEXTURE_WIDTH
+		)
 	_enemy_outline_material.set_shader_parameter(
 		&"outline_color",
 		outline_color
@@ -586,12 +596,18 @@ func _configure_ranged_weapon() -> void:
 		&"outline_color",
 		RANGED_WEAPON_OUTLINE_COLOR
 	)
-	_ranged_weapon_material.set_shader_parameter(&"outline_width", 20.0)
+	_ranged_weapon_material.set_shader_parameter(
+		&"outline_width",
+		RANGED_WEAPON_OUTLINE_TEXTURE_WIDTH
+	)
 	_ranged_weapon_material.set_shader_parameter(
 		&"glow_color",
 		RANGED_WEAPON_GLOW_COLOR
 	)
-	_ranged_weapon_material.set_shader_parameter(&"glow_width", 64.0)
+	_ranged_weapon_material.set_shader_parameter(
+		&"glow_width",
+		RANGED_WEAPON_GLOW_TEXTURE_WIDTH
+	)
 	_ranged_weapon_material.set_shader_parameter(&"glow_strength", 0.34)
 	_ranged_weapon_material.set_shader_parameter(&"readiness_strength", 1.0)
 	_ranged_weapon_material.set_shader_parameter(&"warning_energy", 0.0)
@@ -1487,12 +1503,20 @@ func _begin_dissolve_disappearance(delay: float = 0.0) -> void:
 	ranged_weapon.set_process(false)
 	queue_redraw()
 
-	var dissolve_material := ShaderMaterial.new()
-	dissolve_material.shader = ENEMY_DISSOLVE_SHADER
-	dissolve_material.set_shader_parameter(&"dissolve_amount", 0.0)
-	enemy_sprite.material = dissolve_material
-	melee_weapon.material = dissolve_material
-	ranged_weapon.material = dissolve_material
+	var dissolve_materials: Array[ShaderMaterial] = []
+	for noise_density in [
+		ENEMY_DISSOLVE_NOISE_DENSITY,
+		MELEE_WEAPON_DISSOLVE_NOISE_DENSITY,
+		RANGED_WEAPON_DISSOLVE_NOISE_DENSITY,
+	]:
+		var material := ShaderMaterial.new()
+		material.shader = ENEMY_DISSOLVE_SHADER
+		material.set_shader_parameter(&"dissolve_amount", 0.0)
+		material.set_shader_parameter(&"noise_density", noise_density)
+		dissolve_materials.append(material)
+	enemy_sprite.material = dissolve_materials[0]
+	melee_weapon.material = dissolve_materials[1]
+	ranged_weapon.material = dissolve_materials[2]
 
 	var dissolve_tween := create_tween()
 	if delay > 0.0:
@@ -1500,10 +1524,8 @@ func _begin_dissolve_disappearance(delay: float = 0.0) -> void:
 	dissolve_tween.tween_callback(enemy_sprite.pause)
 	dissolve_tween.tween_method(
 		func(amount: float) -> void:
-			dissolve_material.set_shader_parameter(
-				&"dissolve_amount",
-				amount
-			),
+			for material in dissolve_materials:
+				material.set_shader_parameter(&"dissolve_amount", amount),
 		0.0,
 		1.0,
 		DEATH_DISSOLVE_DURATION
@@ -1909,7 +1931,7 @@ func is_elite_enemy() -> bool:
 	return is_elite
 
 
-## Returns the reward category advertised by this elite's label and outline.
+## Returns the reward category represented by this elite's outline color.
 func get_elite_reward_type() -> EliteRewardType:
 	return elite_reward_type
 
@@ -1917,18 +1939,8 @@ func get_elite_reward_type() -> EliteRewardType:
 func _update_elite_identity() -> void:
 	if not is_instance_valid(elite_label):
 		return
-	elite_label.visible = is_elite
-	if not is_elite:
-		return
-	elite_label.text = (
-		LanguageManager.text("elite_weapon")
-		if elite_reward_type == EliteRewardType.WEAPON
-		else LanguageManager.text("elite_upgrade")
-	)
-	elite_label.add_theme_color_override(
-		"font_color",
-		_get_elite_identity_color()
-	)
+	elite_label.text = ""
+	elite_label.hide()
 
 
 func _get_elite_identity_color() -> Color:

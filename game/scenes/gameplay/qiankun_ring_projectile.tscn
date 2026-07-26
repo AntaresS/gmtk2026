@@ -44,7 +44,7 @@ antialiased = true
 modulate = Color(1, 1, 1, 0.25)
 
 [node name="RingSprite" type="Sprite2D" parent="."]
-scale = Vector2(0.036, 0.036)
+scale = Vector2(0.32623, 0.32623)
 texture = ExtResource("2_ring")
 
 [node name="HitAfterimage1" type="Sprite2D" parent="."]

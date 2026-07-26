@@ -1,10 +1,96 @@
-[gd_scene load_steps=6 format=3 uid="uid://cw1yv0lixgcpj"]
+[gd_scene load_steps=13 format=3 uid="uid://cw1yv0lixgcpj"]
 
 [ext_resource type="Script" uid="uid://dulv23u5i7dx8" path="res://game/scripts/menus/main_menu.gd" id="1_script"]
 [ext_resource type="Script" uid="uid://saekbmlj3h6b" path="res://game/scripts/audio/background_music_player.gd" id="2_bgm_script"]
-[ext_resource type="AudioStream" uid="uid://di3kaxm6ajmjr" path="res://assets/sound/track/stage_1.wav" id="3_stage_1"]
+[ext_resource type="AudioStream" path="res://assets/sound/track/stage_1.ogg" id="3_stage_1"]
 [ext_resource type="PackedScene" path="res://game/scenes/menus/game_info_overlay.tscn" id="4_info"]
-[ext_resource type="Texture2D" path="res://BG/ChatGPT Image 2026年7月26日 15_16_09.png" id="5_background"]
+[ext_resource type="Texture2D" path="res://BG/main_menu_background.png" id="5_background"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_menu_button"]
+content_margin_left = 22.0
+content_margin_top = 12.0
+content_margin_right = 18.0
+content_margin_bottom = 12.0
+bg_color = Color(0.025, 0.045, 0.065, 0.6)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_menu_button_hover"]
+content_margin_left = 26.0
+content_margin_top = 12.0
+content_margin_right = 18.0
+content_margin_bottom = 12.0
+bg_color = Color(0.055, 0.13, 0.175, 0.94)
+border_width_left = 3
+border_color = Color(0.4, 0.86, 0.92, 0.82)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_menu_button_pressed"]
+content_margin_left = 26.0
+content_margin_top = 12.0
+content_margin_right = 18.0
+content_margin_bottom = 12.0
+bg_color = Color(0.035, 0.09, 0.125, 0.98)
+border_width_left = 3
+border_color = Color(0.48, 0.92, 0.96, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_menu_button_focus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.58, 0.91, 0.95, 0.9)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_primary_button"]
+content_margin_left = 22.0
+content_margin_top = 13.0
+content_margin_right = 18.0
+content_margin_bottom = 13.0
+bg_color = Color(0.43, 0.82, 0.86, 0.96)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+shadow_color = Color(0.1, 0.55, 0.65, 0.25)
+shadow_size = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_primary_button_hover"]
+content_margin_left = 26.0
+content_margin_top = 13.0
+content_margin_right = 18.0
+content_margin_bottom = 13.0
+bg_color = Color(0.58, 0.94, 0.96, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+shadow_color = Color(0.15, 0.65, 0.72, 0.32)
+shadow_size = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_primary_button_pressed"]
+content_margin_left = 26.0
+content_margin_top = 13.0
+content_margin_right = 18.0
+content_margin_bottom = 13.0
+bg_color = Color(0.34, 0.69, 0.74, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
 
 [node name="MainMenu" type="Control" unique_id=259486953]
 layout_mode = 3
@@ -32,89 +118,154 @@ texture = ExtResource("5_background")
 expand_mode = 1
 stretch_mode = 6
 
+[node name="MenuScrim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_right = 570.0
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.012, 0.023, 0.035, 0.62)
+
 [node name="CenterContainer" type="CenterContainer" parent="." unique_id=987044855]
 layout_mode = 1
 anchors_preset = 0
 anchor_bottom = 1.0
-offset_left = 64.0
-offset_right = 384.0
+offset_left = 72.0
+offset_right = 500.0
 grow_vertical = 2
 
 [node name="Menu" type="VBoxContainer" parent="CenterContainer" unique_id=534746929]
-custom_minimum_size = Vector2(320, 0)
+custom_minimum_size = Vector2(388, 0)
 layout_mode = 2
-theme_override_constants/separation = 18
+theme_override_constants/separation = 11
 
 [node name="Title" type="Label" parent="CenterContainer/Menu" unique_id=1649196753]
 unique_name_in_owner = true
 layout_mode = 2
-text = "追求永生"
+theme_override_colors/font_color = Color(0.94, 0.97, 0.98, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.82)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 3
+text = "Chasing Eternity"
 horizontal_alignment = 0
-theme_override_font_sizes/font_size = 44
+theme_override_font_sizes/font_size = 52
 
 [node name="Spacer" type="Control" parent="CenterContainer/Menu" unique_id=1752969035]
-custom_minimum_size = Vector2(0, 18)
+custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 mouse_filter = 2
 
 [node name="StartGameButton" type="Button" parent="CenterContainer/Menu" unique_id=542836846]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 52)
+custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
+theme_override_colors/font_color = Color(0.015, 0.055, 0.07, 1)
+theme_override_colors/font_hover_color = Color(0.01, 0.04, 0.055, 1)
+theme_override_colors/font_pressed_color = Color(0.01, 0.04, 0.055, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBox_primary_button")
+theme_override_styles/hover = SubResource("StyleBox_primary_button_hover")
+theme_override_styles/pressed = SubResource("StyleBox_primary_button_pressed")
+theme_override_styles/focus = SubResource("StyleBox_menu_button_focus")
 text = "Start Game"
 alignment = 0
 
 [node name="QuickStartButton" type="Button" parent="CenterContainer/Menu"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 52)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
+theme_override_colors/font_color = Color(0.86, 0.92, 0.95, 1)
+theme_override_colors/font_hover_color = Color(0.9, 0.99, 1, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBox_menu_button")
+theme_override_styles/hover = SubResource("StyleBox_menu_button_hover")
+theme_override_styles/pressed = SubResource("StyleBox_menu_button_pressed")
+theme_override_styles/focus = SubResource("StyleBox_menu_button_focus")
 text = "Quick Start"
 alignment = 0
 
 [node name="WeaponGalleryButton" type="Button" parent="CenterContainer/Menu"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 52)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
+theme_override_colors/font_color = Color(0.86, 0.92, 0.95, 1)
+theme_override_colors/font_hover_color = Color(0.9, 0.99, 1, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBox_menu_button")
+theme_override_styles/hover = SubResource("StyleBox_menu_button_hover")
+theme_override_styles/pressed = SubResource("StyleBox_menu_button_pressed")
+theme_override_styles/focus = SubResource("StyleBox_menu_button_focus")
 text = "Weapon Gallery"
 alignment = 0
 
 [node name="LeaderboardButton" type="Button" parent="CenterContainer/Menu"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 52)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
+theme_override_colors/font_color = Color(0.86, 0.92, 0.95, 1)
+theme_override_colors/font_hover_color = Color(0.9, 0.99, 1, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBox_menu_button")
+theme_override_styles/hover = SubResource("StyleBox_menu_button_hover")
+theme_override_styles/pressed = SubResource("StyleBox_menu_button_pressed")
+theme_override_styles/focus = SubResource("StyleBox_menu_button_focus")
 text = "Leaderboard"
 alignment = 0
 
 [node name="LanguageRow" type="HBoxContainer" parent="CenterContainer/Menu"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 16
 
 [node name="LanguageLabel" type="Label" parent="CenterContainer/Menu/LanguageRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.58, 0.7, 0.78, 1)
+theme_override_font_sizes/font_size = 15
 text = "Language"
 horizontal_alignment = 0
 vertical_alignment = 1
 
 [node name="LanguageOption" type="OptionButton" parent="CenterContainer/Menu/LanguageRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(170, 46)
+custom_minimum_size = Vector2(178, 48)
 layout_mode = 2
+theme_override_colors/font_color = Color(0.86, 0.92, 0.95, 1)
+theme_override_colors/font_hover_color = Color(0.9, 0.99, 1, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBox_menu_button")
+theme_override_styles/hover = SubResource("StyleBox_menu_button_hover")
+theme_override_styles/pressed = SubResource("StyleBox_menu_button_pressed")
+theme_override_styles/focus = SubResource("StyleBox_menu_button_focus")
 alignment = 0
 
 [node name="SoundSettingsButton" type="Button" parent="CenterContainer/Menu" unique_id=1828790268]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 52)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.86, 0.9, 1)
+theme_override_colors/font_hover_color = Color(0.9, 0.99, 1, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBox_menu_button")
+theme_override_styles/hover = SubResource("StyleBox_menu_button_hover")
+theme_override_styles/pressed = SubResource("StyleBox_menu_button_pressed")
+theme_override_styles/focus = SubResource("StyleBox_menu_button_focus")
 text = "Settings"
 alignment = 0
 
 [node name="QuitGameButton" type="Button" parent="CenterContainer/Menu" unique_id=1206835727]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 52)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
+theme_override_colors/font_color = Color(0.67, 0.75, 0.8, 1)
+theme_override_colors/font_hover_color = Color(1, 0.74, 0.62, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBox_menu_button")
+theme_override_styles/hover = SubResource("StyleBox_menu_button_hover")
+theme_override_styles/pressed = SubResource("StyleBox_menu_button_pressed")
+theme_override_styles/focus = SubResource("StyleBox_menu_button_focus")
 text = "Quit Game"
 alignment = 0
 
@@ -140,9 +291,6 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.68, 0.76, 0.8, 1)
 text = "Adjust music and game sound independently"
 horizontal_alignment = 1
-
-[node name="TopSeparator" type="HSeparator" parent="CenterContainer/SoundMenu" unique_id=1827834197]
-layout_mode = 2
 
 [node name="BgmHeader" type="HBoxContainer" parent="CenterContainer/SoundMenu" unique_id=2012329379]
 layout_mode = 2
@@ -215,13 +363,16 @@ layout_mode = 2
 text = "100%"
 horizontal_alignment = 2
 
-[node name="BottomSeparator" type="HSeparator" parent="CenterContainer/SoundMenu" unique_id=1144309775]
-layout_mode = 2
-
 [node name="SoundBackButton" type="Button" parent="CenterContainer/SoundMenu" unique_id=2097455924]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
+theme_override_colors/font_color = Color(0.86, 0.92, 0.95, 1)
+theme_override_colors/font_hover_color = Color(0.9, 0.99, 1, 1)
+theme_override_styles/normal = SubResource("StyleBox_menu_button")
+theme_override_styles/hover = SubResource("StyleBox_menu_button_hover")
+theme_override_styles/pressed = SubResource("StyleBox_menu_button_pressed")
+theme_override_styles/focus = SubResource("StyleBox_menu_button_focus")
 text = "Back"
 
 [connection signal="pressed" from="CenterContainer/Menu/StartGameButton" to="." method="_on_start_game_pressed"]

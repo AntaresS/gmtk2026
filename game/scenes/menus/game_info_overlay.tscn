@@ -1,7 +1,160 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=19 format=3]
 
 [ext_resource type="Script" path="res://game/scripts/menus/game_info_overlay.gd" id="1_script"]
 [ext_resource type="Script" path="res://game/scripts/gameplay/weapon_slot_icon.gd" id="2_weapon_icon"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_outer_panel"]
+bg_color = Color(0.035, 0.037, 0.049, 0.985)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0, 0, 0.5)
+shadow_size = 18
+shadow_offset = Vector2(0, 8)
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_content_panel"]
+bg_color = Color(0.055, 0.058, 0.075, 0.96)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_quick_card"]
+bg_color = Color(0.052, 0.055, 0.072, 0.98)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_details_panel"]
+bg_color = Color(0.05, 0.053, 0.069, 0.98)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_nav_panel"]
+bg_color = Color(0.043, 0.045, 0.059, 0.98)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_list_panel"]
+bg_color = Color(0, 0, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_list_selected"]
+content_margin_left = 14.0
+content_margin_top = 10.0
+content_margin_right = 10.0
+content_margin_bottom = 10.0
+bg_color = Color(0.145, 0.15, 0.255, 1)
+border_width_left = 3
+border_color = Color(0.48, 0.5, 0.96, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_list_hover"]
+content_margin_left = 12.0
+content_margin_top = 10.0
+content_margin_right = 10.0
+content_margin_bottom = 10.0
+bg_color = Color(0.082, 0.084, 0.11, 0.96)
+border_width_left = 2
+border_color = Color(0.38, 0.4, 0.72, 0.72)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_list_focus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.49, 0.51, 0.94, 0.78)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_back_normal"]
+content_margin_left = 18.0
+content_margin_top = 10.0
+content_margin_right = 18.0
+content_margin_bottom = 10.0
+bg_color = Color(0.065, 0.067, 0.086, 0.94)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_back_hover"]
+content_margin_left = 18.0
+content_margin_top = 10.0
+content_margin_right = 18.0
+content_margin_bottom = 10.0
+bg_color = Color(0.15, 0.155, 0.26, 1)
+border_width_left = 2
+border_color = Color(0.5, 0.52, 0.98, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_back_pressed"]
+content_margin_left = 18.0
+content_margin_top = 10.0
+content_margin_right = 18.0
+content_margin_bottom = 10.0
+bg_color = Color(0.105, 0.11, 0.19, 1)
+border_width_left = 2
+border_color = Color(0.56, 0.58, 1, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_back_focus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.56, 0.58, 1, 0.9)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_stat_card"]
+bg_color = Color(0.073, 0.076, 0.096, 0.98)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_trait_card"]
+bg_color = Color(0.065, 0.068, 0.088, 0.98)
+border_width_left = 3
+border_color = Color(0.47, 0.5, 0.94, 0.9)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_growth_card"]
+bg_color = Color(0.065, 0.068, 0.088, 0.98)
+border_width_left = 3
+border_color = Color(0.35, 0.69, 0.75, 0.86)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
 
 [node name="GameInfoOverlay" type="Control"]
 visible = false
@@ -22,7 +175,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.015, 0.025, 0.04, 0.94)
+color = Color(0.012, 0.013, 0.018, 0.9)
 
 [node name="OuterMargin" type="MarginContainer" parent="."]
 layout_mode = 1
@@ -31,62 +184,346 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 120
-theme_override_constants/margin_top = 70
-theme_override_constants/margin_right = 120
-theme_override_constants/margin_bottom = 70
+theme_override_constants/margin_left = 72
+theme_override_constants/margin_top = 44
+theme_override_constants/margin_right = 72
+theme_override_constants/margin_bottom = 44
 
 [node name="Panel" type="PanelContainer" parent="OuterMargin"]
 layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_outer_panel")
 
 [node name="PanelMargin" type="MarginContainer" parent="OuterMargin/Panel"]
 layout_mode = 2
-theme_override_constants/margin_left = 34
+theme_override_constants/margin_left = 32
 theme_override_constants/margin_top = 26
-theme_override_constants/margin_right = 34
+theme_override_constants/margin_right = 32
 theme_override_constants/margin_bottom = 30
 
 [node name="Layout" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin"]
 layout_mode = 2
-theme_override_constants/separation = 20
+theme_override_constants/separation = 18
 
 [node name="Header" type="HBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout"]
 layout_mode = 2
-theme_override_constants/separation = 20
+theme_override_constants/separation = 18
 
-[node name="TitleLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/Header"]
-unique_name_in_owner = true
+[node name="HeaderAccent" type="ColorRect" parent="OuterMargin/Panel/PanelMargin/Layout/Header"]
+custom_minimum_size = Vector2(3, 64)
+layout_mode = 2
+mouse_filter = 2
+color = Color(0.48, 0.5, 0.96, 0.96)
+
+[node name="HeaderText" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/Header"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.65, 1, 0.86, 1)
-theme_override_font_sizes/font_size = 38
-text = "武器画廊"
+theme_override_constants/separation = 1
+
+[node name="KickerLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/Header/HeaderText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.52, 0.82, 1)
+theme_override_font_sizes/font_size = 13
+text = "ARSENAL DATABASE"
+uppercase = true
+
+[node name="TitleLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/Header/HeaderText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.93, 0.94, 0.98, 1)
+theme_override_font_sizes/font_size = 36
+text = "Weapon Gallery"
 
 [node name="BackButton" type="Button" parent="OuterMargin/Panel/PanelMargin/Layout/Header"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 52)
+custom_minimum_size = Vector2(164, 48)
 layout_mode = 2
-text = "返回"
+theme_override_colors/font_color = Color(0.7, 0.71, 0.79, 1)
+theme_override_colors/font_hover_color = Color(0.94, 0.94, 1, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBox_back_normal")
+theme_override_styles/hover = SubResource("StyleBox_back_hover")
+theme_override_styles/pressed = SubResource("StyleBox_back_pressed")
+theme_override_styles/focus = SubResource("StyleBox_back_focus")
+text = "ESC   BACK"
 
-[node name="Separator" type="HSeparator" parent="OuterMargin/Panel/PanelMargin/Layout"]
-layout_mode = 2
-
-[node name="InstructionsPanel" type="ScrollContainer" parent="OuterMargin/Panel/PanelMargin/Layout"]
+[node name="InstructionsPanel" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
+theme_override_constants/separation = 14
 
-[node name="InstructionsText" type="RichTextLabel" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel"]
+[node name="InstructionsHint" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 720)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.59, 0.61, 0.69, 1)
+theme_override_font_sizes/font_size = 16
+text = "Master movement, combat, and cultivation before defying the Heavenly Dao."
+
+[node name="InstructionsScroll" type="ScrollContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="InstructionsGrid" type="GridContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll"]
+custom_minimum_size = Vector2(0, 706)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/default_color = Color(0.9, 0.93, 0.98, 1)
-theme_override_font_sizes/normal_font_size = 22
-theme_override_font_sizes/bold_font_size = 22
+theme_override_constants/h_separation = 14
+theme_override_constants/v_separation = 14
+columns = 2
+
+[node name="ObjectiveCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid"]
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_quick_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/ObjectiveCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 18
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/ObjectiveCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Index" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/ObjectiveCard/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.44, 0.56, 1)
+theme_override_font_sizes/font_size = 13
+text = "01"
+
+[node name="QuickObjectiveTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/ObjectiveCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.93, 0.94, 0.98, 1)
+theme_override_font_sizes/font_size = 22
+text = "Core Objective"
+
+[node name="QuickObjectiveBody" type="RichTextLabel" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/ObjectiveCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/default_color = Color(0.69, 0.71, 0.79, 1)
+theme_override_constants/line_separation = 5
+theme_override_font_sizes/normal_font_size = 17
+theme_override_font_sizes/bold_font_size = 17
 bbcode_enabled = true
-fit_content = true
-text = "玩法说明"
+scroll_active = false
+text = "Fly forward, survive, and cultivate before your lifespan runs out."
+
+[node name="ControlsCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid"]
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_quick_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/ControlsCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 18
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/ControlsCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Index" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/ControlsCard/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.44, 0.56, 1)
+theme_override_font_sizes/font_size = 13
+text = "02"
+
+[node name="QuickControlsTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/ControlsCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.93, 0.94, 0.98, 1)
+theme_override_font_sizes/font_size = 22
+text = "Movement & Input"
+
+[node name="QuickControlsBody" type="RichTextLabel" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/ControlsCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/default_color = Color(0.69, 0.71, 0.79, 1)
+theme_override_constants/line_separation = 4
+theme_override_font_sizes/normal_font_size = 16
+theme_override_font_sizes/bold_font_size = 16
+bbcode_enabled = true
+scroll_active = false
+text = "Move, change speed, use abilities, and inspect your loadout."
+
+[node name="CombatCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid"]
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_quick_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/CombatCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 18
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/CombatCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Index" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/CombatCard/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.44, 0.56, 1)
+theme_override_font_sizes/font_size = 13
+text = "03"
+
+[node name="QuickCombatTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/CombatCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.93, 0.94, 0.98, 1)
+theme_override_font_sizes/font_size = 22
+text = "Combat & Drops"
+
+[node name="QuickCombatBody" type="RichTextLabel" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/CombatCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/default_color = Color(0.69, 0.71, 0.79, 1)
+theme_override_constants/line_separation = 5
+theme_override_font_sizes/normal_font_size = 17
+theme_override_font_sizes/bold_font_size = 17
+bbcode_enabled = true
+scroll_active = false
+text = "Weapons attack automatically. Defeat elites and absorb their drops."
+
+[node name="GrowthCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid"]
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_quick_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/GrowthCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 18
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/GrowthCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Index" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/GrowthCard/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.44, 0.56, 1)
+theme_override_font_sizes/font_size = 13
+text = "04"
+
+[node name="QuickGrowthTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/GrowthCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.93, 0.94, 0.98, 1)
+theme_override_font_sizes/font_size = 22
+text = "Cultivation"
+
+[node name="QuickGrowthBody" type="RichTextLabel" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/GrowthCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/default_color = Color(0.69, 0.71, 0.79, 1)
+theme_override_constants/line_separation = 5
+theme_override_font_sizes/normal_font_size = 17
+theme_override_font_sizes/bold_font_size = 17
+bbcode_enabled = true
+scroll_active = false
+text = "Collect Spiritual Qi, advance layers, and build a stronger loadout."
+
+[node name="TribulationCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid"]
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_quick_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/TribulationCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 18
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/TribulationCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Index" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/TribulationCard/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.44, 0.56, 1)
+theme_override_font_sizes/font_size = 13
+text = "05"
+
+[node name="QuickTribulationTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/TribulationCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.93, 0.94, 0.98, 1)
+theme_override_font_sizes/font_size = 22
+text = "Breakthroughs"
+
+[node name="QuickTribulationBody" type="RichTextLabel" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/TribulationCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/default_color = Color(0.69, 0.71, 0.79, 1)
+theme_override_constants/line_separation = 5
+theme_override_font_sizes/normal_font_size = 17
+theme_override_font_sizes/bold_font_size = 17
+bbcode_enabled = true
+scroll_active = false
+text = "Read danger markers and survive every strike during a breakthrough."
+
+[node name="RoutesCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid"]
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_quick_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/RoutesCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 18
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/RoutesCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Index" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/RoutesCard/Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.44, 0.56, 1)
+theme_override_font_sizes/font_size = 13
+text = "06"
+
+[node name="QuickRoutesTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/RoutesCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.93, 0.94, 0.98, 1)
+theme_override_font_sizes/font_size = 22
+text = "Route Choice"
+
+[node name="QuickRoutesBody" type="RichTextLabel" parent="OuterMargin/Panel/PanelMargin/Layout/InstructionsPanel/InstructionsScroll/InstructionsGrid/RoutesCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/default_color = Color(0.69, 0.71, 0.79, 1)
+theme_override_constants/line_separation = 5
+theme_override_font_sizes/normal_font_size = 17
+theme_override_font_sizes/bold_font_size = 17
+bbcode_enabled = true
+scroll_active = false
+text = "Choose safer routes when low on resources; trials offer higher pressure."
 
 [node name="GalleryPanel" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout"]
 unique_name_in_owner = true
@@ -98,24 +535,58 @@ theme_override_constants/separation = 14
 [node name="GalleryHint" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.7, 0.77, 0.86, 1)
-theme_override_font_sizes/font_size = 18
-text = "选择武器查看真实基础属性与战斗特性"
+theme_override_colors/font_color = Color(0.59, 0.61, 0.69, 1)
+theme_override_font_sizes/font_size = 16
+text = "Select a weapon to inspect its combat profile and progression."
 
 [node name="GalleryContent" type="HBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel"]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/separation = 26
+theme_override_constants/separation = 16
 
-[node name="WeaponList" type="ItemList" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(300, 0)
+[node name="WeaponNav" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent"]
+custom_minimum_size = Vector2(330, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_styles/panel = SubResource("StyleBox_nav_panel")
+
+[node name="WeaponNavMargin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/WeaponNav"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 14
+
+[node name="WeaponNavLayout" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/WeaponNav/WeaponNavMargin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="GalleryArchiveLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/WeaponNav/WeaponNavMargin/WeaponNavLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.48, 0.5, 0.62, 1)
+theme_override_font_sizes/font_size = 12
+text = "AVAILABLE ARMAMENTS"
+uppercase = true
+
+[node name="WeaponList" type="ItemList" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/WeaponNav/WeaponNavMargin/WeaponNavLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.66, 0.67, 0.75, 1)
+theme_override_colors/font_hovered_color = Color(0.9, 0.91, 0.96, 1)
+theme_override_colors/font_selected_color = Color(0.96, 0.96, 1, 1)
+theme_override_constants/line_separation = 10
+theme_override_font_sizes/font_size = 17
+theme_override_styles/panel = SubResource("StyleBox_list_panel")
+theme_override_styles/focus = SubResource("StyleBox_list_focus")
+theme_override_styles/selected = SubResource("StyleBox_list_selected")
+theme_override_styles/selected_focus = SubResource("StyleBox_list_selected")
+theme_override_styles/hovered = SubResource("StyleBox_list_hover")
 
 [node name="DetailsPanel" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_details_panel")
 
 [node name="DetailsMargin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel"]
 layout_mode = 2
@@ -126,15 +597,16 @@ theme_override_constants/margin_bottom = 24
 
 [node name="Details" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin"]
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 16
 
 [node name="WeaponHeader" type="HBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 22
+theme_override_constants/separation = 24
 
 [node name="WeaponIcon" type="Control" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/WeaponHeader"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(108, 104)
+custom_minimum_size = Vector2(112, 108)
 layout_mode = 2
 script = ExtResource("2_weapon_icon")
 
@@ -142,73 +614,383 @@ script = ExtResource("2_weapon_icon")
 layout_mode = 2
 size_flags_horizontal = 3
 alignment = 1
+theme_override_constants/separation = 8
 
 [node name="WeaponNameLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/WeaponHeader/HeaderText"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 34
-text = "大力掌"
+theme_override_colors/font_color = Color(0.94, 0.94, 0.98, 1)
+theme_override_font_sizes/font_size = 32
+text = "Mighty Palm"
 
 [node name="WeaponMetaLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/WeaponHeader/HeaderText"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.67, 0.84, 1, 1)
-theme_override_font_sizes/font_size = 18
-text = "类型：近战 · 修炼倾向：无"
+theme_override_colors/font_color = Color(0.55, 0.57, 0.68, 1)
+theme_override_font_sizes/font_size = 15
+text = "TYPE: MELEE    ·    AFFINITY: NONE"
 
 [node name="WeaponStatsLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.89, 0.56, 1)
-theme_override_font_sizes/font_size = 20
-text = "基础属性"
+theme_override_colors/font_color = Color(0.5, 0.52, 0.64, 1)
+theme_override_font_sizes/font_size = 13
+text = "SYSTEM PARAMETERS"
+uppercase = true
 
-[node name="TraitTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
+[node name="StatsGrid" type="HBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.65, 1, 0.86, 1)
-theme_override_font_sizes/font_size = 24
-text = "战斗特性"
+theme_override_constants/separation = 12
 
-[node name="TraitBody" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
+[node name="DamageCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/StatsGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_stat_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/StatsGrid/DamageCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 13
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 13
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/StatsGrid/DamageCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="DamageCaption" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/StatsGrid/DamageCard/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "武器说明"
+theme_override_colors/font_color = Color(0.49, 0.5, 0.59, 1)
+theme_override_font_sizes/font_size = 13
+text = "DAMAGE"
+uppercase = true
+
+[node name="DamageValue" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/StatsGrid/DamageCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.67, 0.68, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "10–15"
+
+[node name="RangeCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/StatsGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_stat_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/StatsGrid/RangeCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 13
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 13
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/StatsGrid/RangeCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="RangeCaption" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/StatsGrid/RangeCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49, 0.5, 0.59, 1)
+theme_override_font_sizes/font_size = 13
+text = "RANGE"
+uppercase = true
+
+[node name="RangeValue" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/StatsGrid/RangeCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.91, 0.96, 1)
+theme_override_font_sizes/font_size = 26
+text = "180"
+
+[node name="IntervalCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/StatsGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_stat_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/StatsGrid/IntervalCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 13
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 13
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/StatsGrid/IntervalCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="IntervalCaption" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/StatsGrid/IntervalCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49, 0.5, 0.59, 1)
+theme_override_font_sizes/font_size = 13
+text = "ATTACK INTERVAL"
+uppercase = true
+
+[node name="IntervalValue" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/StatsGrid/IntervalCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.91, 0.96, 1)
+theme_override_font_sizes/font_size = 26
+text = "0.80 SEC"
+
+[node name="DescriptionGrid" type="HBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 14
+
+[node name="TraitCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/DescriptionGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_trait_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/DescriptionGrid/TraitCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 18
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/DescriptionGrid/TraitCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TraitTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/DescriptionGrid/TraitCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.67, 0.68, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "COMBAT TRAIT"
+uppercase = true
+
+[node name="TraitBody" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/DescriptionGrid/TraitCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.74, 0.75, 0.82, 1)
+theme_override_font_sizes/font_size = 17
+text = "Weapon description"
 autowrap_mode = 2
 
-[node name="GrowthTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
-unique_name_in_owner = true
+[node name="GrowthCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/DescriptionGrid"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.88, 0.72, 1, 1)
-theme_override_font_sizes/font_size = 24
-text = "重复获得"
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_growth_card")
 
-[node name="GrowthBody" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/DescriptionGrid/GrowthCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 18
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/DescriptionGrid/GrowthCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="GrowthTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/DescriptionGrid/GrowthCard/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "升级说明"
+theme_override_colors/font_color = Color(0.52, 0.78, 0.82, 1)
+theme_override_font_sizes/font_size = 16
+text = "DUPLICATE UPGRADE"
+uppercase = true
+
+[node name="GrowthBody" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/DescriptionGrid/GrowthCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.74, 0.75, 0.82, 1)
+theme_override_font_sizes/font_size = 17
+text = "Upgrade description"
 autowrap_mode = 2
 
-[node name="LeaderboardPanel" type="ScrollContainer" parent="OuterMargin/Panel/PanelMargin/Layout"]
+[node name="FragmentDetails" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 size_flags_vertical = 3
-horizontal_scroll_mode = 0
+theme_override_constants/separation = 18
 
-[node name="LeaderboardText" type="RichTextLabel" parent="OuterMargin/Panel/PanelMargin/Layout/LeaderboardPanel"]
+[node name="FragmentHeader" type="HBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="FragmentGlyphCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails/FragmentHeader"]
+custom_minimum_size = Vector2(112, 108)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_stat_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails/FragmentHeader/FragmentGlyphCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="FragmentGlyphLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails/FragmentHeader/FragmentGlyphCard/Margin"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 720)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.67, 0.68, 1, 1)
+theme_override_font_sizes/font_size = 32
+text = "SPD"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="HeaderText" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails/FragmentHeader"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/default_color = Color(0.9, 0.93, 0.98, 1)
-theme_override_font_sizes/normal_font_size = 22
-theme_override_font_sizes/bold_font_size = 22
+alignment = 1
+theme_override_constants/separation = 8
+
+[node name="FragmentNameLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails/FragmentHeader/HeaderText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.94, 0.98, 1)
+theme_override_font_sizes/font_size = 32
+text = "Attack Speed"
+
+[node name="FragmentMetaLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails/FragmentHeader/HeaderText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.57, 0.68, 1)
+theme_override_font_sizes/font_size = 15
+text = "RUN-WIDE ABILITY UPGRADE"
+uppercase = true
+
+[node name="FragmentEffectCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBox_trait_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails/FragmentEffectCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 22
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails/FragmentEffectCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="FragmentEffectTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails/FragmentEffectCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.67, 0.68, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "EFFECT PROFILE"
+uppercase = true
+
+[node name="FragmentEffectBody" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails/FragmentEffectCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.75, 0.76, 0.83, 1)
+theme_override_font_sizes/font_size = 18
+text = "Shortens every weapon's attack interval."
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="FragmentAcquisitionCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBox_growth_card")
+
+[node name="Margin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails/FragmentAcquisitionCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 22
+
+[node name="Content" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails/FragmentAcquisitionCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="FragmentAcquisitionTitle" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails/FragmentAcquisitionCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.52, 0.78, 0.82, 1)
+theme_override_font_sizes/font_size = 16
+text = "ACQUISITION"
+uppercase = true
+
+[node name="FragmentAcquisitionBody" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/DetailsPanel/DetailsMargin/Details/FragmentDetails/FragmentAcquisitionCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.74, 0.75, 0.82, 1)
+theme_override_font_sizes/font_size = 17
+text = "Defeat an enhancement elite to reveal a choice of two fragments."
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="LeaderboardPanel" type="VBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 14
+
+[node name="LeaderboardHint" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/LeaderboardPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.57, 0.7, 0.78, 1)
+theme_override_font_sizes/font_size = 17
+text = "Your best locally archived cycles, ranked by survival time."
+
+[node name="ArchiveSummary" type="HBoxContainer" parent="OuterMargin/Panel/PanelMargin/Layout/LeaderboardPanel"]
+layout_mode = 2
+
+[node name="ArchiveLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/LeaderboardPanel/ArchiveSummary"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.45, 0.73, 0.82, 1)
+theme_override_font_sizes/font_size = 14
+text = "LOCAL PROFILE  //  SURVIVAL INDEX"
+
+[node name="RecordCountLabel" type="Label" parent="OuterMargin/Panel/PanelMargin/Layout/LeaderboardPanel/ArchiveSummary"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.79, 0.87, 0.91, 1)
+theme_override_font_sizes/font_size = 14
+text = "0 CYCLE RECORDS"
+horizontal_alignment = 2
+
+[node name="LeaderboardCard" type="PanelContainer" parent="OuterMargin/Panel/PanelMargin/Layout/LeaderboardPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBox_content_panel")
+
+[node name="LeaderboardMargin" type="MarginContainer" parent="OuterMargin/Panel/PanelMargin/Layout/LeaderboardPanel/LeaderboardCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 22
+
+[node name="LeaderboardScroll" type="ScrollContainer" parent="OuterMargin/Panel/PanelMargin/Layout/LeaderboardPanel/LeaderboardCard/LeaderboardMargin"]
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="LeaderboardText" type="RichTextLabel" parent="OuterMargin/Panel/PanelMargin/Layout/LeaderboardPanel/LeaderboardCard/LeaderboardMargin/LeaderboardScroll"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 680)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/default_color = Color(0.85, 0.9, 0.94, 1)
+theme_override_constants/line_separation = 9
+theme_override_constants/table_h_separation = 28
+theme_override_constants/table_v_separation = 14
+theme_override_font_sizes/normal_font_size = 18
+theme_override_font_sizes/bold_font_size = 18
 bbcode_enabled = true
 fit_content = true
-text = "排行榜"
+text = "Leaderboard"
 
 [connection signal="pressed" from="OuterMargin/Panel/PanelMargin/Layout/Header/BackButton" to="." method="_on_back_button_pressed"]
-[connection signal="item_selected" from="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/WeaponList" to="." method="_on_weapon_list_item_selected"]
+[connection signal="item_selected" from="OuterMargin/Panel/PanelMargin/Layout/GalleryPanel/GalleryContent/WeaponNav/WeaponNavMargin/WeaponNavLayout/WeaponList" to="." method="_on_weapon_list_item_selected"]

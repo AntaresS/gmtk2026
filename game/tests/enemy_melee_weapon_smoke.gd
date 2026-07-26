@@ -82,7 +82,7 @@ func _run() -> void:
 		"MeleeWeaponTrail1"
 	) as Sprite2D
 	var knife_tip_distance := (
-		enemy.melee_weapon.position.length() + 720.0 * 0.04
+		enemy.melee_weapon.position.length() + 28.125 * 1.024
 	)
 	_check(
 		enemy.is_attack_winding_up()

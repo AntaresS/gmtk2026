@@ -17,7 +17,7 @@ script = ExtResource("1_script")
 [node name="SwordSprite" type="Sprite2D" parent="."]
 z_index = 1
 rotation = 1.5708
-scale = Vector2(0.032, 0.032)
+scale = Vector2(1.024, 1.024)
 texture = ExtResource("2_sword")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]

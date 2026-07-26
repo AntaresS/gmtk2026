@@ -7,6 +7,8 @@ const OUTLINE_SHADER: Shader = preload(
 const PURPLE_OUTLINE_COLOR: Color = Color("d873ff")
 const PURPLE_GLOW_COLOR: Color = Color("a43cff")
 const ELITE_TRAIL_COLOR: Color = Color("8f102f")
+const OUTLINE_TEXTURE_WIDTH: float = 0.742188
+const GLOW_TEXTURE_WIDTH: float = 2.152344
 
 ## Radius, in world pixels, used to resolve a sword crossing its locked target.
 ## This script performs a swept segment check so fast elite swords cannot skip
@@ -46,9 +48,12 @@ func _refresh_presentation() -> void:
 		&"outline_color",
 		PURPLE_OUTLINE_COLOR
 	)
-	outline_material.set_shader_parameter(&"outline_width", 20.0)
+	outline_material.set_shader_parameter(
+		&"outline_width",
+		OUTLINE_TEXTURE_WIDTH
+	)
 	outline_material.set_shader_parameter(&"glow_color", PURPLE_GLOW_COLOR)
-	outline_material.set_shader_parameter(&"glow_width", 58.0)
+	outline_material.set_shader_parameter(&"glow_width", GLOW_TEXTURE_WIDTH)
 	outline_material.set_shader_parameter(&"glow_strength", 0.22)
 	outline_material.set_shader_parameter(&"readiness_strength", 1.0)
 	outline_material.set_shader_parameter(&"warning_energy", 0.0)

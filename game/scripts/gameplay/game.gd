@@ -34,14 +34,14 @@ const WeaponDataResource = preload(
 ## Ordered looping tracks for 练气, 筑基, 金丹, and 元婴. Realm indexes beyond
 ## the configured list reuse the last valid entry.
 @export var realm_bgm_tracks: Array[AudioStream] = [
-	preload("res://assets/sound/track/stage_1.wav"),
-	preload("res://assets/sound/track/stage_2.wav"),
-	preload("res://assets/sound/track/stage_3.wav"),
-	preload("res://assets/sound/track/stage_4.wav"),
+	preload("res://assets/sound/track/stage_1.ogg"),
+	preload("res://assets/sound/track/stage_2.ogg"),
+	preload("res://assets/sound/track/stage_3.ogg"),
+	preload("res://assets/sound/track/stage_4.ogg"),
 ]
 ## Looping track used only while a non-fatal Heavenly Tribulation is active.
 @export var heavenly_tribulation_bgm: AudioStream = preload(
-	"res://assets/sound/track/lei_jie.wav"
+	"res://assets/sound/track/lei_jie.ogg"
 )
 
 @export_category("Breakthrough Audio")

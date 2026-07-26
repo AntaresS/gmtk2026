@@ -277,7 +277,7 @@ position = Vector2(0, 30)
 script = ExtResource("12_shadow")
 
 [node name="CharacterSprite" type="AnimatedSprite2D" parent="." unique_id=1859822539]
-scale = Vector2(0.22, 0.22)
+scale = Vector2(0.999565, 0.999565)
 sprite_frames = SubResource("SpriteFrames_character")
 animation = &"fly"
 autoplay = "qi_walk"
@@ -286,7 +286,7 @@ autoplay = "qi_walk"
 visible = false
 modulate = Color(0.48, 0.86, 1, 0.46)
 z_index = 2
-scale = Vector2(0.17, 0.17)
+scale = Vector2(0.772391, 0.772391)
 sprite_frames = SubResource("SpriteFrames_character")
 animation = &"fly"
 autoplay = "fly"

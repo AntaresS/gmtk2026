@@ -285,10 +285,12 @@ func _run() -> void:
 		"Cultivation did not load its three-fragment data resource."
 	)
 	_check(
-		hud.cultivation_tracks_label.text.contains("通用碎片")
-		and hud.cultivation_tracks_label.text.contains("攻速 Lv.0")
-		and hud.cultivation_tracks_label.text.contains("加减速 Lv.0"),
-		"HUD did not present the explained universal-fragment system."
+		not hud.cultivation_tracks_label.visible
+		and hud.attack_speed_level_name.text == "攻速"
+		and hud.attack_speed_level_label.text == "Lv.0"
+		and hud.speed_control_level_name.text == "加减速"
+		and hud.speed_control_level_label.text == "Lv.0",
+		"HUD did not present the compact fragment-level summary."
 	)
 
 	_check(player.collect_weapon(DAO_DATA, 10), "Dao could not be equipped.")

@@ -95,10 +95,10 @@ enum FantianSealVisualState {
 	SHADOW_SHRINK,
 }
 
-const PALM_LAUNCH_SCALE: float = 0.035
-const PALM_CHARGED_SCALE: float = 0.025
-const PALM_STRIKE_SCALE: float = 0.105
-const PALM_CENTER_OFFSET_PIXELS: float = 88.0
+const PALM_LAUNCH_SCALE: float = 0.294784
+const PALM_CHARGED_SCALE: float = 0.21056
+const PALM_STRIKE_SCALE: float = 0.884353
+const PALM_CENTER_OFFSET_PIXELS: float = 10.448311
 const PALM_IDLE_RADIUS: float = 68.0
 const PALM_CHARGED_RADIUS: float = 24.0
 const PALM_WARNING_MARGIN: float = 74.0
@@ -106,9 +106,10 @@ const PALM_STRIKE_DURATION: float = 0.13
 const PALM_STRIKE_STAGGER: float = 0.14
 const PALM_DISSOLVE_DURATION: float = 0.14
 const PALM_COVERAGE_FLASH_DURATION: float = 0.22
-const PALM_OUTLINE_TEXTURE_WIDTH: float = 20.0
+const PALM_OUTLINE_TEXTURE_WIDTH: float = 2.374616
+const PALM_DISSOLVE_NOISE_DENSITY: float = 0.547457
 const PALM_GLOW_COLOR: Color = Color("d9ffff")
-const FLYING_SWORD_SCALE: float = 0.032
+const FLYING_SWORD_SCALE: float = 1.024
 const FLYING_SWORD_MIN_RADIUS_RATIO: float = 1.0 / 3.0
 const FLYING_SWORD_MAX_RADIUS_RATIO: float = 2.0 / 3.0
 const FLYING_SWORD_RADIUS_RATIO_PER_EXTRA_SWORD: float = 1.0 / 30.0
@@ -119,10 +120,10 @@ const FLYING_SWORD_SUMMON_DURATION: float = 0.18
 const FLYING_SWORD_SUMMON_STAGGER: float = 0.045
 const FLYING_SWORD_MAX_SUMMON_WINDOW: float = 0.28
 const FLYING_SWORD_REFILL_DURATION: float = 0.14
-const FLYING_SWORD_OUTLINE_TEXTURE_WIDTH: float = 22.0
+const FLYING_SWORD_OUTLINE_TEXTURE_WIDTH: float = 0.6875
 const FLYING_SWORD_OUTLINE_COLOR: Color = Color("f6fbff")
-const QIANKUN_RING_SCALE: float = 0.036
-const FANTIAN_SEAL_IDLE_SCALE: float = 0.052
+const QIANKUN_RING_SCALE: float = 0.32623
+const FANTIAN_SEAL_IDLE_SCALE: float = 0.21471
 const FANTIAN_SEAL_IDLE_POSITION: Vector2 = Vector2(54.0, -8.0)
 const FANTIAN_SEAL_SUMMON_DURATION: float = 0.18
 const FANTIAN_SEAL_ASCENT_DURATION: float = 0.48
@@ -132,8 +133,8 @@ const FANTIAN_SEAL_SWITCH_SHADOW_DURATION: float = 0.3
 const FANTIAN_SEAL_RANGE_FILL_COLOR := Color(0.055, 0.09, 0.055, 0.025)
 const FANTIAN_SEAL_RANGE_EDGE_COLOR := Color(0.38, 0.72, 0.48, 0.34)
 const FANTIAN_SEAL_SEQUENCE_WINDOW_RATIO: float = 0.7
-const DAO_WEAPON_SCALE: float = 0.045
-const DAO_WEAPON_TIP_OFFSET_PIXELS: float = 665.0
+const DAO_WEAPON_SCALE: float = 1.001739
+const DAO_WEAPON_TIP_OFFSET_PIXELS: float = 29.873047
 const DAO_IDLE_ORBIT_SPEED: float = 0.9
 const DAO_ATTACK_ORBIT_SPEED: float = 8.5
 const DAO_ATTACK_VISUAL_HOLD_DURATION: float = 0.75
@@ -233,9 +234,9 @@ const DAO_MAX_ATTACK_TRAIL_COUNT: int = 24
 @export var flying_sword_warning_glow_color: Color = Color("8ce6ff")
 ## Maximum opacity of the soft readiness glow around each sword.
 @export_range(0.0, 1.0, 0.01) var flying_sword_warning_glow_strength := 0.32
-## Glow reach in source-texture pixels. Because the sword texture is scaled at
-## runtime, larger values widen the aura without changing combat geometry.
-@export_range(16.0, 128.0, 1.0) var flying_sword_warning_glow_width := 68.0
+## Glow reach in optimized source-texture pixels. Because the sword texture is
+## scaled at runtime, larger values widen the aura without changing combat geometry.
+@export_range(0.5, 8.0, 0.125) var flying_sword_warning_glow_width := 2.125
 ## Fraction of glow intensity removed at the low point of its breathing pulse.
 ## Zero keeps the glow steady; larger values make readiness easier to notice.
 @export_range(0.0, 0.8, 0.01) var flying_sword_warning_pulse_depth := 0.35
@@ -3225,6 +3226,10 @@ func _ensure_palm_attack_sprite_count(required_count: int) -> void:
 func _create_palm_dissolve_material() -> ShaderMaterial:
 	var dissolve_material := ShaderMaterial.new()
 	dissolve_material.shader = DISSOLVE_SHADER
+	dissolve_material.set_shader_parameter(
+		&"noise_density",
+		PALM_DISSOLVE_NOISE_DENSITY
+	)
 	dissolve_material.set_shader_parameter(
 		&"edge_color",
 		Color("78f7ff")

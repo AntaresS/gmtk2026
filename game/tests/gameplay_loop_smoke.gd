@@ -181,12 +181,19 @@ func _run() -> void:
 		"Bounded lifespan progression did not use the tuned MVP defaults."
 	)
 	_check(
-		hud.technique_label.text == "功法  大力掌",
-		"HUD did not show the starting Great Strength Palm technique."
+		not hud.technique_label.visible
+		and not hud.realm_ability_label.visible,
+		"Tab details still showed technique or active-skill text."
 	)
 	_check(
-		hud.weapon_label.text == "当前装备  大力掌  · 伤害 5",
-		"HUD did not show the starting equipment."
+		not hud.weapon_label.visible
+		and hud.damage_stat_value.text == "5",
+		"Compact HUD did not hide equipment or show current damage."
+	)
+	_check(
+		hud.start_prompt_label.visible
+		and hud.start_prompt_label.text == "快跑，挺住攻击活下去！",
+		"Localized survival prompt did not appear when gameplay started."
 	)
 	_check(
 		hud.lifespan_rate_label.text == "寿元消耗  -1.00 / 秒",
@@ -842,9 +849,9 @@ func _run() -> void:
 					== EnemyController.EliteRewardType.WEAPON
 				and spawned_enemy.max_health > 5
 				and spawned_enemy.melee_attack_range > 55.0
-				and spawned_enemy.elite_label.visible
-				and spawned_enemy.elite_label.text == "武器精英",
-				"Elite enemy lacked its larger health, range, or visible identity."
+				and not spawned_enemy.elite_label.visible
+				and spawned_enemy.elite_label.text.is_empty(),
+				"Elite stats changed or its overhead text remained visible."
 			)
 			enemy_spawner.set(
 				"_elapsed_run_time",
@@ -1657,10 +1664,9 @@ func _run() -> void:
 		"Collected weapon did not retain its rolled damage."
 	)
 	_check(
-		hud.weapon_label.text == (
-			"当前装备  飞剑  · 伤害 %d" % level_one_sword_damage
-		),
-		"HUD did not update after equipping a weapon drop."
+		not hud.weapon_label.visible
+		and hud.damage_stat_value.text == str(level_one_sword_damage),
+		"Compact HUD damage did not update after equipping a weapon drop."
 	)
 	_check(
 		player.collect_weapon(FLYING_SWORD_DATA, 5)
@@ -1794,8 +1800,9 @@ func _run() -> void:
 	Input.parse_input_event(tab_press)
 	await _wait_process_frames(2)
 	_check(
-		hud.is_detail_drawer_visible(),
-		"Holding Tab did not reveal the character detail drawer."
+		hud.is_detail_drawer_visible()
+		and not hud.detail_shortcut_hint.visible,
+		"Holding Tab did not reveal details or hide its shortcut hint."
 	)
 	var tab_release := InputEventKey.new()
 	tab_release.keycode = KEY_TAB
@@ -1805,18 +1812,27 @@ func _run() -> void:
 	await _wait_process_frames(1)
 	_check(
 		not hud.is_detail_drawer_visible()
+		and hud.detail_shortcut_hint.visible
 		and player.get_weapon_name() == weapon_name_before_details,
-		"Releasing Tab did not close details or changed equipment."
+		"Releasing Tab did not restore the hint or changed equipment."
 	)
 	_check(
-		hud.equipment_library_label.text.contains("刀 ×1  伤害 4")
-			and hud.equipment_library_label.text.contains("飞剑 ×2  伤害 6")
-			and hud.equipment_library_label.text.contains(
-				"乾坤圈 ×1  伤害 5"
-			),
-			"HUD equipment library mismatch: %s"
-				% hud.equipment_library_label.text
-		)
+		not hud.detail_title_label.visible
+			and not hud.player_stats_label.visible
+			and not hud.equipment_library_label.visible
+			and hud.attack_speed_level_label.visible
+			and hud.detail_drawer.size.x <= 450.0
+			and (
+				hud.detail_drawer.get_node(
+					"DetailMargin/DetailColumn/DetailScroll"
+				) is MarginContainer
+			)
+			and hud.movement_stat_value.text
+				== "%.0f" % player.current_forward_speed
+			and hud.range_stat_value.text
+				== "%.0f" % player.get_current_attack_range(),
+		"Tab drawer did not keep only core stats and fragment levels."
+	)
 
 	var realm_config := resources.realm_progression_config
 	_check(
