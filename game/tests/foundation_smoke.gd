@@ -46,6 +46,60 @@ func _run() -> void:
 
 	var main_menu := current_scene
 	_check(main_menu != null and main_menu.name == "MainMenu", "Main menu is not the boot flow.")
+	var menu_bgm := main_menu.get_node("BackgroundMusic") as AudioStreamPlayer
+	var menu_bgm_source := menu_bgm.call("get_source_stream") as AudioStream
+	_check(
+		menu_bgm_source != null
+		and menu_bgm_source.resource_path
+			== "res://assets/sound/track/stage_1.wav"
+		and menu_bgm.stream is AudioStreamWAV
+		and bool(menu_bgm.get("loop_tracks"))
+		and menu_bgm.playing,
+		"Main menu did not start looping stage_1 music."
+	)
+	var bgm_bus_index := AudioServer.get_bus_index(&"BGM")
+	var sfx_bus_index := AudioServer.get_bus_index(&"SFX")
+	_check(
+		bgm_bus_index >= 0
+		and sfx_bus_index >= 0
+		and menu_bgm.bus == &"BGM",
+		"Dedicated BGM/SFX buses are missing or menu music is misrouted."
+	)
+	main_menu.call("_on_sound_settings_pressed")
+	var sound_menu := main_menu.get_node("CenterContainer/SoundMenu")
+	var main_menu_panel := main_menu.get_node("CenterContainer/Menu")
+	_check(
+		sound_menu.visible and not main_menu_panel.visible,
+		"Sound button did not open its dedicated submenu."
+	)
+	main_menu.call("_on_bgm_volume_changed", 37.0)
+	main_menu.call("_on_bgm_mute_toggled", true)
+	main_menu.call("_on_sfx_volume_changed", 61.0)
+	main_menu.call("_on_sfx_mute_toggled", true)
+	_check(
+		is_equal_approx(
+			AudioServer.get_bus_volume_db(bgm_bus_index),
+			linear_to_db(0.37)
+		)
+		and AudioServer.is_bus_mute(bgm_bus_index)
+		and is_equal_approx(
+			AudioServer.get_bus_volume_db(sfx_bus_index),
+			linear_to_db(0.61)
+		)
+		and AudioServer.is_bus_mute(sfx_bus_index)
+		and (main_menu.get_node("%BgmPercent") as Label).text == "37%"
+		and (main_menu.get_node("%SfxPercent") as Label).text == "61%",
+		"Sound submenu did not independently apply BGM and SFX controls."
+	)
+	main_menu.call("_on_bgm_mute_toggled", false)
+	main_menu.call("_on_sfx_mute_toggled", false)
+	main_menu.call("_on_bgm_volume_changed", 100.0)
+	main_menu.call("_on_sfx_volume_changed", 100.0)
+	main_menu.call("_on_sound_back_pressed")
+	_check(
+		not sound_menu.visible and main_menu_panel.visible,
+		"Sound Back button did not restore the main menu."
+	)
 	main_menu.call("_on_start_game_pressed")
 	await _wait_process_frames(4)
 
@@ -54,6 +108,69 @@ func _run() -> void:
 	var player := game.get_node("Player") as PlayerController
 	var world := game.get_node("InfiniteWorld") as InfiniteWorld
 	var pause_menu := game.get_node("PauseMenu")
+	var game_bgm := game.get_node("BackgroundMusic") as AudioStreamPlayer
+	var realm_bgm_tracks := game.get("realm_bgm_tracks") as Array[AudioStream]
+	_check(
+		realm_bgm_tracks.size() == 4
+		and realm_bgm_tracks[0].resource_path.ends_with("stage_1.wav")
+		and realm_bgm_tracks[1].resource_path.ends_with("stage_2.wav")
+		and realm_bgm_tracks[2].resource_path.ends_with("stage_3.wav")
+		and realm_bgm_tracks[3].resource_path.ends_with("stage_4.wav")
+		and (
+			game.get("heavenly_tribulation_bgm") as AudioStream
+		).resource_path.ends_with("lei_jie.wav"),
+		"Gameplay BGM tracks do not match the four realms and tribulation."
+	)
+	_check(
+		game_bgm.bus == &"BGM"
+		and player.weapon_sfx_bus == &"SFX",
+		"Gameplay music or weapon effects bypassed their dedicated audio bus."
+	)
+	var breakthrough_success_player := (
+		game.get_node("BreakthroughSuccessSfx") as AudioStreamPlayer
+	)
+	_check(
+		breakthrough_success_player.stream != null
+		and breakthrough_success_player.stream.resource_path
+			== "res://assets/sound/sfx/dujie_success.mp3"
+		and is_equal_approx(
+			breakthrough_success_player.volume_db,
+			float(game.get("breakthrough_success_volume_db"))
+		),
+		"Successful breakthrough SFX is missing or ignored its volume tuning."
+	)
+	for realm_index in realm_bgm_tracks.size():
+		game.call("_play_realm_bgm", realm_index, true)
+		var active_source := game_bgm.call("get_source_stream") as AudioStream
+		_check(
+			active_source == realm_bgm_tracks[realm_index]
+			and game_bgm.stream is AudioStreamWAV
+			and bool(game_bgm.get("loop_tracks"))
+			and game_bgm.playing,
+			"Realm %d did not select its looping BGM." % realm_index
+		)
+	game.call("_play_realm_bgm", 0, true)
+	var tribulation_preview := (
+		load(
+			"res://game/scenes/gameplay/heavenly_tribulation.tscn"
+		).instantiate() as HeavenlyTribulation
+	)
+	root.add_child(tribulation_preview)
+	await process_frame
+	_check(
+		tribulation_preview.strike_sfx != null
+		and tribulation_preview.strike_sfx.resource_path
+			== "res://assets/sound/sfx/duejie_thunder.mp3"
+		and tribulation_preview.strike_sfx_volume_db < 0.0
+		and tribulation_preview.strike_sfx_player.max_polyphony
+			== tribulation_preview.strike_sfx_max_polyphony,
+		"Heavenly Tribulation thunder SFX is missing, unattenuated, or not polyphonic."
+	)
+	_check(
+		tribulation_preview.strike_sfx_player.bus == &"SFX",
+		"Heavenly Tribulation thunder bypassed the SFX bus."
+	)
+	tribulation_preview.queue_free()
 	_check(player != null, "Gameplay has no PlayerController.")
 	_check(world != null, "Gameplay has no InfiniteWorld.")
 	var character_sprite := (

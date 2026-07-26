@@ -36,7 +36,25 @@ enum Phase {
 ## Pause between one impact fading and the next warning, in seconds.
 @export_range(0.0, 1.0, 0.05) var inter_strike_delay: float = 0.16
 
+@export_category("Audio")
+## Sound played once for every lightning landing, regardless of whether it
+## hits the player. The imported stream remains non-looping.
+@export var strike_sfx: AudioStream = preload(
+	"res://assets/sound/sfx/duejie_thunder.mp3"
+)
+## Lightning loudness in decibels. The negative default keeps repeated,
+## overlapping strikes below the foreground weapon mix.
+@export_range(-40.0, 12.0, 0.5) var strike_sfx_volume_db: float = -6.0
+## Lightning playback-speed and pitch multiplier. One preserves the source.
+@export_range(0.25, 4.0, 0.05) var strike_sfx_pitch_scale: float = 1.0
+## Maximum overlapping lightning voices. At saturation, AudioStreamPlayer
+## discards its oldest voice while keeping new strike feedback responsive.
+@export_range(1, 20, 1) var strike_sfx_max_polyphony: int = 9
+## Audio bus used by lightning. Missing bus names safely fall back to Master.
+@export var strike_sfx_bus: StringName = &"SFX"
+
 @onready var warning_label: Label = $WarningLabel
+@onready var strike_sfx_player: AudioStreamPlayer = $StrikeSfx
 
 var _player: PlayerController
 var _phase: Phase = Phase.IDLE
@@ -52,6 +70,22 @@ func _ready() -> void:
 	add_to_group("heavenly_tribulations")
 	_rng.randomize()
 	warning_label.hide()
+	strike_sfx_player.stream = strike_sfx
+	strike_sfx_player.volume_db = strike_sfx_volume_db
+	strike_sfx_player.pitch_scale = clampf(
+		strike_sfx_pitch_scale,
+		0.25,
+		4.0
+	)
+	strike_sfx_player.max_polyphony = maxi(
+		strike_sfx_max_polyphony,
+		1
+	)
+	strike_sfx_player.bus = (
+		strike_sfx_bus
+		if AudioServer.get_bus_index(strike_sfx_bus) >= 0
+		else &"Master"
+	)
 	set_physics_process(false)
 
 
@@ -183,6 +217,8 @@ func _land_current_strike() -> void:
 	_phase = Phase.FLASH
 	_phase_time_remaining = maxf(flash_duration, 0.01)
 	warning_label.hide()
+	if strike_sfx_player.stream != null:
+		strike_sfx_player.play()
 	var hit_player := (
 		_player.global_position.distance_to(_landing_position)
 		<= strike_radius

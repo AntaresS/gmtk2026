@@ -1,8 +1,10 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://cw1yv0lixgcpj"]
 
-[ext_resource type="Script" path="res://game/scripts/menus/main_menu.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://dulv23u5i7dx8" path="res://game/scripts/menus/main_menu.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://saekbmlj3h6b" path="res://game/scripts/audio/background_music_player.gd" id="2_bgm_script"]
+[ext_resource type="AudioStream" uid="uid://di3kaxm6ajmjr" path="res://assets/sound/track/stage_1.wav" id="3_stage_1"]
 
-[node name="MainMenu" type="Control"]
+[node name="MainMenu" type="Control" unique_id=259486953]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -11,7 +13,12 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="BackgroundMusic" type="AudioStreamPlayer" parent="." unique_id=2061960211]
+stream = ExtResource("3_stage_1")
+script = ExtResource("2_bgm_script")
+music_volume_db = -10.0
+
+[node name="Background" type="ColorRect" parent="." unique_id=257210968]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -21,7 +28,7 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.055, 0.075, 0.09, 1)
 
-[node name="CenterContainer" type="CenterContainer" parent="."]
+[node name="CenterContainer" type="CenterContainer" parent="." unique_id=987044855]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -29,32 +36,147 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Menu" type="VBoxContainer" parent="CenterContainer"]
+[node name="Menu" type="VBoxContainer" parent="CenterContainer" unique_id=534746929]
 custom_minimum_size = Vector2(320, 0)
 layout_mode = 2
 theme_override_constants/separation = 18
 
-[node name="Title" type="Label" parent="CenterContainer/Menu"]
+[node name="Title" type="Label" parent="CenterContainer/Menu" unique_id=1649196753]
 layout_mode = 2
+theme_override_font_sizes/font_size = 44
 text = "Count Down"
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 44
 
-[node name="Spacer" type="Control" parent="CenterContainer/Menu"]
+[node name="Spacer" type="Control" parent="CenterContainer/Menu" unique_id=1752969035]
 custom_minimum_size = Vector2(0, 18)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="StartGameButton" type="Button" parent="CenterContainer/Menu"]
+[node name="StartGameButton" type="Button" parent="CenterContainer/Menu" unique_id=542836846]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 text = "Start Game"
 
-[node name="QuitGameButton" type="Button" parent="CenterContainer/Menu"]
+[node name="SoundSettingsButton" type="Button" parent="CenterContainer/Menu" unique_id=1828790268]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+text = "Settings"
+
+[node name="QuitGameButton" type="Button" parent="CenterContainer/Menu" unique_id=1206835727]
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 text = "Quit Game"
 
+[node name="SoundMenu" type="VBoxContainer" parent="CenterContainer" unique_id=114705232]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="CenterContainer/SoundMenu" unique_id=922967206]
+layout_mode = 2
+theme_override_font_sizes/font_size = 38
+text = "Settings"
+horizontal_alignment = 1
+
+[node name="Description" type="Label" parent="CenterContainer/SoundMenu" unique_id=1668613225]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.68, 0.76, 0.8, 1)
+text = "Adjust music and game sound independently"
+horizontal_alignment = 1
+
+[node name="TopSeparator" type="HSeparator" parent="CenterContainer/SoundMenu" unique_id=1827834197]
+layout_mode = 2
+
+[node name="BgmHeader" type="HBoxContainer" parent="CenterContainer/SoundMenu" unique_id=2012329379]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Label" type="Label" parent="CenterContainer/SoundMenu/BgmHeader" unique_id=863322544]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 20
+text = "Background Music"
+
+[node name="BgmMute" type="CheckButton" parent="CenterContainer/SoundMenu/BgmHeader" unique_id=409210055]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Mute"
+
+[node name="BgmSliderRow" type="HBoxContainer" parent="CenterContainer/SoundMenu" unique_id=1027558447]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="BgmVolume" type="HSlider" parent="CenterContainer/SoundMenu/BgmSliderRow" unique_id=1324901336]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(320, 32)
+layout_mode = 2
+size_flags_horizontal = 3
+value = 100.0
+
+[node name="BgmPercent" type="Label" parent="CenterContainer/SoundMenu/BgmSliderRow" unique_id=524467782]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(58, 0)
+layout_mode = 2
+text = "100%"
+horizontal_alignment = 2
+
+[node name="SoundSpacer" type="Control" parent="CenterContainer/SoundMenu" unique_id=870939541]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="SfxHeader" type="HBoxContainer" parent="CenterContainer/SoundMenu" unique_id=1560637928]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Label" type="Label" parent="CenterContainer/SoundMenu/SfxHeader" unique_id=1311230836]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 20
+text = "Sound Effects"
+
+[node name="SfxMute" type="CheckButton" parent="CenterContainer/SoundMenu/SfxHeader" unique_id=1713678801]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Mute"
+
+[node name="SfxSliderRow" type="HBoxContainer" parent="CenterContainer/SoundMenu" unique_id=1434382597]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SfxVolume" type="HSlider" parent="CenterContainer/SoundMenu/SfxSliderRow" unique_id=476736126]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(320, 32)
+layout_mode = 2
+size_flags_horizontal = 3
+value = 100.0
+
+[node name="SfxPercent" type="Label" parent="CenterContainer/SoundMenu/SfxSliderRow" unique_id=609401478]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(58, 0)
+layout_mode = 2
+text = "100%"
+horizontal_alignment = 2
+
+[node name="BottomSeparator" type="HSeparator" parent="CenterContainer/SoundMenu" unique_id=1144309775]
+layout_mode = 2
+
+[node name="SoundBackButton" type="Button" parent="CenterContainer/SoundMenu" unique_id=2097455924]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+text = "Back"
+
 [connection signal="pressed" from="CenterContainer/Menu/StartGameButton" to="." method="_on_start_game_pressed"]
+[connection signal="pressed" from="CenterContainer/Menu/SoundSettingsButton" to="." method="_on_sound_settings_pressed"]
 [connection signal="pressed" from="CenterContainer/Menu/QuitGameButton" to="." method="_on_quit_game_pressed"]
+[connection signal="toggled" from="CenterContainer/SoundMenu/BgmHeader/BgmMute" to="." method="_on_bgm_mute_toggled"]
+[connection signal="value_changed" from="CenterContainer/SoundMenu/BgmSliderRow/BgmVolume" to="." method="_on_bgm_volume_changed"]
+[connection signal="toggled" from="CenterContainer/SoundMenu/SfxHeader/SfxMute" to="." method="_on_sfx_mute_toggled"]
+[connection signal="value_changed" from="CenterContainer/SoundMenu/SfxSliderRow/SfxVolume" to="." method="_on_sfx_volume_changed"]
+[connection signal="pressed" from="CenterContainer/SoundMenu/SoundBackButton" to="." method="_on_sound_back_pressed"]

@@ -6,6 +6,8 @@
 z_index = 20
 script = ExtResource("1_script")
 
+[node name="StrikeSfx" type="AudioStreamPlayer" parent="."]
+
 [node name="WarningLabel" type="Label" parent="."]
 offset_right = 136.0
 offset_bottom = 24.0

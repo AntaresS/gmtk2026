@@ -1,5 +1,9 @@
 extends Node2D
 
+const BackgroundMusicPlayerResource = preload(
+	"res://game/scripts/audio/background_music_player.gd"
+)
+
 ## Vertical camera lead in world pixels. Larger values show more road ahead and
 ## place the player lower on screen; smaller values move the player upward.
 @export var camera_forward_look_ahead: float = 180.0
@@ -23,6 +27,38 @@ extends Node2D
 	"res://game/scenes/menus/main_menu.tscn"
 )
 
+@export_category("Background Music")
+## Ordered looping tracks for 练气, 筑基, 金丹, and 元婴. Realm indexes beyond
+## the configured list reuse the last valid entry.
+@export var realm_bgm_tracks: Array[AudioStream] = [
+	preload("res://assets/sound/track/stage_1.wav"),
+	preload("res://assets/sound/track/stage_2.wav"),
+	preload("res://assets/sound/track/stage_3.wav"),
+	preload("res://assets/sound/track/stage_4.wav"),
+]
+## Looping track used only while a non-fatal Heavenly Tribulation is active.
+@export var heavenly_tribulation_bgm: AudioStream = preload(
+	"res://assets/sound/track/lei_jie.wav"
+)
+
+@export_category("Breakthrough Audio")
+## Non-looping celebration played only after a pending realm breakthrough is
+## successfully committed.
+@export var breakthrough_success_sfx: AudioStream = preload(
+	"res://assets/sound/sfx/dujie_success.mp3"
+)
+## Breakthrough-success loudness in decibels.
+@export_range(-40.0, 12.0, 0.5) var breakthrough_success_volume_db: float = -4.0
+## Breakthrough-success playback-speed and pitch multiplier.
+@export_range(0.25, 4.0, 0.05) var breakthrough_success_pitch_scale: float = 1.0
+## Audio bus used by the breakthrough-success cue. Missing bus names safely
+## fall back to Master.
+@export var breakthrough_success_bus: StringName = &"SFX"
+
+@onready var background_music: BackgroundMusicPlayerResource = $BackgroundMusic
+@onready var breakthrough_success_player: AudioStreamPlayer = (
+	$BreakthroughSuccessSfx
+)
 @onready var player: PlayerController = $Player
 @onready var camera: Camera2D = $Camera2D
 @onready var infinite_world: InfiniteWorld = $InfiniteWorld
@@ -59,6 +95,18 @@ func _ready() -> void:
 	_active_tribulation = null
 	_active_annihilation = null
 	_fatal_breakthrough_triggered = false
+	breakthrough_success_player.stream = breakthrough_success_sfx
+	breakthrough_success_player.volume_db = breakthrough_success_volume_db
+	breakthrough_success_player.pitch_scale = clampf(
+		breakthrough_success_pitch_scale,
+		0.25,
+		4.0
+	)
+	breakthrough_success_player.bus = (
+		breakthrough_success_bus
+		if AudioServer.get_bus_index(breakthrough_success_bus) >= 0
+		else &"Master"
+	)
 	_active_route_center_x = infinite_world.get_route_center_x()
 	_camera_route_center_x = _active_route_center_x
 	_camera_pan_start_x = _active_route_center_x
@@ -104,6 +152,7 @@ func _ready() -> void:
 	run_resources.cultivation_level_changed.connect(
 		enemy_spawner.set_cultivation_level
 	)
+	run_resources.realm_state_changed.connect(_on_realm_state_changed)
 	run_resources.breakthrough_requested.connect(_on_breakthrough_requested)
 	player.apply_cultivation_level(run_resources.cultivation_level)
 	enemy_spawner.set_cultivation_level(run_resources.cultivation_level)
@@ -114,6 +163,7 @@ func _ready() -> void:
 	camera.global_position = _get_camera_target()
 	camera.reset_smoothing()
 	debug_layer.visible = show_debug_ui
+	_play_realm_bgm(run_resources.get_current_realm_index(), true)
 
 
 func _physics_process(delta: float) -> void:
@@ -208,6 +258,25 @@ func _on_breakthrough_requested(
 		_try_start_next_tribulation()
 
 
+func _on_realm_state_changed(
+	realm_index: int,
+	_realm_name: String,
+	_layer: int,
+	_layer_count: int
+) -> void:
+	if is_instance_valid(_active_tribulation):
+		return
+	_play_realm_bgm(realm_index)
+
+
+func _play_realm_bgm(realm_index: int, immediate: bool = false) -> void:
+	if realm_bgm_tracks.is_empty():
+		background_music.play_track(null, immediate)
+		return
+	var track_index := clampi(realm_index, 0, realm_bgm_tracks.size() - 1)
+	background_music.play_track(realm_bgm_tracks[track_index], immediate)
+
+
 func _try_start_next_tribulation() -> void:
 	if (
 		_run_ended
@@ -234,6 +303,7 @@ func _try_start_next_tribulation() -> void:
 	tribulation.tribulation_completed.connect(
 		_on_heavenly_tribulation_completed
 	)
+	background_music.play_track(heavenly_tribulation_bgm)
 	tribulation.start(player, run_resources.max_lifespan)
 
 
@@ -241,6 +311,9 @@ func _on_heavenly_tribulation_completed() -> void:
 	_active_tribulation = null
 	if run_resources.complete_pending_breakthrough():
 		player.play_breakthrough_effect()
+		if breakthrough_success_player.stream != null:
+			breakthrough_success_player.play()
+	_play_realm_bgm(run_resources.get_current_realm_index())
 
 
 func _start_realm_annihilation() -> void:
@@ -297,6 +370,7 @@ func _finish_run(ascended: bool) -> void:
 	if is_instance_valid(_active_tribulation):
 		_active_tribulation.cancel()
 		_active_tribulation = null
+		_play_realm_bgm(run_resources.get_current_realm_index())
 	if is_instance_valid(_active_annihilation):
 		_active_annihilation.queue_free()
 		_active_annihilation = null

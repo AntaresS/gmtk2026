@@ -183,7 +183,7 @@ const DAO_MAX_ATTACK_TRAIL_COUNT: int = 24
 
 @export_category("Weapon SFX")
 ## Audio bus used by weapon cues. Missing bus names safely fall back to Master.
-@export var weapon_sfx_bus: StringName = &"Master"
+@export var weapon_sfx_bus: StringName = &"SFX"
 ## Player-wide loudness adjustment applied after each weapon cue's own volume.
 @export_range(-40.0, 12.0, 0.5) var weapon_sfx_volume_db: float = 0.0
 ## Maximum simultaneous weapon cues. When saturated, the oldest cue is reused

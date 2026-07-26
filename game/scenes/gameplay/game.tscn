@@ -1,6 +1,7 @@
-[gd_scene format=3 uid="uid://dt3cq5k4og56r"]
+[gd_scene load_steps=11 format=3 uid="uid://dt3cq5k4og56r"]
 
 [ext_resource type="Script" uid="uid://8y3eqgopjr0k" path="res://game/scripts/gameplay/game.gd" id="1_script"]
+[ext_resource type="Script" path="res://game/scripts/audio/background_music_player.gd" id="2_bgm_script"]
 [ext_resource type="PackedScene" path="res://game/scenes/gameplay/player.tscn" id="3_player"]
 [ext_resource type="Script" uid="uid://dh365sfe2c42s" path="res://game/scripts/gameplay/infinite_world.gd" id="4_world"]
 [ext_resource type="PackedScene" uid="uid://cs0urbmqtpj4t" path="res://game/scenes/menus/pause_menu.tscn" id="5_pause"]
@@ -13,6 +14,13 @@
 [node name="Game" type="Node2D" unique_id=666890130]
 script = ExtResource("1_script")
 camera_forward_look_ahead = 300.0
+
+[node name="BackgroundMusic" type="AudioStreamPlayer" parent="."]
+script = ExtResource("2_bgm_script")
+music_volume_db = -10.0
+transition_duration = 0.6
+
+[node name="BreakthroughSuccessSfx" type="AudioStreamPlayer" parent="."]
 
 [node name="RunResources" type="Node" parent="." unique_id=130728736]
 script = ExtResource("6_resources")
