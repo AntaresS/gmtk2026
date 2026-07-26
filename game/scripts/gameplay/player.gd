@@ -128,12 +128,9 @@ const FANTIAN_SEAL_SUMMON_DURATION: float = 0.18
 const FANTIAN_SEAL_ASCENT_DURATION: float = 0.48
 const FANTIAN_SEAL_SWITCH_SHADOW_DELAY: float = 0.3
 const FANTIAN_SEAL_SWITCH_SHADOW_DURATION: float = 0.3
-const FANTIAN_SEAL_RANGE_SHADOW_COLOR: Color = Color(
-	0.055,
-	0.09,
-	0.055,
-	0.20
-)
+const FANTIAN_SEAL_RANGE_FILL_COLOR := Color(0.055, 0.09, 0.055, 0.025)
+const FANTIAN_SEAL_RANGE_EDGE_COLOR := Color(0.38, 0.72, 0.48, 0.34)
+const FANTIAN_SEAL_SEQUENCE_WINDOW_RATIO: float = 0.7
 const DAO_WEAPON_SCALE: float = 0.045
 const DAO_WEAPON_TIP_OFFSET_PIXELS: float = 665.0
 const DAO_IDLE_ORBIT_SPEED: float = 0.9
@@ -441,6 +438,11 @@ var _special_sequence_launched: int = 0
 var _special_sequence_damage: int = 1
 var _special_sequence_is_critical: bool = false
 var _special_sequence_timer: float = 0.0
+var _special_sequence_interval: float = 0.01
+var _special_sequence_total: int = 0
+var _special_sequence_targets: Array[EnemyController] = []
+var _fantian_seal_volley_serial: int = 0
+var _active_fantian_seal_volley_id: int = -1
 var _cultivation_resources: RunResources
 var _global_combat_stats: PlayerGlobalCombatStatsResource = (
 	PlayerGlobalCombatStatsResource.new()
@@ -614,8 +616,14 @@ func _draw() -> void:
 				)
 				draw_rect(
 					attack_square,
-					FANTIAN_SEAL_RANGE_SHADOW_COLOR,
+					FANTIAN_SEAL_RANGE_FILL_COLOR,
 					true
+				)
+				draw_rect(
+					attack_square,
+					FANTIAN_SEAL_RANGE_EDGE_COLOR,
+					false,
+					2.0
 				)
 		else:
 			draw_circle(Vector2.ZERO, attack_range, Color(range_color, 0.035))
@@ -1872,7 +1880,10 @@ func _update_weapon_attack(delta: float) -> void:
 	else:
 		_begin_palm_cast(targets[0], attack_damage)
 
-	if attack_kind != WeaponDataResource.AttackKind.FLYING_SWORD:
+	if (
+		attack_kind != WeaponDataResource.AttackKind.FLYING_SWORD
+		and attack_kind != WeaponDataResource.AttackKind.FANTIAN_SEAL
+	):
 		_attack_cooldown_remaining = get_current_attack_interval()
 	queue_redraw()
 
@@ -2229,22 +2240,32 @@ func _begin_special_projectile_sequence(
 	attack_damage: AttackDamageResultResource
 ) -> void:
 	_special_sequence_kind = attack_kind
-	_pending_special_projectiles = get_current_delivery_count()
+	_special_sequence_total = get_current_delivery_count()
+	_pending_special_projectiles = _special_sequence_total
 	_special_sequence_launched = 0
 	_special_sequence_damage = maxi(attack_damage.damage, 1)
 	_special_sequence_is_critical = attack_damage.is_critical
 	_special_sequence_timer = 0.0
+	_special_sequence_targets = _get_attack_targets()
+	_special_sequence_interval = _resolve_special_sequence_interval(
+		attack_kind,
+		_special_sequence_total
+	)
+	if attack_kind == WeaponDataResource.AttackKind.FANTIAN_SEAL:
+		_fantian_seal_volley_serial += 1
+		_active_fantian_seal_volley_id = _fantian_seal_volley_serial
+	else:
+		_active_fantian_seal_volley_id = -1
 	_launch_next_special_projectile()
 
 
 func _launch_next_special_projectile() -> void:
 	if _pending_special_projectiles <= 0:
 		return
-	var targets := _get_attack_targets()
-	if targets.is_empty():
+	var target := _get_next_special_sequence_target()
+	if target == null:
 		_cancel_special_projectile_sequence()
 		return
-	var target := targets[_special_sequence_launched % targets.size()]
 	var weapon_data := _get_current_weapon_data()
 	if weapon_data.projectile_scene == null:
 		_cancel_special_projectile_sequence()
@@ -2278,7 +2299,8 @@ func _launch_next_special_projectile() -> void:
 				maxf(get_current_aoe_radius(), 48.0),
 				_special_sequence_is_critical,
 				global_position,
-				get_current_attack_range()
+				get_current_attack_range(),
+				_active_fantian_seal_volley_id
 			)
 			if get_parent().has_method("request_camera_shake"):
 				seal.impact_landed.connect(
@@ -2286,16 +2308,71 @@ func _launch_next_special_projectile() -> void:
 				)
 	_special_sequence_launched += 1
 	_pending_special_projectiles -= 1
-	_special_sequence_timer = maxf(
-		weapon_data.projectile_sequence_interval,
+	_special_sequence_timer = _special_sequence_interval
+	if (
+		_special_sequence_kind == WeaponDataResource.AttackKind.FANTIAN_SEAL
+		and _pending_special_projectiles <= 0
+	):
+		_attack_cooldown_remaining = get_current_attack_interval()
+
+
+## Resolves one readable duplicate-launch gap while ensuring a Fantian Seal
+## volley finishes inside 70% of its attack-speed-adjusted cooldown.
+func _resolve_special_sequence_interval(
+	attack_kind: int,
+	delivery_count: int
+) -> float:
+	var authored_interval := maxf(
+		_get_current_weapon_data().projectile_sequence_interval,
 		0.01
 	)
+	if (
+		attack_kind != WeaponDataResource.AttackKind.FANTIAN_SEAL
+		or delivery_count <= 1
+	):
+		return authored_interval
+	var available_window := (
+		get_current_attack_interval()
+		* FANTIAN_SEAL_SEQUENCE_WINDOW_RATIO
+	)
+	return maxf(
+		minf(
+			authored_interval,
+			available_window / float(delivery_count - 1)
+		),
+		0.01
+	)
+
+
+## Returns the next stable volley target. Duplicates advance through the
+## acquisition snapshot before wrapping, so they spread across distinct enemies
+## whenever enough valid targets remain.
+func _get_next_special_sequence_target() -> EnemyController:
+	if not _special_sequence_targets.is_empty():
+		var target_count := _special_sequence_targets.size()
+		for offset in target_count:
+			var target_index := (
+				_special_sequence_launched + offset
+			) % target_count
+			var candidate := _special_sequence_targets[target_index]
+			if is_instance_valid(candidate) and candidate.is_combat_active():
+				return candidate
+	var live_targets := _get_attack_targets()
+	if live_targets.is_empty():
+		return null
+	return live_targets[_special_sequence_launched % live_targets.size()]
+
+
 func _cancel_special_projectile_sequence() -> void:
 	_pending_special_projectiles = 0
 	_special_sequence_kind = -1
 	_special_sequence_launched = 0
 	_special_sequence_is_critical = false
 	_special_sequence_timer = 0.0
+	_special_sequence_interval = 0.01
+	_special_sequence_total = 0
+	_special_sequence_targets.clear()
+	_active_fantian_seal_volley_id = -1
 
 
 func _get_attack_targets() -> Array[EnemyController]:
@@ -4325,11 +4402,10 @@ func _rebuild_combat_stats() -> void:
 				- 1,
 			1
 		)
-		if weapon_data.attack_kind == WeaponDataResource.AttackKind.DAO:
-			delivery_count = mini(
-				delivery_count,
-				maxi(weapon_data.attack_range_level_cap, 1)
-			)
+		delivery_count = mini(
+			delivery_count,
+			maxi(weapon_data.delivery_count_cap, 1)
+		)
 		_current_weapon_combat_stats.delivery_count = delivery_count
 		var attack_speed_level := _universal_upgrade_levels[
 			UniversalUpgradeTypes.UpgradeType.ATTACK_SPEED
@@ -4352,7 +4428,8 @@ func _rebuild_combat_stats() -> void:
 		)
 		_current_weapon_combat_stats.attack_range *= range_multiplier
 		_current_weapon_combat_stats.secondary_targeting_range *= range_multiplier
-		_current_weapon_combat_stats.aoe_radius *= range_multiplier
+		if weapon_data.bonuses_scale_aoe_radius:
+			_current_weapon_combat_stats.aoe_radius *= range_multiplier
 		if (
 			(equipment["data"] as WeaponDataResource).attack_kind
 			== WeaponDataResource.AttackKind.GREAT_STRENGTH_PALM

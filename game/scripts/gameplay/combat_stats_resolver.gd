@@ -240,7 +240,7 @@ static func resolve_weapon(
 
 	var aoe_bonus := (
 		global_stats.aoe_radius_bonus
-		if global_stats != null
+		if global_stats != null and weapon_data.bonuses_scale_aoe_radius
 		else 0.0
 	)
 	snapshot.aoe_radius_bonus = aoe_bonus

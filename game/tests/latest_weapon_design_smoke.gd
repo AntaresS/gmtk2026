@@ -573,18 +573,59 @@ func _run() -> void:
 			node.queue_free()
 	await _wait_physics_frames(2)
 
-	player.collect_weapon(FANTIAN_SEAL_DATA, 18)
-	player.collect_weapon(FANTIAN_SEAL_DATA, 18)
+	player.collect_weapon(
+		FANTIAN_SEAL_DATA,
+		FANTIAN_SEAL_DATA.minimum_damage
+	)
+	player.collect_weapon(
+		FANTIAN_SEAL_DATA,
+		FANTIAN_SEAL_DATA.minimum_damage
+	)
 	_check(
 		player.select_weapon_slot(2),
 		"Fantian Seal could not be selected from weapon slot 3."
 	)
 	_check(
 		player.get_current_delivery_count() == 2
-		and is_equal_approx(FANTIAN_SEAL_DATA.attack_interval, 2.25)
-		and is_equal_approx(FANTIAN_SEAL_DATA.attack_range, 462.0)
-		and player.attack_shape.shape is RectangleShape2D,
-		"Fantian Seal count, doubled speed, or square 1.65x range is wrong."
+		and FANTIAN_SEAL_DATA.minimum_damage == 6
+		and FANTIAN_SEAL_DATA.delivery_count_cap == 10
+		and not FANTIAN_SEAL_DATA.bonuses_scale_aoe_radius
+		and is_equal_approx(FANTIAN_SEAL_DATA.attack_interval, 1.5)
+		and is_equal_approx(FANTIAN_SEAL_DATA.attack_range, 320.0)
+		and is_equal_approx(
+			FANTIAN_SEAL_DATA.projectile_sequence_interval,
+			0.35
+		)
+		and player.attack_shape.shape is RectangleShape2D
+		and (
+			player.attack_shape.shape as RectangleShape2D
+		).size.is_equal_approx(
+			Vector2.ONE * player.get_current_attack_range() * 2.0
+		),
+		"Fantian Seal damage, cadence, count, or square range is wrong."
+	)
+	var six_seal_gap_before_speed := float(
+		player.call(
+			"_resolve_special_sequence_interval",
+			WeaponData.AttackKind.FANTIAN_SEAL,
+			6
+		)
+	)
+	player.apply_universal_upgrade(
+		UniversalUpgradeTypes.UpgradeType.ATTACK_SPEED
+	)
+	var six_seal_gap_after_speed := float(
+		player.call(
+			"_resolve_special_sequence_interval",
+			WeaponData.AttackKind.FANTIAN_SEAL,
+			6
+		)
+	)
+	_check(
+		six_seal_gap_after_speed < six_seal_gap_before_speed
+		and six_seal_gap_after_speed * 5.0
+			<= player.get_current_attack_interval() * 0.7 + 0.001,
+		"Attack speed did not compress a high-level Fantian Seal volley."
 	)
 	var normal_target := _make_enemy(
 		player,
@@ -597,12 +638,17 @@ func _run() -> void:
 		100
 	)
 	elite_target.configure_elite(2.0, 1.2, 1.2)
+	var normal_health_before := normal_target.current_health
 	var elite_health_before := elite_target.current_health
 	await _wait_physics_frames(2)
 	player.call(
 		"_begin_special_projectile_sequence",
 		WeaponData.AttackKind.FANTIAN_SEAL,
-		AttackDamageResult.new(18, false)
+		AttackDamageResult.new(FANTIAN_SEAL_DATA.minimum_damage, false)
+	)
+	_check(
+		is_equal_approx(float(player.get("_special_sequence_interval")), 0.35),
+		"Fantian Seal Lv.2 did not use its readable 0.35s duplicate gap."
 	)
 	player.call("_launch_next_special_projectile")
 	var seal_count := 0
@@ -612,11 +658,11 @@ func _run() -> void:
 	await _wait_physics_frames(60)
 	_check(
 		seal_count == 2
-		and (
-			not is_instance_valid(normal_target)
-			or not normal_target.is_combat_active()
-		)
-		and elite_target.current_health == elite_health_before - 18,
+		and normal_target.is_combat_active()
+		and normal_target.current_health
+			== normal_health_before - FANTIAN_SEAL_DATA.minimum_damage
+		and elite_target.current_health
+			== elite_health_before - FANTIAN_SEAL_DATA.minimum_damage,
 		(
 			"Fantian Seal mismatch (seals=%d, normal_valid=%s, elite=%d/%d)."
 			% [
@@ -627,6 +673,99 @@ func _run() -> void:
 			]
 		)
 	)
+
+	var level_four_player := PLAYER_SCENE.instantiate() as PlayerController
+	root.add_child(level_four_player)
+	level_four_player.global_position = Vector2(9000.0, 9000.0)
+	level_four_player.set_movement_enabled(false)
+	for _level in 4:
+		level_four_player.collect_weapon(
+			FANTIAN_SEAL_DATA,
+			FANTIAN_SEAL_DATA.minimum_damage
+		)
+	_check(
+		level_four_player.select_weapon_slot(0)
+		and level_four_player.get_current_delivery_count() == 4,
+		"Fantian Seal Lv.4 could not be prepared for cooldown validation."
+	)
+	level_four_player.set("_attack_cooldown_remaining", 999.0)
+	var level_four_target := _make_enemy(
+		level_four_player,
+		level_four_player.global_position + Vector2(80.0, 0.0),
+		500
+	)
+	await _wait_physics_frames(2)
+	level_four_player.set("_attack_cooldown_remaining", 0.0)
+	level_four_player.call(
+		"_begin_special_projectile_sequence",
+		WeaponData.AttackKind.FANTIAN_SEAL,
+		AttackDamageResult.new(FANTIAN_SEAL_DATA.minimum_damage, false)
+	)
+	var cooldown_after_first_launch := float(
+		level_four_player.get("_attack_cooldown_remaining")
+	)
+	for _duplicate in 3:
+		level_four_player.call("_launch_next_special_projectile")
+	var level_four_gap := float(
+		level_four_player.get("_special_sequence_interval")
+	)
+	var cooldown_after_final_launch := float(
+		level_four_player.get("_attack_cooldown_remaining")
+	)
+	_check(
+		is_zero_approx(cooldown_after_first_launch)
+		and is_equal_approx(
+			cooldown_after_final_launch,
+			level_four_player.get_current_attack_interval()
+		)
+		and is_equal_approx(
+			level_four_gap * 3.0 + cooldown_after_final_launch,
+			2.55
+		),
+		"Fantian Seal Lv.4 cooldown overlapped its duplicate volley."
+	)
+	level_four_target.queue_free()
+	level_four_player.queue_free()
+
+	var capped_seal_player := PLAYER_SCENE.instantiate() as PlayerController
+	root.add_child(capped_seal_player)
+	capped_seal_player.set_movement_enabled(false)
+	for _level in 11:
+		capped_seal_player.collect_weapon(
+			FANTIAN_SEAL_DATA,
+			FANTIAN_SEAL_DATA.minimum_damage
+		)
+	_check(
+		capped_seal_player.select_weapon_slot(0),
+		"Fantian Seal could not be selected for cap validation."
+	)
+	var capped_seal_aoe := capped_seal_player.get_current_aoe_radius()
+	var capped_seal_range := capped_seal_player.get_current_attack_range()
+	capped_seal_player.apply_universal_upgrade(
+		UniversalUpgradeTypes.UpgradeType.DAMAGE_RANGE
+	)
+	_check(
+		capped_seal_player.get_current_delivery_count() == 10
+		and capped_seal_player.get_current_weapon_damage()
+			== roundi(
+				float(FANTIAN_SEAL_DATA.minimum_damage)
+				* (
+					1.0
+					+ FANTIAN_SEAL_DATA.damage_ratio_per_level_above_range_cap
+				)
+			)
+		and capped_seal_player.get_current_attack_range() > capped_seal_range
+		and is_equal_approx(
+			capped_seal_player.get_current_aoe_radius(),
+			capped_seal_aoe
+		)
+		and is_equal_approx(
+			capped_seal_aoe,
+			FANTIAN_SEAL_DATA.base_aoe_radius
+		),
+		"Fantian Seal post-cap damage or fixed footprint progression is wrong."
+	)
+	capped_seal_player.queue_free()
 
 	if _failures.is_empty():
 		print("LATEST WEAPON TEST: PASS")

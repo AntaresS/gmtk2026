@@ -107,16 +107,22 @@ func _run() -> void:
 	target.configure_elite(2.0, 1.0, 1.0)
 	root.add_child(target)
 	target.global_position = Vector2(180.0, 90.0)
+	var edge_target := ENEMY_SCENE.instantiate() as EnemyController
+	edge_target.player = player
+	edge_target.max_health = 100
+	edge_target.cruise_speed = 1.0
+	root.add_child(edge_target)
 	var seal := SEAL_SCENE.instantiate() as FantianSealProjectile
 	root.add_child(seal)
 	seal.global_position = target.global_position
 	seal.configure(
 		target,
-		18,
+		FANTIAN_SEAL_DATA.minimum_damage,
 		80.0,
 		false,
 		player.global_position,
-		FANTIAN_SEAL_DATA.attack_range
+		FANTIAN_SEAL_DATA.attack_range,
+		77
 	)
 	var attack_sprite := seal.seal_sprite
 	_check(
@@ -124,7 +130,8 @@ func _run() -> void:
 		and absf(attack_sprite.scale.x - 160.0 / 715.0) < 0.001
 		and attack_sprite.position.y < -270.0
 		and attack_sprite.modulate.a < 0.01
-		and seal.z_index > target.z_index,
+		and seal.z_index < target.z_index
+		and attack_sprite.z_index > target.z_index,
 		"Fantian Seal attack sprite did not match its damage region."
 	)
 	await _wait_physics_frames(2)
@@ -134,6 +141,8 @@ func _run() -> void:
 		seal.global_position.distance_to(target.global_position) < 1.0,
 		"Fantian Seal did not track its locked area before impact."
 	)
+	edge_target.global_position = target.global_position + Vector2(99.0, 0.0)
+	var edge_health_before := edge_target.current_health
 	await _wait_seconds(0.20)
 	_check(
 		not bool(seal.get("_impacted"))
@@ -158,10 +167,17 @@ func _run() -> void:
 		and target.is_combat_active()
 		and target.is_fantian_seal_immobilized()
 		and target.immobilized_status_label.visible
-		and target.immobilized_status_label.text.contains("定身")
+		and target.immobilized_status_label.text == "定"
+		and target.health_value_label.visible
+		and target.health_value_label.text
+			== "%d/%d" % [target.current_health, target.max_health]
+		and target.is_fantian_seal_root_vfx_active()
+		and edge_target.current_health
+			== edge_health_before - FANTIAN_SEAL_DATA.minimum_damage
 		and attack_sprite.position.is_zero_approx()
-		and attack_sprite.modulate.a > 0.99,
-		"Fantian Seal did not immobilize its surviving target with UI feedback."
+		and attack_sprite.modulate.a > 0.99
+		and attack_sprite.z_index < target.z_index,
+		"Fantian Seal damage overlap or root feedback was not readable."
 	)
 	target.global_position += Vector2(90.0, 40.0)
 	await _wait_physics_frames(2)
@@ -173,27 +189,56 @@ func _run() -> void:
 	await _wait_seconds(0.16)
 	_check(
 		target.is_fantian_seal_immobilized()
-		and target.immobilized_status_label.visible,
-		"Fantian Seal immobilization ended before 0.3s."
+		and target.is_fantian_seal_root_vfx_active()
+		and target.immobilized_status_label.visible
+		and target.health_value_label.visible
+		and not target.enemy_sprite.self_modulate.is_equal_approx(Color.WHITE),
+		"Fantian Seal root tint, glyph, rune, or health readout ended early."
 	)
 	await _wait_seconds(0.20)
 	_check(
+		target.health_value_label.visible
+		and (
+			not is_instance_valid(seal)
+			or attack_sprite.z_index < target.z_index
+		),
+		"Fantian Seal did not expose its surviving target after impact."
+	)
+	var first_volley_applied := target.apply_fantian_seal_immobilize(0.3, 91)
+	await _wait_seconds(0.10)
+	var root_before_duplicate := target.get_fantian_seal_immobilized_remaining()
+	var duplicate_refreshed := target.apply_fantian_seal_immobilize(0.3, 91)
+	var root_after_duplicate := target.get_fantian_seal_immobilized_remaining()
+	var next_volley_applied := target.apply_fantian_seal_immobilize(0.3, 92)
+	_check(
+		first_volley_applied
+		and not duplicate_refreshed
+		and root_after_duplicate <= root_before_duplicate + 0.01
+		and next_volley_applied
+		and target.get_fantian_seal_immobilized_remaining()
+			> root_after_duplicate,
+		"Fantian Seal duplicate roots refreshed within one volley."
+	)
+	await _wait_seconds(0.33)
+	_check(
 		not target.is_fantian_seal_immobilized()
-		and not target.immobilized_status_label.visible,
-		"Fantian Seal immobilization UI did not clear after 0.3s."
+		and not target.is_temporary_health_readout_visible()
+		and target.immobilized_status_label.visible
+		and target.is_fantian_seal_root_vfx_active(),
+		"Fantian Seal survivor health outlived its intended readout."
 	)
+	await _wait_seconds(0.20)
 	_check(
-		is_instance_valid(seal) and attack_sprite.modulate.a > 0.95,
-		"Landed Fantian Seal did not remain opaque for 0.5s."
-	)
-	await _wait_seconds(0.38)
-	_check(
-		not is_instance_valid(seal),
-		"Landed Fantian Seal did not fade out after its 0.5s hold."
+		not target.immobilized_status_label.visible
+		and not target.is_fantian_seal_root_vfx_active()
+		and not is_instance_valid(seal),
+		"Fantian Seal root release feedback did not finish cleanly."
 	)
 
 	if is_instance_valid(target):
 		target.queue_free()
+	if is_instance_valid(edge_target):
+		edge_target.queue_free()
 	player.queue_free()
 	await _wait_process_frames(2)
 	if _failures.is_empty():

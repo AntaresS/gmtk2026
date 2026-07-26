@@ -4,9 +4,12 @@
 [ext_resource type="Texture2D" path="res://assets/player_weapons/fantian_seal.png" id="2_seal"]
 
 [node name="FantianSealProjectile" type="Node2D"]
-z_index = 20
+z_index = 2
 script = ExtResource("1_script")
+landed_hold_duration = 0.08
+landed_fade_duration = 0.14
 
 [node name="SealSprite" type="Sprite2D" parent="."]
-z_index = 1
+z_as_relative = false
+z_index = 20
 texture = ExtResource("2_seal")

@@ -84,6 +84,9 @@ var cultivation_type: int = -1
 ## Base number of weapon copies delivered in one attack. Runtime duplicate
 ## pickups add to this value without mutating the shared weapon definition.
 @export_range(1, 100, 1) var base_delivery_count: int = 1
+## Maximum weapon copies delivered in one attack after duplicate pickups.
+## Definitions that do not need a practical cap may retain the default of 100.
+@export_range(1, 100, 1) var delivery_count_cap: int = 100
 ## Fixed extra enemy-to-enemy bounces made by each Universe Ring projectile.
 ## This is deliberately independent from duplicate-weapon delivery count.
 @export_range(0, 20, 1) var base_bounce_count: int = 0
@@ -96,6 +99,9 @@ var cultivation_type: int = -1
 ## Whether the player-wide AoE radius bonus also expands this weapon's primary
 ## attack/detection circle. Enable for area attacks such as Dao.
 @export var aoe_bonus_scales_attack_range: bool = false
+## Whether cultivation AoE bonuses and universal range fragments expand this
+## weapon's per-hit area. Disable for fixed-footprint attacks such as the Seal.
+@export var bonuses_scale_aoe_radius: bool = true
 
 @export_category("Weapon Level Progression")
 ## Flat attack-radius growth in world pixels for each duplicate level after

@@ -215,7 +215,7 @@ func _run() -> void:
 	var seal := SEAL_SCENE.instantiate() as FantianSealProjectile
 	root.add_child(seal)
 	seal.global_position = tracking_target.global_position
-	seal.configure(tracking_target, 18, 80.0)
+	seal.configure(tracking_target, 6, 80.0)
 	await _wait_physics_frames(2)
 	tracking_target.global_position += Vector2(85.0, 30.0)
 	await _wait_physics_frames(2)

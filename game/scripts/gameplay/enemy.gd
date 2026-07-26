@@ -89,6 +89,10 @@ const MELEE_WEAPON_DARK_OUTLINE: Color = Color("681018")
 const MELEE_WEAPON_BRIGHT_OUTLINE: Color = Color("ffb347")
 const DEATH_DISSOLVE_DURATION: float = 0.48
 const IMMOBILIZED_STATUS_PULSE_SPEED: float = 15.0
+const FANTIAN_ROOT_TINT: Color = Color("83dcff")
+const FANTIAN_ROOT_RUNE_COLOR: Color = Color("6ee7ff")
+const FANTIAN_ROOT_FLASH_DURATION: float = 0.14
+const FANTIAN_ROOT_RELEASE_DURATION: float = 0.18
 
 @onready var enemy_sprite: AnimatedSprite2D = $EnemySprite
 @onready var melee_weapon: Sprite2D = $MeleeWeapon
@@ -96,6 +100,7 @@ const IMMOBILIZED_STATUS_PULSE_SPEED: float = 15.0
 @onready var elite_label: Label = $EliteLabel
 @onready var attack_warning_label: Label = $AttackWarningLabel
 @onready var immobilized_status_label: Label = $ImmobilizedStatusLabel
+@onready var health_value_label: Label = $HealthValueLabel
 
 ## Player pursued and attacked by this enemy. EnemySpawner injects the active
 ## player when the enemy is created.
@@ -200,6 +205,10 @@ var _melee_weapon_outline_material: ShaderMaterial
 var _melee_weapon_trails: Array[Sprite2D] = []
 var _fantian_seal_immobilized_remaining: float = 0.0
 var _fantian_seal_immobilized_position: Vector2 = Vector2.ZERO
+var _fantian_seal_root_flash_remaining: float = 0.0
+var _fantian_seal_root_release_remaining: float = 0.0
+var _last_fantian_seal_root_volley_id: int = -1
+var _temporary_health_readout_remaining: float = 0.0
 
 
 func _ready() -> void:
@@ -210,6 +219,7 @@ func _ready() -> void:
 	_update_elite_identity()
 	attack_warning_label.hide()
 	immobilized_status_label.hide()
+	health_value_label.hide()
 	_melee_cooldown_remaining = _get_recovery_duration()
 	_autonomous_time_remaining = maxf(autonomous_turn_interval, 0.2)
 	_healing_time_remaining = maxf(healing_interval, 0.2)
@@ -229,6 +239,7 @@ func _physics_process(delta: float) -> void:
 		_autonomous_direction *= -1.0
 		_autonomous_time_remaining = maxf(autonomous_turn_interval, 0.2)
 	_update_fantian_seal_immobilization(delta)
+	_update_temporary_health_readout(delta)
 	if is_fantian_seal_immobilized():
 		velocity = Vector2.ZERO
 		_knockback_velocity = Vector2.ZERO
@@ -291,6 +302,7 @@ func _draw() -> void:
 	if not _combat_active:
 		return
 	_draw_threat_indicator()
+	_draw_fantian_seal_root_vfx()
 
 	var has_authored_sprite := is_instance_valid(enemy_sprite)
 	var body_color := _get_elite_identity_color() if is_elite else Color("d94b55")
@@ -306,6 +318,8 @@ func _draw() -> void:
 		)
 	if _hit_flash_remaining > 0.0:
 		body_color = Color("fff2a8")
+	elif is_fantian_seal_immobilized():
+		body_color = body_color.lerp(FANTIAN_ROOT_TINT, 0.3)
 	if is_flying and not has_authored_sprite:
 		var flap := 4.0 + sin(_indicator_time * 9.0) * 5.0
 		draw_colored_polygon(
@@ -786,6 +800,12 @@ func _update_sprite_feedback() -> void:
 				warning_flash
 			)
 			return
+	if is_fantian_seal_immobilized():
+		enemy_sprite.self_modulate = Color.WHITE.lerp(
+			FANTIAN_ROOT_TINT,
+			0.28
+		)
+		return
 	enemy_sprite.self_modulate = Color.WHITE
 
 
@@ -1078,6 +1098,7 @@ func _explode(_trigger_target: Node2D) -> void:
 				explosion_damage,
 				self
 			)
+	_clear_fantian_seal_root_state()
 	_combat_active = false
 	collision_layer = 0
 	collision_mask = 0
@@ -1445,18 +1466,34 @@ func get_knockback_velocity() -> Vector2:
 
 
 ## Anchors a surviving enemy to one absolute world position. The effect only
-## blocks movement; attacks and archetype abilities continue updating.
-func apply_fantian_seal_immobilize(duration: float = 0.3) -> void:
+## blocks movement; attacks and archetype abilities continue updating. A
+## non-negative volley ID may apply the root only once, preventing duplicate
+## seals from refreshing the same enemy until the next volley.
+func apply_fantian_seal_immobilize(
+	duration: float = 0.3,
+	volley_id: int = -1
+) -> bool:
 	if not _combat_active or duration <= 0.0:
-		return
+		return false
+	if (
+		volley_id >= 0
+		and volley_id == _last_fantian_seal_root_volley_id
+	):
+		return false
+	if volley_id >= 0:
+		_last_fantian_seal_root_volley_id = volley_id
 	_fantian_seal_immobilized_remaining = maxf(
 		_fantian_seal_immobilized_remaining,
 		duration
 	)
 	_fantian_seal_immobilized_position = global_position
+	_fantian_seal_root_flash_remaining = FANTIAN_ROOT_FLASH_DURATION
+	_fantian_seal_root_release_remaining = 0.0
 	_knockback_velocity = Vector2.ZERO
 	velocity = Vector2.ZERO
 	_update_fantian_seal_immobilized_status()
+	queue_redraw()
+	return true
 
 
 func is_fantian_seal_immobilized() -> bool:
@@ -1470,40 +1507,222 @@ func get_fantian_seal_immobilized_remaining() -> float:
 	return _fantian_seal_immobilized_remaining
 
 
+## Returns whether the anchored rune, application glyph, or release fracture is
+## currently visible for focused gameplay and presentation validation.
+func is_fantian_seal_root_vfx_active() -> bool:
+	return (
+		is_fantian_seal_immobilized()
+		or _fantian_seal_root_flash_remaining > 0.0
+		or _fantian_seal_root_release_remaining > 0.0
+	)
+
+
+func _clear_fantian_seal_root_state() -> void:
+	_fantian_seal_immobilized_remaining = 0.0
+	_fantian_seal_root_flash_remaining = 0.0
+	_fantian_seal_root_release_remaining = 0.0
+	_last_fantian_seal_root_volley_id = -1
+	if is_instance_valid(immobilized_status_label):
+		immobilized_status_label.hide()
+		immobilized_status_label.scale = Vector2.ONE
+		immobilized_status_label.modulate = Color.WHITE
+	_temporary_health_readout_remaining = 0.0
+	if is_instance_valid(health_value_label):
+		health_value_label.hide()
+
+
 func _update_fantian_seal_immobilization(delta: float) -> void:
-	if _fantian_seal_immobilized_remaining <= 0.0:
-		return
-	_fantian_seal_immobilized_remaining = maxf(
-		_fantian_seal_immobilized_remaining - delta,
+	var was_immobilized := _fantian_seal_immobilized_remaining > 0.0
+	if was_immobilized:
+		_fantian_seal_immobilized_remaining = maxf(
+			_fantian_seal_immobilized_remaining - delta,
+			0.0
+		)
+	_fantian_seal_root_flash_remaining = maxf(
+		_fantian_seal_root_flash_remaining - delta,
 		0.0
 	)
+	if (
+		was_immobilized
+		and _fantian_seal_immobilized_remaining <= 0.0
+	):
+		_fantian_seal_root_release_remaining = FANTIAN_ROOT_RELEASE_DURATION
+	elif _fantian_seal_root_release_remaining > 0.0:
+		_fantian_seal_root_release_remaining = maxf(
+			_fantian_seal_root_release_remaining - delta,
+			0.0
+		)
 	_update_fantian_seal_immobilized_status()
+	if (
+		was_immobilized
+		or _fantian_seal_root_flash_remaining > 0.0
+		or _fantian_seal_root_release_remaining > 0.0
+	):
+		queue_redraw()
 
 
 func _update_fantian_seal_immobilized_status() -> void:
 	if not is_instance_valid(immobilized_status_label):
 		return
-	var is_active := is_fantian_seal_immobilized()
-	immobilized_status_label.visible = is_active
-	if not is_active:
-		immobilized_status_label.scale = Vector2.ONE
-		return
-	immobilized_status_label.text = "定身 %.1fs" % (
-		ceilf(_fantian_seal_immobilized_remaining * 10.0) / 10.0
+	var active := is_fantian_seal_immobilized()
+	var releasing := (
+		not active
+		and _fantian_seal_root_release_remaining > 0.0
 	)
-	var pulse := (
-		0.5
-		+ 0.5
-			* sin(
-				_fantian_seal_immobilized_remaining
-					* IMMOBILIZED_STATUS_PULSE_SPEED
-			)
+	immobilized_status_label.visible = active or releasing
+	if not immobilized_status_label.visible:
+		immobilized_status_label.scale = Vector2.ONE
+		immobilized_status_label.modulate = Color.WHITE
+		return
+	immobilized_status_label.text = "定"
+	if active:
+		var flash_progress := 1.0 - clampf(
+			_fantian_seal_root_flash_remaining / FANTIAN_ROOT_FLASH_DURATION,
+			0.0,
+			1.0
+		)
+		immobilized_status_label.scale = Vector2.ONE * lerpf(
+			1.28,
+			1.0,
+			flash_progress
+		)
+		immobilized_status_label.modulate = Color.WHITE
+		return
+	var release_alpha := clampf(
+		_fantian_seal_root_release_remaining / FANTIAN_ROOT_RELEASE_DURATION,
+		0.0,
+		1.0
 	)
 	immobilized_status_label.scale = Vector2.ONE * lerpf(
-		0.96,
-		1.04,
-		pulse
+		1.22,
+		1.0,
+		release_alpha
 	)
+	immobilized_status_label.modulate = Color(
+		1.0,
+		1.0,
+		1.0,
+		release_alpha
+	)
+
+
+## Shows exact survivor health briefly after a Fantian Seal hit. The readout
+## remains visible throughout the root and stays above weapon presentation.
+func show_temporary_health_readout(duration: float = 0.75) -> void:
+	if not _combat_active or duration <= 0.0:
+		return
+	_temporary_health_readout_remaining = maxf(
+		_temporary_health_readout_remaining,
+		duration
+	)
+	_update_temporary_health_readout(0.0)
+
+
+func is_temporary_health_readout_visible() -> bool:
+	return (
+		is_instance_valid(health_value_label)
+		and health_value_label.visible
+	)
+
+
+func _update_temporary_health_readout(delta: float) -> void:
+	_temporary_health_readout_remaining = maxf(
+		_temporary_health_readout_remaining - delta,
+		0.0
+	)
+	if not is_instance_valid(health_value_label):
+		return
+	health_value_label.visible = (
+		_combat_active
+		and (
+			_temporary_health_readout_remaining > 0.0
+			or is_fantian_seal_immobilized()
+		)
+	)
+	if not health_value_label.visible:
+		return
+	health_value_label.text = "%d/%d" % [
+		current_health,
+		maxi(max_health, 1),
+	]
+
+
+func _draw_fantian_seal_root_vfx() -> void:
+	if not is_fantian_seal_root_vfx_active():
+		return
+	var active := is_fantian_seal_immobilized()
+	var alpha := 1.0
+	var release_progress := 0.0
+	if not active:
+		alpha = clampf(
+			_fantian_seal_root_release_remaining
+				/ FANTIAN_ROOT_RELEASE_DURATION,
+			0.0,
+			1.0
+		)
+		release_progress = 1.0 - alpha
+	var pulse := 0.5 + 0.5 * sin(_indicator_time * IMMOBILIZED_STATUS_PULSE_SPEED)
+	var center := Vector2(0.0, 28.0)
+	var half_size := Vector2(
+		26.0 + release_progress * 10.0,
+		10.0 + release_progress * 4.0
+	)
+	var corners := PackedVector2Array([
+		center + Vector2(-half_size.x, 0.0),
+		center + Vector2(0.0, -half_size.y),
+		center + Vector2(half_size.x, 0.0),
+		center + Vector2(0.0, half_size.y),
+		center + Vector2(-half_size.x, 0.0),
+	])
+	draw_colored_polygon(
+		PackedVector2Array([
+			corners[0],
+			corners[1],
+			corners[2],
+			corners[3],
+		]),
+		Color(FANTIAN_ROOT_RUNE_COLOR, alpha * (0.07 + pulse * 0.04))
+	)
+	draw_polyline(
+		corners,
+		Color(FANTIAN_ROOT_RUNE_COLOR, alpha * (0.72 + pulse * 0.2)),
+		3.0,
+		true
+	)
+	var bracket_length := 8.0
+	for corner_index in 4:
+		var corner := corners[corner_index]
+		var next_corner := corners[(corner_index + 1) % 4]
+		var previous_corner := corners[(corner_index + 3) % 4]
+		draw_line(
+			corner,
+			corner.move_toward(next_corner, bracket_length),
+			Color(0.82, 0.98, 1.0, alpha),
+			4.0,
+			true
+		)
+		draw_line(
+			corner,
+			corner.move_toward(previous_corner, bracket_length),
+			Color(0.82, 0.98, 1.0, alpha),
+			4.0,
+			true
+		)
+	if active:
+		draw_line(
+			center + Vector2(-13.0, -5.0),
+			Vector2(-8.0, -15.0),
+			Color(FANTIAN_ROOT_RUNE_COLOR, 0.46 + pulse * 0.18),
+			2.0,
+			true
+		)
+		draw_line(
+			center + Vector2(13.0, -5.0),
+			Vector2(8.0, -15.0),
+			Color(FANTIAN_ROOT_RUNE_COLOR, 0.46 + pulse * 0.18),
+			2.0,
+			true
+		)
 
 
 ## Applies player damage exactly once per hit and removes the enemy after its
@@ -1522,8 +1741,7 @@ func take_melee_damage(amount: int, is_critical: bool = false) -> void:
 	var defeat_position := global_position
 	var defeat_velocity := velocity
 	_combat_active = false
-	_fantian_seal_immobilized_remaining = 0.0
-	immobilized_status_label.hide()
+	_clear_fantian_seal_root_state()
 	collision_layer = 0
 	collision_mask = 0
 	defeated.emit(defeat_position, defeat_velocity)
@@ -1557,14 +1775,13 @@ func set_combat_enabled(enabled: bool) -> void:
 	_combat_active = enabled and current_health > 0
 	if not _combat_active:
 		velocity = Vector2.ZERO
-		_fantian_seal_immobilized_remaining = 0.0
+		_clear_fantian_seal_root_state()
 		_is_attack_winding_up = false
 		_attack_windup_remaining = 0.0
 		_melee_weapon_visibility = 0.0
 		_melee_weapon_return_remaining = 0.0
 		if is_node_ready():
 			attack_warning_label.hide()
-			immobilized_status_label.hide()
 			melee_weapon.hide()
 			_hide_melee_weapon_trails()
 			_set_melee_weapon_outline(Color.TRANSPARENT)
