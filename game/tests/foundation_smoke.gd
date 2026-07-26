@@ -51,8 +51,8 @@ func _run() -> void:
 	_check(
 		menu_bgm_source != null
 		and menu_bgm_source.resource_path
-			== "res://assets/sound/track/stage_1.wav"
-		and menu_bgm.stream is AudioStreamWAV
+			== "res://assets/sound/track/stage_1.ogg"
+		and menu_bgm.stream is AudioStreamOggVorbis
 		and bool(menu_bgm.get("loop_tracks"))
 		and menu_bgm.playing,
 		"Main menu did not start looping stage_1 music."
@@ -112,13 +112,13 @@ func _run() -> void:
 	var realm_bgm_tracks := game.get("realm_bgm_tracks") as Array[AudioStream]
 	_check(
 		realm_bgm_tracks.size() == 4
-		and realm_bgm_tracks[0].resource_path.ends_with("stage_1.wav")
-		and realm_bgm_tracks[1].resource_path.ends_with("stage_2.wav")
-		and realm_bgm_tracks[2].resource_path.ends_with("stage_3.wav")
-		and realm_bgm_tracks[3].resource_path.ends_with("stage_4.wav")
+		and realm_bgm_tracks[0].resource_path.ends_with("stage_1.ogg")
+		and realm_bgm_tracks[1].resource_path.ends_with("stage_2.ogg")
+		and realm_bgm_tracks[2].resource_path.ends_with("stage_3.ogg")
+		and realm_bgm_tracks[3].resource_path.ends_with("stage_4.ogg")
 		and (
 			game.get("heavenly_tribulation_bgm") as AudioStream
-		).resource_path.ends_with("lei_jie.wav"),
+		).resource_path.ends_with("lei_jie.ogg"),
 		"Gameplay BGM tracks do not match the four realms and tribulation."
 	)
 	_check(
@@ -144,7 +144,7 @@ func _run() -> void:
 		var active_source := game_bgm.call("get_source_stream") as AudioStream
 		_check(
 			active_source == realm_bgm_tracks[realm_index]
-			and game_bgm.stream is AudioStreamWAV
+			and game_bgm.stream is AudioStreamOggVorbis
 			and bool(game_bgm.get("loop_tracks"))
 			and game_bgm.playing,
 			"Realm %d did not select its looping BGM." % realm_index

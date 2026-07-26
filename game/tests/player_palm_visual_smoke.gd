@@ -8,7 +8,7 @@ const PALM_TEXTURE := preload(
 const AttackDamageResultResource := preload(
 	"res://game/scripts/gameplay/attack_damage_result.gd"
 )
-const PALM_CENTER_OFFSET_PIXELS: float = 88.0
+const PALM_CENTER_OFFSET_PIXELS: float = 10.448311
 
 var _failures: Array[String] = []
 
@@ -52,7 +52,7 @@ func _run() -> void:
 		and player.get_palm_visual_state() == 3
 		and player.get_visible_palm_sprite_count() == 1
 		and not player.is_palm_debug_geometry_visible()
-		and absf(palm.scale.x - 0.035) < 0.001
+		and absf(palm.scale.x - 0.294784) < 0.001
 		and absf(palm.position.length() - 68.0) < 1.0,
 		"Equipping Great Strength Palm did not show its floating aim indicator."
 	)
@@ -77,7 +77,7 @@ func _run() -> void:
 		player.get_palm_warning_strength() > 0.65
 		and palm.visible
 		and palm.position.length() < 42.0
-		and palm.scale.x < 0.035
+		and palm.scale.x < 0.294784
 		and palm.modulate.r > 1.15
 		and warning_outline.a > 0.65
 		and palm.position.normalized().dot(Vector2.RIGHT) > 0.95
@@ -113,7 +113,7 @@ func _run() -> void:
 		palm.position
 		+ Vector2.DOWN.rotated(PI * 0.5)
 			* PALM_CENTER_OFFSET_PIXELS
-			* 0.105
+			* 0.884353
 	)
 	var dissolve_material := palm.material as ShaderMaterial
 	_check(

@@ -14,6 +14,10 @@ const SILENT_VOLUME_DB: float = -80.0
 @onready var main_menu_panel: VBoxContainer = $CenterContainer/Menu
 @onready var sound_settings_button: Button = %SoundSettingsButton
 @onready var sound_menu: VBoxContainer = %SoundMenu
+@onready var sound_title: Label = $CenterContainer/SoundMenu/Title
+@onready var sound_description: Label = $CenterContainer/SoundMenu/Description
+@onready var bgm_label: Label = $CenterContainer/SoundMenu/BgmHeader/Label
+@onready var sfx_label: Label = $CenterContainer/SoundMenu/SfxHeader/Label
 @onready var bgm_mute: CheckButton = %BgmMute
 @onready var bgm_volume: HSlider = %BgmVolume
 @onready var bgm_percent: Label = %BgmPercent
@@ -173,7 +177,7 @@ func _set_bus_volume_percent(
 
 
 func _update_mute_text(button: CheckButton, muted: bool) -> void:
-	button.text = "Muted" if muted else "Mute"
+	button.text = LanguageManager.text("muted" if muted else "mute")
 
 
 func _update_percent_label(label: Label, value: float) -> void:
@@ -218,12 +222,32 @@ func _on_info_overlay_closed() -> void:
 
 func _refresh_language() -> void:
 	title_label.text = LanguageManager.text("main_title")
-	start_button.text = LanguageManager.text("start_game")
-	quick_start_button.text = LanguageManager.text("quick_start")
-	gallery_button.text = LanguageManager.text("weapon_gallery")
-	leaderboard_button.text = LanguageManager.text("leaderboard")
-	quit_button.text = LanguageManager.text("quit_game")
-	language_label.text = LanguageManager.text("language")
+	start_button.text = "01  //  %s" % LanguageManager.text(
+		"start_game"
+	).to_upper()
+	quick_start_button.text = "02  //  %s" % LanguageManager.text(
+		"quick_start"
+	).to_upper()
+	gallery_button.text = "03  //  %s" % LanguageManager.text(
+		"weapon_gallery"
+	).to_upper()
+	leaderboard_button.text = "04  //  %s" % LanguageManager.text(
+		"leaderboard"
+	).to_upper()
+	sound_settings_button.text = "05  //  %s" % LanguageManager.text(
+		"settings"
+	).to_upper()
+	quit_button.text = "06  //  %s" % LanguageManager.text(
+		"quit_game"
+	).to_upper()
+	language_label.text = LanguageManager.text("language").to_upper()
+	sound_title.text = LanguageManager.text("settings")
+	sound_description.text = LanguageManager.text("audio_settings_hint")
+	bgm_label.text = LanguageManager.text("background_music")
+	sfx_label.text = LanguageManager.text("sound_effects")
+	_update_mute_text(bgm_mute, bgm_mute.button_pressed)
+	_update_mute_text(sfx_mute, sfx_mute.button_pressed)
+	sound_back_button.text = "ESC   %s" % LanguageManager.text("back").to_upper()
 	_syncing_language_option = true
 	language_option.select(LanguageManager.get_locale_index())
 	_syncing_language_option = false

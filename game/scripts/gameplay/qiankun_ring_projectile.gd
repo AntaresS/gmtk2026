@@ -7,8 +7,8 @@ signal enemy_hit(enemy: EnemyController)
 const TRAIL_MAXIMUM_POINTS: int = 10
 const TRAIL_SAMPLE_DISTANCE: float = 18.0
 const HIT_AFTERIMAGE_DURATION: float = 0.2
-const HIT_AFTERIMAGE_START_SCALE: float = 0.043
-const HIT_AFTERIMAGE_END_SCALE: float = 0.11
+const HIT_AFTERIMAGE_START_SCALE: float = 0.389664
+const HIT_AFTERIMAGE_END_SCALE: float = 0.996814
 
 ## Outbound and bounce travel speed in world pixels per second.
 @export var travel_speed: float = 760.0

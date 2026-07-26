@@ -12,6 +12,36 @@ const TEXTS: Dictionary = {
 		"quick_start": "快速入门",
 		"weapon_gallery": "武器画廊",
 		"leaderboard": "轮回排行",
+		"quick_start_kicker": "行动简报",
+		"weapon_gallery_kicker": "兵装资料库",
+		"leaderboard_kicker": "轮回档案",
+		"quick_start_hint": "掌握移动、战斗与修炼循环，做好对抗天道的准备。",
+		"quick_objective_title": "核心目标",
+		"quick_objective_body": "角色会自动向前飞行，寿元也会持续流失。\n躲避敌人、收集灵气，并在寿元归零前提升境界。",
+		"quick_controls_title": "移动与操作",
+		"quick_controls_body": "[color=#a5b4fc][b]A / D · ← / →[/b][/color]  横向移动\n[color=#a5b4fc][b]W / S · ↑ / ↓[/b][/color]  加速或减速\n[color=#a5b4fc][b]Space[/b][/color]  境界能力\n[color=#a5b4fc][b]Tab[/b][/color]  战斗详情\n[color=#a5b4fc][b]1–6 / Q[/b][/color]  切换装备",
+		"quick_combat_title": "战斗与战利品",
+		"quick_combat_body": "武器会自动索敌攻击。保持移动，避免被敌人包围。\n击败金色精英可获得武器与强化碎片；留在同步区域内即可吸收掉落。",
+		"quick_growth_title": "修炼成长",
+		"quick_growth_body": "灵气条充满后提升一层境界，并恢复部分寿元。\n重复武器会强化独特机制；能力碎片则对全局生效。",
+		"quick_tribulation_title": "突破与雷劫",
+		"quick_tribulation_body": "突破大境界会触发天劫。观察地面预警并避开落雷；成功渡劫可提高寿元上限。",
+		"quick_routes_title": "路线选择",
+		"quick_routes_body": "岔路会改变后续路线。试炼地狱拥有更密集、更强的敌人；状态不佳时应选择普通路线。",
+		"gallery_archive_label": "战斗资料库",
+		"leaderboard_hint": "本地保存的最佳轮回记录，按生存时间排序。",
+		"leaderboard_record_count": "%d 条轮回记录",
+		"leaderboard_rank": "排名",
+		"leaderboard_cycle": "轮回",
+		"leaderboard_survival": "生存时间",
+		"leaderboard_damage": "总伤害",
+		"leaderboard_top_weapon": "最高输出兵装",
+		"settings": "设置",
+		"audio_settings_hint": "分别调整音乐与游戏音效。",
+		"background_music": "背景音乐",
+		"sound_effects": "游戏音效",
+		"mute": "静音",
+		"muted": "已静音",
 		"quit_game": "退出游戏",
 		"language": "语言",
 		"chinese": "中文",
@@ -29,6 +59,11 @@ const TEXTS: Dictionary = {
 		"fatal_world_unstable": "此世界尚不稳定。你被懵懂的世界意志（天道）强行压制，请等下次轮回、天道完整之后，再来对抗天道。",
 		"ordinary_run_ended": "本次轮回已经结束。",
 		"run_summary": "本次游玩总结",
+		"result_duration": "生存时间",
+		"result_damage": "总伤害",
+		"result_enemies": "击败敌人",
+		"result_loadout": "最终武器等级",
+		"result_damage_breakdown": "武器输出",
 		"survival_duration": "抵抗天道时长",
 		"weapon_levels": "武器等级",
 		"total_damage_dealt": "造成总伤害",
@@ -51,6 +86,12 @@ const TEXTS: Dictionary = {
 		"not_obtained": "尚未获得",
 		"character_details": "角色详情",
 		"release_tab_to_close": "松开 Tab 关闭",
+		"detail_shortcut_hint": "按住 Tab 查看具体信息",
+		"detail_current_damage": "当前伤害",
+		"detail_movement_speed": "移动速度",
+		"detail_attack_range": "攻击范围",
+		"detail_upgrade_levels": "强化等级",
+		"start_survival_prompt": "快跑，挺住攻击活下去！",
 		"complete_weapon_data": "完整武器数据（1–6 / Q 选择）",
 		"danger_lifespan": "⚠  寿元危急  ⚠",
 		"lifespan_format": "寿元  %.1fs / %.1fs",
@@ -65,7 +106,17 @@ const TEXTS: Dictionary = {
 		"realm_筑基": "筑基",
 		"realm_金丹": "金丹",
 		"realm_元婴": "元婴",
-		"gallery_hint": "选择武器查看真实基础属性与战斗特性",
+		"gallery_hint": "选择武器或能力碎片，查看完整战斗数据与成长效果。",
+		"fragment_gallery_label": "能力碎片",
+		"fragment_meta": "本轮全局能力强化",
+		"fragment_effect_profile": "能力效果",
+		"fragment_acquisition": "获取方式",
+		"fragment_acquisition_body": "击败强化精英后会出现两枚能力碎片供你选择。进入其中一枚的同步区域并持续停留即可吸收；效果可在本次轮回中叠加。",
+		"fragment_effect_attack_speed": "缩短所有武器的攻击间隔，让自动攻击循环更快。",
+		"fragment_effect_damage": "为常规武器增加固定伤害；乾坤圈则改为增加一次额外弹射。",
+		"fragment_effect_mobility": "提高横向移动速度与纵向加速度，让走位和变速更加灵活。",
+		"fragment_effect_range": "按比例扩大所有适用武器的攻击范围与伤害区域。",
+		"fragment_effect_speed_control": "提高加速状态的目标速度，并降低减速状态的目标速度，使节奏控制更强。",
 		"weapon_stats": "基础属性",
 		"damage": "伤害",
 		"range": "范围",
@@ -204,33 +255,39 @@ const TEXTS: Dictionary = {
 		"debug_lateral_speed": "横向速度 ",
 		"debug_acceleration": "纵向加速度 ",
 		"debug_apply_stats": "应用基础数值",
-		"instructions_body": """[font_size=28][color=#a6ffdb][b]核心目标[/b][/color][/font_size]
+		"instructions_body": """[font_size=14][color=#5f8798]01  //  核心循环[/color][/font_size]
+[font_size=27][color=#7edce3][b]核心目标[/b][/color][/font_size]
 你会自动向前飞行，寿元也会持续流逝。避开敌人、收集灵气并提升境界，在寿元耗尽前尽可能变强。
 
-[font_size=28][color=#a6ffdb][b]基本操作[/b][/color][/font_size]
-[b]A / D 或 ← / →[/b]：左右移动
-[b]W / ↑[/b]：加速前进
-[b]S / ↓[/b]：减速
-[b]Space[/b]：使用当前境界能力
-[b]按住 Tab[/b]：查看角色、碎片与武器详情
-[b]1–6 / Q[/b]：选择装备
-[b]Esc[/b]：暂停游戏
+[font_size=14][color=#5f8798]02  //  输入配置[/color][/font_size]
+[font_size=27][color=#7edce3][b]基本操作[/b][/color][/font_size]
+[color=#f0d68e][b]A / D 或 ← / →[/b][/color]    左右移动
+[color=#f0d68e][b]W / ↑[/b][/color]    加速前进
+[color=#f0d68e][b]S / ↓[/b][/color]    减速
+[color=#f0d68e][b]Space[/b][/color]    使用当前境界能力
+[color=#f0d68e][b]按住 Tab[/b][/color]    查看核心战斗数据与碎片等级
+[color=#f0d68e][b]1–6 / Q[/b][/color]    选择装备
+[color=#f0d68e][b]Esc[/b][/color]    暂停游戏
 
-[font_size=28][color=#a6ffdb][b]战斗机制[/b][/color][/font_size]
+[font_size=14][color=#5f8798]03  //  交战协议[/color][/font_size]
+[font_size=27][color=#7edce3][b]战斗机制[/b][/color][/font_size]
 • 武器会自动寻找敌人并攻击；取得武器后，用数字键切换当前装备。
 • 敌人碰撞或攻击会直接扣除寿元。保持移动，别让敌群包围你。
 • 击败金色精英可获得武器与强化碎片。
 • 掉落物会随你移动；进入同步圈并停留至进度完成即可吸收，提前离开会重置进度。
 
-[font_size=28][color=#a6ffdb][b]修炼与成长[/b][/color][/font_size]
+[font_size=14][color=#5f8798]04  //  成长系统[/color][/font_size]
+[font_size=27][color=#7edce3][b]修炼与成长[/b][/color][/font_size]
 • 收集灵气填满进度条可提升小境界，每次升级都会恢复部分寿元。
 • 重复获得同种武器会强化其独特机制；详细效果可在“武器画廊”查看。
 • 强化碎片会为武器提供额外的通用成长。
 
-[font_size=28][color=#ffdf8f][b]突破与天劫[/b][/color][/font_size]
+[font_size=14][color=#8f805b]05  //  高风险事件[/color][/font_size]
+[font_size=27][color=#f0d68e][b]突破与天劫[/b][/color][/font_size]
 跨越大境界时会触发天劫。留意地面的预警区域并及时躲避；撑过全部雷击后，寿元上限会提高。
 
-[font_size=28][color=#ff9e8f][b]道路选择[/b][/color][/font_size]
+[font_size=14][color=#9b665f]06  //  路线决策[/color][/font_size]
+[font_size=27][color=#e99c8d][b]道路选择[/b][/color][/font_size]
 道路分岔会改变后续路线。“试炼地狱”中的敌人更强、更多、攻击更频繁。状态不好时，选择普通道路更稳妥。""",
 		"weapon_great_strength_palm": "大力掌",
 		"weapon_dao": "旋转刀",
@@ -260,6 +317,36 @@ const TEXTS: Dictionary = {
 		"quick_start": "Quick Start",
 		"weapon_gallery": "Weapon Gallery",
 		"leaderboard": "Cycle Leaderboard",
+		"quick_start_kicker": "FIELD BRIEFING",
+		"weapon_gallery_kicker": "ARSENAL DATABASE",
+		"leaderboard_kicker": "CYCLE ARCHIVE",
+		"quick_start_hint": "Master movement, combat, and cultivation before defying the Heavenly Dao.",
+		"quick_objective_title": "Core Objective",
+		"quick_objective_body": "You fly forward automatically while your lifespan steadily drains.\nEvade enemies, gather Spiritual Qi, and cultivate before time runs out.",
+		"quick_controls_title": "Movement & Input",
+		"quick_controls_body": "[color=#a5b4fc][b]A / D · ← / →[/b][/color]  Move sideways\n[color=#a5b4fc][b]W / S · ↑ / ↓[/b][/color]  Accelerate or slow down\n[color=#a5b4fc][b]Space[/b][/color]  Realm ability\n[color=#a5b4fc][b]Tab[/b][/color]  Combat details\n[color=#a5b4fc][b]1–6 / Q[/b][/color]  Switch equipment",
+		"quick_combat_title": "Combat & Drops",
+		"quick_combat_body": "Weapons seek targets automatically. Keep moving and avoid being surrounded.\nDefeat golden elites for weapons and fragments; remain inside a sync zone to absorb a drop.",
+		"quick_growth_title": "Cultivation",
+		"quick_growth_body": "Fill the Spiritual Qi bar to gain a minor layer and restore lifespan.\nDuplicate weapons improve unique mechanics; ability fragments apply run-wide bonuses.",
+		"quick_tribulation_title": "Breakthroughs",
+		"quick_tribulation_body": "Major-realm breakthroughs trigger a Heavenly Tribulation. Read the ground markers, evade every strike, and raise your lifespan cap.",
+		"quick_routes_title": "Route Choice",
+		"quick_routes_body": "Road forks change the route ahead. Infernal Trials contain denser, stronger enemies; take a normal path when resources are low.",
+		"gallery_archive_label": "COMBAT CATALOG",
+		"leaderboard_hint": "Your best runs saved locally, ranked by survival time.",
+		"leaderboard_record_count": "%d CYCLE RECORDS",
+		"leaderboard_rank": "RANK",
+		"leaderboard_cycle": "CYCLE",
+		"leaderboard_survival": "SURVIVAL",
+		"leaderboard_damage": "TOTAL DAMAGE",
+		"leaderboard_top_weapon": "TOP ARMAMENT",
+		"settings": "Settings",
+		"audio_settings_hint": "Tune music and gameplay sound independently.",
+		"background_music": "Background Music",
+		"sound_effects": "Sound Effects",
+		"mute": "Mute",
+		"muted": "Muted",
 		"quit_game": "Quit Game",
 		"language": "Language",
 		"chinese": "中文",
@@ -277,16 +364,21 @@ const TEXTS: Dictionary = {
 		"fatal_world_unstable": "This world is still nascent. The unformed will of Heaven—the Heavenly Dao—has suppressed you by force. Return in the next cycle, when the Heavenly Dao is complete, and defy it once more.",
 		"ordinary_run_ended": "This cycle has ended.",
 		"run_summary": "Run Summary",
-		"survival_duration": "Time Defying the Heavenly Dao",
+		"result_duration": "Survival",
+		"result_damage": "Total Damage",
+		"result_enemies": "Enemies Defeated",
+		"result_loadout": "Final Loadout",
+		"result_damage_breakdown": "Damage by Weapon",
+		"survival_duration": "Time Spent Defying the Heavenly Dao",
 		"weapon_levels": "Weapon Levels",
 		"total_damage_dealt": "Total Damage",
 		"enemies_defeated": "Enemies Defeated",
 		"elite": "Elite",
 		"weapon_damage_ranking": "Weapon Damage Ranking",
-		"local_survival_leaderboard": "Local Leaderboard · Time Defying the Heavenly Dao",
+		"local_survival_leaderboard": "Local Leaderboard · Survival Time",
 		"leaderboard_columns": "Rank  ·  Cycle  ·  Survival  ·  Total Damage  ·  Top Weapon",
 		"cycle_number_format": "Cycle %d",
-		"damage_value_format": "Damage %d",
+		"damage_value_format": "Total Damage %d",
 		"no_damage_recorded": "No damage dealt this run",
 		"no_local_records": "No local records yet",
 		"realm_echo": "Realm Echo",
@@ -299,6 +391,12 @@ const TEXTS: Dictionary = {
 		"not_obtained": "Not Obtained",
 		"character_details": "Character Details",
 		"release_tab_to_close": "Release Tab to close",
+		"detail_shortcut_hint": "Hold Tab to view details",
+		"detail_current_damage": "Current Damage",
+		"detail_movement_speed": "Movement Speed",
+		"detail_attack_range": "Attack Range",
+		"detail_upgrade_levels": "Upgrade Levels",
+		"start_survival_prompt": "Run! Endure the onslaught and stay alive!",
 		"complete_weapon_data": "Full Weapon Data (1–6 / Q to select)",
 		"danger_lifespan": "⚠  LIFESPAN CRITICAL  ⚠",
 		"lifespan_format": "Lifespan  %.1fs / %.1fs",
@@ -313,7 +411,17 @@ const TEXTS: Dictionary = {
 		"realm_筑基": "Foundation Establishment",
 		"realm_金丹": "Golden Core",
 		"realm_元婴": "Nascent Soul",
-		"gallery_hint": "Select a weapon to view its real base stats and combat traits",
+		"gallery_hint": "Select a weapon or upgrade fragment to inspect its full combat profile.",
+		"fragment_gallery_label": "Upgrade Fragments",
+		"fragment_meta": "Run-Wide Weapon Upgrade",
+		"fragment_effect_profile": "Effect Profile",
+		"fragment_acquisition": "Acquisition",
+		"fragment_acquisition_body": "Defeat a Fragment Elite to choose between two Upgrade Fragments. Stay inside one synchronization field to absorb it; all effects stack for the current run.",
+		"fragment_effect_attack_speed": "Shortens every weapon's attack interval, accelerating all automatic attack cycles.",
+		"fragment_effect_damage": "Adds flat damage to standard weapons. Qiankun Ring gains one additional bounce instead.",
+		"fragment_effect_mobility": "Raises lateral movement speed and forward acceleration for more responsive positioning.",
+		"fragment_effect_range": "Expands the attack range and damage area of every compatible weapon.",
+		"fragment_effect_speed_control": "Increases your top speed while accelerating and lowers your speed while braking, giving you finer control over your pace.",
 		"weapon_stats": "Base Stats",
 		"damage": "Damage",
 		"range": "Range",
@@ -328,32 +436,32 @@ const TEXTS: Dictionary = {
 		"qi": "Qi",
 		"shen": "Spirit",
 		"weapon_trait": "Combat Trait",
-		"weapon_growth": "Duplicate Upgrade",
+		"weapon_growth": "Duplicate Bonus",
 		"unknown": "Unknown",
 		"invalid_weapon": "Invalid Weapon",
 		"realm_default": "Realm",
 		"countdown_seconds": "%ds",
 		"elite_weapon": "Weapon Elite",
-		"elite_upgrade": "Enhancement Elite",
+		"elite_upgrade": "Fragment Elite",
 		"immobilized": "ROOT",
 		"critical_hit_format": "CRITICAL!  -%d",
-		"body_break": "BODY BREAK!",
+		"body_break": "EXECUTED!",
 		"heavenly_strike_format": "Heavenly Strike  %d / %d",
 		"annihilation_warning": "Nascent Soul IX · Heavenly Dao's Final Judgment",
-		"annihilation_impact": "Heavenly Punishment · Annihilated by the Dao",
+		"annihilation_impact": "Heavenly Punishment · Annihilated by the Heavenly Dao",
 		"qi_pickup": "Spiritual Qi",
 		"weapon_channeling_format": "%s%s  %d\nSynchronizing %.1f / %.1fs",
 		"weapon_choice_dimmed_format": "%s  %d\nOther choice in progress",
-		"weapon_choice_idle_format": "%s  %d\nRemain for 1 second",
-		"weapon_pickup_idle_format": "%s  %d\nSynchronize inside for 1 second",
+		"weapon_choice_idle_format": "%s  %d\nStay here for 1 second",
+		"weapon_pickup_idle_format": "%s  %d\nStay inside the circle for 1 second",
 		"fragment_channeling_format": "%s%s Fragment\nChanneling %.1f / %.1fs",
 		"fragment_choice_dimmed_format": "%s Fragment\nOther choice in progress",
-		"fragment_choice_idle_format": "%s Fragment\nRemain for 1 second",
-		"fragment_pickup_idle_format": "%s Fragment\nApproach and remain inside",
+		"fragment_choice_idle_format": "%s Fragment\nStay here for 1 second",
+		"fragment_pickup_idle_format": "%s Fragment\nEnter the circle and stay inside",
 		"upgrade_attack_speed": "Attack Speed",
 		"upgrade_damage": "Damage",
 		"upgrade_mobility": "Mobility",
-		"upgrade_range": "Area",
+		"upgrade_range": "Range",
 		"upgrade_speed_control": "Speed Control",
 		"upgrade_attack_speed_glyph": "SPD",
 		"upgrade_damage_glyph": "DMG",
@@ -363,23 +471,23 @@ const TEXTS: Dictionary = {
 		"qi_glyph": "Qi",
 		"player_stats_empty": "Character Stats\nNo combat data available",
 		"player_stats_title": "Character Stats",
-		"stats_base_format": "Core  %s · Global Damage +%.1f / +%s · %s Damage %d",
+		"stats_base_format": "Base  %s · Global Damage +%.1f flat / %s · %s Damage %d",
 		"realm_level_format": "Realm Lv.%d",
-		"stats_overview_format": "Overview  Crit %s / %s · Attack Speed %s",
-		"stats_projectile_format": "Projectiles  Speed ×%.2f · Current Weapon ×%d · Area %s · Targeting %s",
-		"stats_fragments_format": "Fragments  Attack Speed %d · Damage %d · Mobility %d · Area %d · Speed Control %d",
-		"stats_movement_format": "Movement  Lateral %.0f · Forward Acceleration %.0f · Slow Target %.0f",
-		"fragments_unbound": "Universal Fragments: No player bound",
-		"fragments_details_format": "Universal Fragments\nAttack Speed Lv.%d: +%.0f%% per level\nDamage Lv.%d: Standard weapons +%d / Qiankun Ring +1 bounce\nMobility Lv.%d: Lateral Speed +%.0f / Forward Acceleration +%.0f\nArea Lv.%d: All weapons +%.0f%% per level\nSpeed Control Lv.%d: Boost +%.0f / Slow Target -%.0f (minimum %.0f)",
+		"stats_overview_format": "Overview  Crit Chance %s · Crit Damage %s · Attack Speed %s",
+		"stats_projectile_format": "Attacks  Projectile Speed ×%.2f · Copies per Attack %d · Area Bonus %s · Targeting Range %s",
+		"stats_fragments_format": "Fragments  Attack Speed %d · Damage %d · Mobility %d · Range %d · Speed Control %d",
+		"stats_movement_format": "Movement  Lateral Speed %.0f · Forward Acceleration %.0f · Braking Speed %.0f",
+		"fragments_unbound": "Upgrade Fragments: No character data available",
+		"fragments_details_format": "Upgrade Fragments\nAttack Speed Lv.%d: +%.0f%% per level\nDamage Lv.%d: Standard weapons +%d / Qiankun Ring +1 bounce\nMobility Lv.%d: Lateral Speed +%.0f / Forward Acceleration +%.0f\nRange Lv.%d: All weapons +%.0f%% per level\nSpeed Control Lv.%d: Top Speed +%.0f / Braking Speed -%.0f (minimum %.0f)",
 		"level_up_format": "%s\nLifespan +%.0f",
 		"ability_ground_training": "Grounded Cultivation",
 		"ability_roll_summary": "Space: Invincible Roll · CD 0.8s",
 		"flight_ascending": "Ascending",
 		"flight_holding": "Gliding",
 		"flight_descending": "Descending",
-		"flight_active_format": "Aerial Step: %s",
+		"flight_active_format": "Skyward Leap: %s",
 		"flight_prompt": "Space: Skyward Leap",
-		"flight_permanent": "Skywalking",
+		"flight_permanent": "Permanent Flight",
 		"shield_active_summary": "Spiritual Qi Shield active [Space]",
 		"shield_prompt": "Space: Activate Spiritual Qi Shield",
 		"projection_active_summary": "Spirit Projection · ×2 damage / ×1.5 damage taken / shield active [Space]",
@@ -393,35 +501,35 @@ const TEXTS: Dictionary = {
 		"status_rolling": "Rolling",
 		"cooldown_format": "Cooldown %.1fs",
 		"ability_flight": "Skyward Leap",
-		"ability_flight_description": "Rise briefly above the ground to evade terrestrial threats",
+		"ability_flight_description": "Rise briefly above the ground to evade ground hazards",
 		"status_ascending": "Ascending",
 		"status_holding": "Gliding",
 		"status_descending": "Descending",
 		"ability_qi_shield": "Spiritual Qi Shield",
 		"ability_qi_shield_description": "Consume Spiritual Qi to absorb damage; attacks penetrate when Qi is depleted",
-		"status_shield_active": "Shield active · Press again to dismiss",
+		"status_shield_active": "Shield active · Press again to deactivate",
 		"status_shield_inactive": "Inactive · Ready to activate",
 		"ability_spirit_projection": "Spirit Projection",
-		"ability_spirit_projection_description": "Manifest your spirit for 200% damage while taking 150% damage",
-		"status_projection_active": "Spirit projected · Press again to return",
+		"ability_spirit_projection_description": "Activate your shield and project your spirit, dealing 200% damage while taking 150% damage",
+		"status_projection_active": "Spirit Projection active · Press again to return",
 		"shield_off_projection": "◇ Spiritual Qi Shield inactive · Activates with Spirit Projection",
 		"shield_off_prompt": "◇ Spiritual Qi Shield inactive · Press Space to activate",
 		"qi_shield_capacity_format": "Spiritual Qi  %d / %d  ·  Shield %.0f",
 		"shield_status_format": "◉ Spiritual Qi Shield  %.0f capacity  ·  1 Qi absorbs %.1f damage",
 		"shield_depleted": "◇ Spiritual Qi Shield depleted · Gather Qi to restore it",
-		"shield_absorbed_format": "Shielded %.0f  ·  Spent %d Qi  ·  %.0f remaining",
-		"shield_penetrated_format": "  ·  %.1f penetrated",
+		"shield_absorbed_format": "Absorbed %.0f damage  ·  Spent %d Qi  ·  %.0f shield remaining",
+		"shield_penetrated_format": "  ·  %.1f damage bypassed the shield",
 		"projection_entered": "Spirit Projection\nDamage ×2 · Damage Taken ×1.5 · Shield Active",
 		"projection_returned": "Spirit Returned",
-		"damage_upgrade_format": "Damage Enhancement Lv.%d\nStandard Weapons +%d Damage · Qiankun Ring +%d Bounces",
-		"generic_upgrade_format": "%s Enhancement Lv.%d\nApplies Globally",
+		"damage_upgrade_format": "Damage Upgrade Lv.%d\nStandard Weapons +%d Damage · Qiankun Ring: Bounces +%d",
+		"generic_upgrade_format": "%s Upgrade Lv.%d\nApplies Globally",
 		"tribulation_success": "Tribulation Survived\nMaximum Lifespan Increased",
-		"tribulation_warning": "Prepare for Tribulation\nA Realm-Advancement Lightning Tribulation Approaches",
+		"tribulation_warning": "Prepare for Tribulation\nA Lightning Tribulation Approaches",
 		"route_main": "Continue on the Main Path",
 		"route_left": "Endless Left Path",
 		"route_right": "Endless Right Path",
 		"route_trial": "Infernal Trial",
-		"route_trial_description": "Infernal Trial\nHigh-Pressure Combat Zone",
+		"route_trial_description": "Infernal Trial\nHigh-Intensity Combat Zone",
 		"route_selected_format": "Selected: %s",
 		"route_entering_format": "Entering: %s",
 		"realm_progress_format": "%s · Layer %d",
@@ -429,7 +537,7 @@ const TEXTS: Dictionary = {
 		"shield_empty_short": "Shield Depleted",
 		"shield_blocked_format": "Blocked %.0f  ·  -%d Qi",
 		"lifespan_damage_format": "-%.1f Lifespan",
-		"equipment_locked_suffix": "  [Locked in Current Realm]",
+		"equipment_locked_suffix": "  [Unavailable in This Realm]",
 		"equipment_entry_format": "%s%s ×%d  Damage %d%s",
 		"debug_waiting": "Waiting for game state",
 		"debug_status_format": "%s · Spiritual Qi %d/%d · Lifespan %.1f\nCurrent %s ×%d · Damage %d\nFragments %s",
@@ -444,7 +552,7 @@ const TEXTS: Dictionary = {
 		"debug_remove_weapon": "-Weapon",
 		"debug_damage_add": "Current Damage +1",
 		"debug_damage_remove": "Current Damage -1",
-		"debug_fragment_levels": "Universal Fragment Levels",
+		"debug_fragment_levels": "Upgrade Fragment Levels",
 		"debug_add_fragment": "+Fragment",
 		"debug_remove_fragment": "-Fragment",
 		"debug_base_stats": "Player Base Stats",
@@ -452,34 +560,40 @@ const TEXTS: Dictionary = {
 		"debug_lateral_speed": "Lateral Speed ",
 		"debug_acceleration": "Forward Acceleration ",
 		"debug_apply_stats": "Apply Base Stats",
-		"instructions_body": """[font_size=28][color=#a6ffdb][b]Core Objective[/b][/color][/font_size]
-You fly forward automatically while your lifespan steadily ticks down. Evade enemies, gather qi, and advance your cultivation before your lifespan runs out.
+		"instructions_body": """[font_size=14][color=#5f8798]01  //  CORE LOOP[/color][/font_size]
+[font_size=27][color=#7edce3][b]CORE OBJECTIVE[/b][/color][/font_size]
+You fly forward automatically while your lifespan steadily ticks down. Evade enemies, gather Spiritual Qi, and advance your cultivation before your lifespan runs out.
 
-[font_size=28][color=#a6ffdb][b]Controls[/b][/color][/font_size]
-[b]A / D or ← / →[/b]: Move left and right
-[b]W / ↑[/b]: Accelerate
-[b]S / ↓[/b]: Slow down
-[b]Space[/b]: Use your current realm ability
-[b]Hold Tab[/b]: View character, fragment, and weapon details
-[b]1–6 / Q[/b]: Select equipment
-[b]Esc[/b]: Pause the game
+[font_size=14][color=#5f8798]02  //  INPUT MAP[/color][/font_size]
+[font_size=27][color=#7edce3][b]CONTROLS[/b][/color][/font_size]
+[color=#f0d68e][b]A / D or ← / →[/b][/color]    Move left and right
+[color=#f0d68e][b]W / ↑[/b][/color]    Accelerate
+[color=#f0d68e][b]S / ↓[/b][/color]    Slow down
+[color=#f0d68e][b]Space[/b][/color]    Use your current realm ability
+[color=#f0d68e][b]Hold Tab[/b][/color]    View core combat stats and fragment levels
+[color=#f0d68e][b]1–6 / Q[/b][/color]    Select equipment
+[color=#f0d68e][b]Esc[/b][/color]    Pause the game
 
-[font_size=28][color=#a6ffdb][b]Combat[/b][/color][/font_size]
-• Weapons automatically seek and attack enemies. Use the number keys to switch equipment after collecting it.
+[font_size=14][color=#5f8798]03  //  ENGAGEMENT PROTOCOL[/color][/font_size]
+[font_size=27][color=#7edce3][b]COMBAT[/b][/color][/font_size]
+• Weapons automatically seek and attack enemies. After collecting weapons, use the number keys to switch between them.
 • Enemy contact and attacks drain lifespan directly. Keep moving and avoid being surrounded.
-• Defeat golden elite enemies to earn weapons and enhancement fragments.
-• Drops travel with you. Stay inside a synchronization circle until it completes; leaving early resets its progress.
+• Defeat golden elite enemies to earn weapons and upgrade fragments.
+• Drops travel with you. Stay inside a synchronization circle until the meter fills; leaving early resets its progress.
 
-[font_size=28][color=#a6ffdb][b]Cultivation & Growth[/b][/color][/font_size]
+[font_size=14][color=#5f8798]04  //  PROGRESSION SYSTEM[/color][/font_size]
+[font_size=27][color=#7edce3][b]CULTIVATION & GROWTH[/b][/color][/font_size]
 • Fill the Spiritual Qi bar to advance one minor layer. Every advancement restores part of your lifespan.
 • Duplicate weapons strengthen their unique mechanics. See the Weapon Gallery for exact effects.
-• Upgrade fragments provide additional universal weapon growth.
+• Upgrade fragments grant bonuses that apply to every weapon.
 
-[font_size=28][color=#ffdf8f][b]Breakthroughs & Tribulations[/b][/color][/font_size]
-Breaking through into a major realm triggers a Heavenly Tribulation. Watch for marked danger zones and evade every strike; surviving raises your maximum lifespan.
+[font_size=14][color=#8f805b]05  //  HIGH-RISK EVENT[/color][/font_size]
+[font_size=27][color=#f0d68e][b]BREAKTHROUGHS & TRIBULATIONS[/b][/color][/font_size]
+Breaking through to a new major realm triggers a Heavenly Tribulation. Watch for marked danger zones and evade every strike; surviving raises your maximum lifespan.
 
-[font_size=28][color=#ff9e8f][b]Choosing a Path[/b][/color][/font_size]
-Road forks change the route ahead. The Infernal Trial contains stronger, denser enemies that attack more often. Remain on the ordinary path when your cultivation is struggling.""",
+[font_size=14][color=#9b665f]06  //  ROUTE DECISION[/color][/font_size]
+[font_size=27][color=#e99c8d][b]CHOOSING A PATH[/b][/color][/font_size]
+Road forks change the route ahead. The Infernal Trial contains stronger, more numerous enemies that attack more often. Choose an ordinary path if you are struggling.""",
 		"weapon_great_strength_palm": "Mighty Palm",
 		"weapon_dao": "Orbiting Blades",
 		"weapon_flying_sword": "Flying Sword",
@@ -493,9 +607,9 @@ Road forks change the route ahead. The Infernal Trial contains stronger, denser 
 		"growth_dao": "Each duplicate adds another orbiting ring. Levels beyond the range-growth cap increase damage instead.",
 		"trait_flying_sword": "A fast linear projectile with 3 energy. Hitting a new enemy consumes 1 energy and allows it to keep piercing.",
 		"growth_flying_sword": "Each duplicate adds one more sequential sword to every attack volley.",
-		"trait_qiankun_ring": "Bounces between enemies after impact, with 2 base bonus bounces, then returns to the player.",
+		"trait_qiankun_ring": "Bounces between enemies after impact, making 2 additional bounces by default before returning to the player.",
 		"growth_qiankun_ring": "Each duplicate adds another ring to the volley. Damage fragments grant extra bounces instead of damage.",
-		"trait_golden_bell": "Forms renewable shields around the player. Contact damages and knocks enemies back; the outermost layer is consumed first.",
+		"trait_golden_bell": "Forms renewable shield layers around the player. Contact with the shield damages and knocks enemies back; the outermost layer is consumed first.",
 		"growth_golden_bell": "Each duplicate adds one shield layer. Spent layers briefly flicker, then regenerate automatically.",
 		"trait_thunder_hammer": "Launches a slow-moving thundercloud that repeatedly damages enemies inside its area.",
 		"growth_thunder_hammer": "Each duplicate adds another cloud to the volley. Levels beyond the cloud cap increase damage.",
@@ -504,7 +618,7 @@ Road forks change the route ahead. The Infernal Trial contains stronger, denser 
 	},
 }
 
-var current_locale: String = "zh"
+var current_locale: String = "en"
 
 
 func _ready() -> void:

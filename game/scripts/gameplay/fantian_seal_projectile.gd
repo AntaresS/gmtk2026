@@ -17,7 +17,7 @@ signal shadow_contract_finished
 ## Light camera-shake magnitude requested on impact.
 @export_range(0.0, 20.0, 0.5) var camera_shake_strength: float = 4.0
 
-const SEAL_VISIBLE_WIDTH_PIXELS: float = 715.0
+const SEAL_VISIBLE_WIDTH_PIXELS: float = 173.164063
 const SHADOW_LIGHT_COLOR: Color = Color(0.055, 0.09, 0.055, 0.055)
 const SHADOW_DARK_COLOR: Color = Color(0.025, 0.04, 0.025, 0.42)
 const SHADOW_EDGE_COLOR: Color = Color(0.46, 0.78, 0.52, 0.58)

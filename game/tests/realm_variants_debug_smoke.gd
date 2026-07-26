@@ -238,17 +238,49 @@ func _run() -> void:
 		"Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls/PalmGeometryCheck"
 	) as CheckButton
 	_check(
-		hud.cultivation_tracks_label.visible
-		and hud.cultivation_tracks_label.text.contains("每级")
+		not hud.cultivation_tracks_label.visible
+		and hud.attack_speed_level_label.visible
+		and hud.attack_speed_level_label.text.contains("Lv.")
+		and not pause.is_debug_panel_visible()
 		and pause.get_node_or_null(
 			"Overlay/DebugPanel/DebugScroll/DebugMargin/DebugControls"
 		) != null,
-		"Universal-fragment explanation or pause debug panel is missing."
+		"Compact fragment levels are missing or debug started unlocked."
+	)
+	pause.pause_game()
+	for keycode in [
+		KEY_UP,
+		KEY_UP,
+		KEY_DOWN,
+		KEY_DOWN,
+		KEY_LEFT,
+		KEY_LEFT,
+		KEY_RIGHT,
+		KEY_RIGHT,
+		KEY_B,
+		KEY_A,
+		KEY_B,
+		KEY_A,
+	]:
+		var unlock_event := InputEventKey.new()
+		unlock_event.keycode = keycode
+		unlock_event.physical_keycode = keycode
+		unlock_event.pressed = true
+		Input.parse_input_event(unlock_event)
+	await _wait_process_frames(1)
+	_check(
+		pause.is_debug_panel_visible(),
+		"Pause debug panel did not unlock after the hidden key sequence."
 	)
 	palm_geometry_check.button_pressed = true
 	_check(
 		game_player.is_palm_debug_geometry_visible(),
 		"Pause debug panel did not enable exact Palm combat geometry."
+	)
+	pause.resume_game()
+	_check(
+		not pause.is_debug_panel_visible(),
+		"Pause debug panel remained visible after resuming."
 	)
 
 	if _failures.is_empty():

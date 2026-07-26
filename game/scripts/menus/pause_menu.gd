@@ -1,5 +1,20 @@
 extends CanvasLayer
 
+const DEBUG_UNLOCK_SEQUENCE := [
+	KEY_UP,
+	KEY_UP,
+	KEY_DOWN,
+	KEY_DOWN,
+	KEY_LEFT,
+	KEY_LEFT,
+	KEY_RIGHT,
+	KEY_RIGHT,
+	KEY_B,
+	KEY_A,
+	KEY_B,
+	KEY_A,
+]
+
 ## Main-menu scene opened by Return to Main Menu. The tree is unpaused before
 ## this scene is loaded.
 @export_file("*.tscn") var main_menu_scene_path: String = (
@@ -14,6 +29,7 @@ extends CanvasLayer
 @onready var language_label: Label = %LanguageLabel
 @onready var language_option: OptionButton = %LanguageOption
 @onready var game_info_overlay: GameInfoOverlay = %GameInfoOverlay
+@onready var debug_panel: PanelContainer = %DebugPanel
 @onready var debug_status: Label = %DebugStatus
 @onready var palm_geometry_check: CheckButton = %PalmGeometryCheck
 @onready var weapon_option: OptionButton = %WeaponOption
@@ -70,6 +86,7 @@ extends CanvasLayer
 
 var _pause_enabled: bool = true
 var _syncing_language_option: bool = false
+var _debug_unlock_index: int = 0
 var _debug_player: PlayerController
 var _debug_resources: RunResources
 var _debug_weapons: Array[WeaponData] = [
@@ -102,7 +119,37 @@ func _ready() -> void:
 			UniversalUpgradeTypes.get_display_name(upgrade_type)
 		)
 	_refresh_language()
+	debug_panel.hide()
 	hide()
+
+
+func _input(event: InputEvent) -> void:
+	if (
+		not _pause_enabled
+		or not visible
+		or not get_tree().paused
+		or game_info_overlay.visible
+		or debug_panel.visible
+		or not (event is InputEventKey)
+	):
+		return
+	var key_event := event as InputEventKey
+	if not key_event.pressed or key_event.is_echo():
+		return
+	var pressed_key := key_event.keycode
+	if pressed_key == KEY_NONE:
+		pressed_key = key_event.physical_keycode
+	if pressed_key == DEBUG_UNLOCK_SEQUENCE[_debug_unlock_index]:
+		_debug_unlock_index += 1
+	else:
+		_debug_unlock_index = (
+			1 if pressed_key == DEBUG_UNLOCK_SEQUENCE[0] else 0
+		)
+	if _debug_unlock_index < DEBUG_UNLOCK_SEQUENCE.size():
+		return
+	_debug_unlock_index = 0
+	debug_panel.show()
+	_refresh_debug_panel()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -123,6 +170,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func pause_game() -> void:
 	if not _pause_enabled:
 		return
+	_debug_unlock_index = 0
+	debug_panel.hide()
 	show()
 	get_tree().paused = true
 	resume_button.grab_focus()
@@ -130,6 +179,8 @@ func pause_game() -> void:
 
 
 func resume_game() -> void:
+	_debug_unlock_index = 0
+	debug_panel.hide()
 	get_tree().paused = false
 	hide()
 
@@ -139,8 +190,15 @@ func resume_game() -> void:
 func set_pause_enabled(enabled: bool) -> void:
 	_pause_enabled = enabled
 	if not _pause_enabled:
+		_debug_unlock_index = 0
+		debug_panel.hide()
 		get_tree().paused = false
 		hide()
+
+
+## Returns whether the pause-only debug controls have been unlocked.
+func is_debug_panel_visible() -> bool:
+	return debug_panel.visible
 
 
 func _on_resume_pressed() -> void:

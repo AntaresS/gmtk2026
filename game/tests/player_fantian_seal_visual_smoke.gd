@@ -136,7 +136,7 @@ func _run() -> void:
 	var attack_sprite := seal.seal_sprite
 	_check(
 		attack_sprite.texture == FANTIAN_SEAL_TEXTURE
-		and absf(attack_sprite.scale.x - 160.0 / 715.0) < 0.001
+		and absf(attack_sprite.scale.x - 160.0 / 173.164063) < 0.001
 		and attack_sprite.position.y < -270.0
 		and attack_sprite.modulate.a < 0.01
 		and seal.z_index < target.z_index

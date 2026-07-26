@@ -33,9 +33,27 @@ const SHIELD_FEEDBACK_DURATION: float = 1.1
 
 @onready var damage_flash: ColorRect = %DamageFlash
 @onready var pause_button: Button = %PauseButton
+@onready var detail_shortcut_hint: Label = %DetailShortcutHint
 @onready var detail_drawer: PanelContainer = %DetailDrawer
 @onready var detail_title_label: Label = %DetailTitleLabel
 @onready var detail_hint_label: Label = %DetailHintLabel
+@onready var damage_stat_title: Label = %DamageStatTitle
+@onready var damage_stat_value: Label = %DamageStatValue
+@onready var movement_stat_title: Label = %MovementStatTitle
+@onready var movement_stat_value: Label = %MovementStatValue
+@onready var range_stat_title: Label = %RangeStatTitle
+@onready var range_stat_value: Label = %RangeStatValue
+@onready var fragment_section_label: Label = %FragmentSectionLabel
+@onready var attack_speed_level_name: Label = %AttackSpeedLevelName
+@onready var attack_speed_level_label: Label = %AttackSpeedLevelLabel
+@onready var damage_level_name: Label = %DamageLevelName
+@onready var damage_level_label: Label = %DamageLevelLabel
+@onready var movement_level_name: Label = %MovementLevelName
+@onready var movement_level_label: Label = %MovementLevelLabel
+@onready var range_level_name: Label = %RangeLevelName
+@onready var range_level_label: Label = %RangeLevelLabel
+@onready var speed_control_level_name: Label = %SpeedControlLevelName
+@onready var speed_control_level_label: Label = %SpeedControlLevelLabel
 @onready var danger_border: Control = %DangerBorder
 @onready var danger_warning_label: Label = %DangerWarningLabel
 @onready var lifespan_label: Label = %LifespanLabel
@@ -70,6 +88,8 @@ const SHIELD_FEEDBACK_DURATION: float = 1.1
 )
 @onready var active_ability_progress: ProgressBar = %ActiveAbilityProgress
 @onready var active_ability_status_label: Label = %ActiveAbilityStatusLabel
+@onready var start_prompt_label: Label = %StartPromptLabel
+@onready var start_prompt_timer: Timer = %StartPromptTimer
 @onready var level_up_message: Label = %LevelUpMessage
 @onready var level_up_timer: Timer = %LevelUpTimer
 @onready var tribulation_warning_label: Label = %TribulationWarningLabel
@@ -103,8 +123,13 @@ var _has_pending_qi_presentation: bool = false
 func _ready() -> void:
 	LanguageManager.language_changed.connect(_on_language_changed)
 	pause_button.text = LanguageManager.text("pause")
+	detail_shortcut_hint.text = LanguageManager.text(
+		"detail_shortcut_hint"
+	)
 	detail_title_label.text = LanguageManager.text("character_details")
 	detail_hint_label.text = LanguageManager.text("release_tab_to_close")
+	_localize_detail_stat_titles()
+	start_prompt_label.text = LanguageManager.text("start_survival_prompt")
 	danger_warning_label.text = LanguageManager.text("danger_lifespan")
 	damage_flash.color.a = 0.0
 	detail_drawer.hide()
@@ -113,7 +138,9 @@ func _ready() -> void:
 	tribulation_warning_label.hide()
 	channel_feedback.hide()
 	qi_shield_status_label.hide()
-	cultivation_tracks_label.show()
+	cultivation_tracks_label.hide()
+	start_prompt_label.show()
+	start_prompt_timer.start()
 	realm_progress_bar.infusion_finished.connect(
 		_on_realm_infusion_finished
 	)
@@ -135,21 +162,30 @@ func _input(event: InputEvent) -> void:
 	if is_tab_key:
 		if event.pressed and not event.is_echo():
 			detail_drawer.show()
+			detail_shortcut_hint.hide()
 		elif not event.pressed:
 			detail_drawer.hide()
+			detail_shortcut_hint.show()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("show_details"):
 		detail_drawer.show()
+		detail_shortcut_hint.hide()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_released("show_details"):
 		detail_drawer.hide()
+		detail_shortcut_hint.show()
 		get_viewport().set_input_as_handled()
 
 
 func _on_language_changed(_locale: String) -> void:
 	pause_button.text = LanguageManager.text("pause")
+	detail_shortcut_hint.text = LanguageManager.text(
+		"detail_shortcut_hint"
+	)
 	detail_title_label.text = LanguageManager.text("character_details")
 	detail_hint_label.text = LanguageManager.text("release_tab_to_close")
+	_localize_detail_stat_titles()
+	start_prompt_label.text = LanguageManager.text("start_survival_prompt")
 	danger_warning_label.text = LanguageManager.text("danger_lifespan")
 	if _resources != null:
 		_sync_all()
@@ -175,6 +211,8 @@ func _on_language_changed(_locale: String) -> void:
 
 func _process(delta: float) -> void:
 	_refresh_active_ability_card()
+	if detail_drawer.visible:
+		_refresh_detail_core_stats()
 	if _damage_flash_remaining > 0.0:
 		_damage_flash_remaining = maxf(
 			_damage_flash_remaining - delta,
@@ -711,6 +749,7 @@ func _on_combat_stats_changed(
 	global_stats: PlayerGlobalCombatStatsResource,
 	weapon_stats: WeaponCombatStatsResource
 ) -> void:
+	_refresh_detail_core_stats()
 	if global_stats == null or weapon_stats == null:
 		player_stats_label.text = LanguageManager.text("player_stats_empty")
 		return
@@ -1008,8 +1047,10 @@ func _render_cultivation_tracks() -> void:
 		cultivation_tracks_label.text = LanguageManager.text(
 			"fragments_unbound"
 		)
+		_set_fragment_level_labels({})
 		return
 	var levels := _player.get_universal_upgrade_snapshot()
+	_set_fragment_level_labels(levels)
 	cultivation_tracks_label.text = LanguageManager.text(
 		"fragments_details_format"
 	) % [
@@ -1027,6 +1068,46 @@ func _render_cultivation_tracks() -> void:
 		_player.slow_speed_reduction_per_fragment,
 		_player.minimum_controlled_speed,
 	]
+
+
+func _localize_detail_stat_titles() -> void:
+	damage_stat_title.text = LanguageManager.text("detail_current_damage")
+	movement_stat_title.text = LanguageManager.text("detail_movement_speed")
+	range_stat_title.text = LanguageManager.text("detail_attack_range")
+	fragment_section_label.text = LanguageManager.text(
+		"detail_upgrade_levels"
+	)
+	_render_cultivation_tracks()
+
+
+func _refresh_detail_core_stats() -> void:
+	if _player == null:
+		damage_stat_value.text = "0"
+		movement_stat_value.text = "0"
+		range_stat_value.text = "0"
+		return
+	damage_stat_value.text = str(_player.get_current_weapon_damage())
+	movement_stat_value.text = "%.0f" % _player.current_forward_speed
+	range_stat_value.text = "%.0f" % _player.get_current_attack_range()
+
+
+func _set_fragment_level_labels(levels: Dictionary) -> void:
+	attack_speed_level_name.text = LanguageManager.text(
+		"upgrade_attack_speed"
+	)
+	damage_level_name.text = LanguageManager.text("upgrade_damage")
+	movement_level_name.text = LanguageManager.text("upgrade_mobility")
+	range_level_name.text = LanguageManager.text("upgrade_range")
+	speed_control_level_name.text = LanguageManager.text(
+		"upgrade_speed_control"
+	)
+	attack_speed_level_label.text = "Lv.%d" % int(levels.get("攻速", 0))
+	damage_level_label.text = "Lv.%d" % int(levels.get("伤害", 0))
+	movement_level_label.text = "Lv.%d" % int(levels.get("身法", 0))
+	range_level_label.text = "Lv.%d" % int(levels.get("范围", 0))
+	speed_control_level_label.text = "Lv.%d" % int(
+		levels.get("加减速", 0)
+	)
 
 
 func _on_level_up_occurred(level: int, restored_lifespan: float) -> void:
@@ -1325,3 +1406,7 @@ func _on_tribulation_warning_timer_timeout() -> void:
 
 func _on_channel_feedback_timer_timeout() -> void:
 	channel_feedback.hide()
+
+
+func _on_start_prompt_timer_timeout() -> void:
+	start_prompt_label.hide()

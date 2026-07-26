@@ -1,7 +1,98 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://game/scripts/gameplay/run_ended_overlay.gd" id="1_script"]
 [ext_resource type="Script" path="res://game/scripts/menus/logical_ui_scaler.gd" id="2_ui_scaler"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_outer"]
+bg_color = Color(0.035, 0.037, 0.049, 0.99)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0, 0, 0.56)
+shadow_size = 22
+shadow_offset = Vector2(0, 10)
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_section"]
+bg_color = Color(0.052, 0.055, 0.071, 0.98)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_metric"]
+bg_color = Color(0.072, 0.075, 0.094, 0.98)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_primary"]
+content_margin_left = 24.0
+content_margin_top = 13.0
+content_margin_right = 24.0
+content_margin_bottom = 13.0
+bg_color = Color(0.37, 0.39, 0.83, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_primary_hover"]
+content_margin_left = 24.0
+content_margin_top = 13.0
+content_margin_right = 24.0
+content_margin_bottom = 13.0
+bg_color = Color(0.45, 0.47, 0.94, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_primary_pressed"]
+content_margin_left = 24.0
+content_margin_top = 13.0
+content_margin_right = 24.0
+content_margin_bottom = 13.0
+bg_color = Color(0.3, 0.32, 0.7, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_secondary"]
+content_margin_left = 24.0
+content_margin_top = 13.0
+content_margin_right = 24.0
+content_margin_bottom = 13.0
+bg_color = Color(0.073, 0.076, 0.096, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_secondary_hover"]
+content_margin_left = 24.0
+content_margin_top = 13.0
+content_margin_right = 24.0
+content_margin_bottom = 13.0
+bg_color = Color(0.12, 0.124, 0.16, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_focus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.62, 0.64, 1, 0.92)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
 
 [node name="RunEndedOverlay" type="CanvasLayer"]
 process_mode = 3
@@ -26,108 +117,314 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.78)
+color = Color(0.008, 0.009, 0.013, 0.9)
 
-[node name="CenterContainer" type="CenterContainer" parent="Overlay"]
+[node name="OuterMargin" type="MarginContainer" parent="Overlay"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/margin_left = 92
+theme_override_constants/margin_top = 58
+theme_override_constants/margin_right = 92
+theme_override_constants/margin_bottom = 58
 
-[node name="Menu" type="VBoxContainer" parent="Overlay/CenterContainer"]
-custom_minimum_size = Vector2(1220, 0)
+[node name="CenterContainer" type="CenterContainer" parent="Overlay/OuterMargin"]
 layout_mode = 2
-theme_override_constants/separation = 12
 
-[node name="Title" type="Label" parent="Overlay/CenterContainer/Menu"]
+[node name="Panel" type="PanelContainer" parent="Overlay/OuterMargin/CenterContainer"]
+custom_minimum_size = Vector2(1320, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_outer")
+
+[node name="PanelMargin" type="MarginContainer" parent="Overlay/OuterMargin/CenterContainer/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 38
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 38
+theme_override_constants/margin_bottom = 32
+
+[node name="Layout" type="VBoxContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Header" type="HBoxContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Accent" type="ColorRect" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Header"]
+custom_minimum_size = Vector2(3, 72)
+layout_mode = 2
+mouse_filter = 2
+color = Color(0.48, 0.5, 0.96, 1)
+
+[node name="HeaderText" type="VBoxContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+theme_override_constants/separation = 5
+
+[node name="Title" type="Label" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Header/HeaderText"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 42
+theme_override_colors/font_color = Color(0.94, 0.94, 0.98, 1)
+theme_override_font_sizes/font_size = 38
 text = "Run Ended"
-horizontal_alignment = 1
 
-[node name="OutcomeMessage" type="Label" parent="Overlay/CenterContainer/Menu"]
+[node name="OutcomeMessage" type="Label" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Header/HeaderText"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.82, 0.88, 1, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.58, 0.6, 0.69, 1)
+theme_override_font_sizes/font_size = 17
 text = "Run outcome"
-horizontal_alignment = 1
 autowrap_mode = 2
 
-[node name="ResultsScroll" type="ScrollContainer" parent="Overlay/CenterContainer/Menu"]
-custom_minimum_size = Vector2(0, 430)
+[node name="Content" type="HBoxContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout"]
+custom_minimum_size = Vector2(0, 560)
 layout_mode = 2
-horizontal_scroll_mode = 0
+size_flags_vertical = 3
+theme_override_constants/separation = 16
 
-[node name="Content" type="HBoxContainer" parent="Overlay/CenterContainer/Menu/ResultsScroll"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 32
-
-[node name="SummaryColumn" type="VBoxContainer" parent="Overlay/CenterContainer/Menu/ResultsScroll/Content"]
-custom_minimum_size = Vector2(560, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 8
-
-[node name="SummaryTitle" type="Label" parent="Overlay/CenterContainer/Menu/ResultsScroll/Content/SummaryColumn"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.82, 0.38, 1)
-theme_override_font_sizes/font_size = 25
-text = "Run Summary"
-
-[node name="Summary" type="RichTextLabel" parent="Overlay/CenterContainer/Menu/ResultsScroll/Content/SummaryColumn"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 230)
-layout_mode = 2
-bbcode_enabled = true
-fit_content = true
-scroll_active = false
-theme_override_font_sizes/normal_font_size = 19
-theme_override_font_sizes/bold_font_size = 19
-text = "Summary"
-
-[node name="VerticalSeparator" type="VSeparator" parent="Overlay/CenterContainer/Menu/ResultsScroll/Content"]
-layout_mode = 2
-
-[node name="LeaderboardColumn" type="VBoxContainer" parent="Overlay/CenterContainer/Menu/ResultsScroll/Content"]
+[node name="SummaryPanel" type="PanelContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content"]
 custom_minimum_size = Vector2(620, 0)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 8
+theme_override_styles/panel = SubResource("StyleBox_section")
 
-[node name="LeaderboardTitle" type="Label" parent="Overlay/CenterContainer/Menu/ResultsScroll/Content/LeaderboardColumn"]
+[node name="Margin" type="MarginContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 22
+
+[node name="SummaryLayout" type="VBoxContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="SummaryTitle" type="Label" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.82, 0.38, 1)
-theme_override_font_sizes/font_size = 25
-text = "Local Leaderboard"
+theme_override_colors/font_color = Color(0.52, 0.54, 0.66, 1)
+theme_override_font_sizes/font_size = 14
+text = "RUN SUMMARY"
+uppercase = true
 
-[node name="Leaderboard" type="RichTextLabel" parent="Overlay/CenterContainer/Menu/ResultsScroll/Content/LeaderboardColumn"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 220)
+[node name="Metrics" type="GridContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout"]
 layout_mode = 2
+theme_override_constants/h_separation = 10
+columns = 3
+
+[node name="DurationCard" type="PanelContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout/Metrics"]
+custom_minimum_size = Vector2(0, 96)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_metric")
+
+[node name="Margin" type="MarginContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout/Metrics/DurationCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="Content" type="VBoxContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout/Metrics/DurationCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="DurationCaption" type="Label" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout/Metrics/DurationCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.48, 0.49, 0.59, 1)
+theme_override_font_sizes/font_size = 12
+text = "SURVIVAL"
+uppercase = true
+
+[node name="DurationValue" type="Label" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout/Metrics/DurationCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.69, 0.7, 1, 1)
+theme_override_font_sizes/font_size = 27
+text = "00:00"
+
+[node name="DamageCard" type="PanelContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout/Metrics"]
+custom_minimum_size = Vector2(0, 96)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_metric")
+
+[node name="Margin" type="MarginContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout/Metrics/DamageCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="Content" type="VBoxContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout/Metrics/DamageCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="DamageCaption" type="Label" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout/Metrics/DamageCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.48, 0.49, 0.59, 1)
+theme_override_font_sizes/font_size = 12
+text = "TOTAL DAMAGE"
+uppercase = true
+
+[node name="DamageValue" type="Label" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout/Metrics/DamageCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.92, 0.97, 1)
+theme_override_font_sizes/font_size = 27
+text = "0"
+
+[node name="EnemiesCard" type="PanelContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout/Metrics"]
+custom_minimum_size = Vector2(0, 96)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_metric")
+
+[node name="Margin" type="MarginContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout/Metrics/EnemiesCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="Content" type="VBoxContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout/Metrics/EnemiesCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="EnemiesCaption" type="Label" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout/Metrics/EnemiesCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.48, 0.49, 0.59, 1)
+theme_override_font_sizes/font_size = 12
+text = "ENEMIES"
+uppercase = true
+
+[node name="EnemiesValue" type="Label" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout/Metrics/EnemiesCard/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.92, 0.97, 1)
+theme_override_font_sizes/font_size = 22
+text = "0 · 0 ELITE"
+
+[node name="LoadoutTitle" type="Label" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.52, 0.54, 0.66, 1)
+theme_override_font_sizes/font_size = 13
+text = "FINAL LOADOUT"
+uppercase = true
+
+[node name="LoadoutValue" type="Label" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.77, 0.78, 0.85, 1)
+theme_override_font_sizes/font_size = 17
+text = "No weapons"
+autowrap_mode = 2
+
+[node name="RankingTitle" type="Label" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.52, 0.54, 0.66, 1)
+theme_override_font_sizes/font_size = 13
+text = "DAMAGE BY WEAPON"
+uppercase = true
+
+[node name="Ranking" type="RichTextLabel" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/SummaryPanel/Margin/SummaryLayout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 188)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/default_color = Color(0.76, 0.77, 0.84, 1)
+theme_override_constants/line_separation = 7
+theme_override_constants/table_h_separation = 18
+theme_override_constants/table_v_separation = 7
+theme_override_font_sizes/normal_font_size = 16
+theme_override_font_sizes/bold_font_size = 16
 bbcode_enabled = true
-fit_content = true
 scroll_active = false
-theme_override_font_sizes/normal_font_size = 19
+text = "No damage"
+
+[node name="LeaderboardPanel" type="PanelContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content"]
+custom_minimum_size = Vector2(650, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBox_section")
+
+[node name="Margin" type="MarginContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/LeaderboardPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 22
+
+[node name="LeaderboardLayout" type="VBoxContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/LeaderboardPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="LeaderboardTitle" type="Label" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/LeaderboardPanel/Margin/LeaderboardLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.52, 0.54, 0.66, 1)
+theme_override_font_sizes/font_size = 14
+text = "LOCAL LEADERBOARD"
+uppercase = true
+
+[node name="Leaderboard" type="RichTextLabel" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/Content/LeaderboardPanel/Margin/LeaderboardLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/default_color = Color(0.76, 0.77, 0.84, 1)
+theme_override_constants/line_separation = 7
+theme_override_constants/table_h_separation = 20
+theme_override_constants/table_v_separation = 11
+theme_override_font_sizes/normal_font_size = 15
+theme_override_font_sizes/bold_font_size = 15
+bbcode_enabled = true
+scroll_active = false
 text = "Leaderboard"
 
-[node name="RestartButton" type="Button" parent="Overlay/CenterContainer/Menu"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 54)
+[node name="ButtonRow" type="HBoxContainer" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout"]
 layout_mode = 2
-text = "Restart"
+theme_override_constants/separation = 12
 
-[node name="MainMenuButton" type="Button" parent="Overlay/CenterContainer/Menu"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 54)
+[node name="Spacer" type="Control" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/ButtonRow"]
 layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MainMenuButton" type="Button" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/ButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 52)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.73, 0.74, 0.82, 1)
+theme_override_colors/font_hover_color = Color(0.94, 0.94, 1, 1)
+theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("StyleBox_secondary")
+theme_override_styles/hover = SubResource("StyleBox_secondary_hover")
+theme_override_styles/pressed = SubResource("StyleBox_secondary")
+theme_override_styles/focus = SubResource("StyleBox_focus")
 text = "Main Menu"
 
-[connection signal="pressed" from="Overlay/CenterContainer/Menu/RestartButton" to="." method="_on_restart_pressed"]
-[connection signal="pressed" from="Overlay/CenterContainer/Menu/MainMenuButton" to="." method="_on_main_menu_pressed"]
+[node name="RestartButton" type="Button" parent="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/ButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 52)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.97, 0.97, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("StyleBox_primary")
+theme_override_styles/hover = SubResource("StyleBox_primary_hover")
+theme_override_styles/pressed = SubResource("StyleBox_primary_pressed")
+theme_override_styles/focus = SubResource("StyleBox_focus")
+text = "Restart"
+
+[connection signal="pressed" from="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/ButtonRow/MainMenuButton" to="." method="_on_main_menu_pressed"]
+[connection signal="pressed" from="Overlay/OuterMargin/CenterContainer/Panel/PanelMargin/Layout/ButtonRow/RestartButton" to="." method="_on_restart_pressed"]

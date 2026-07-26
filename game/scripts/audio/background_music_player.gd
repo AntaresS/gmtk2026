@@ -2,8 +2,8 @@ class_name BackgroundMusicPlayer
 extends AudioStreamPlayer
 
 ## Whether every assigned track repeats from its beginning after reaching the
-## end. Compressed WAV tracks restart on `finished`, because enabling their
-## AudioStreamWAV loop mode prevents Godot's QOA format from playing.
+## end. OGG and MP3 tracks use their native loop flag; other formats restart
+## when the player emits `finished`.
 @export var loop_tracks: bool = true
 ## Target music loudness in decibels after a transition finishes.
 @export_range(-40.0, 6.0, 0.5) var music_volume_db: float = -8.0
@@ -91,4 +91,8 @@ func _make_playback_stream(source: AudioStream) -> AudioStream:
 		var mp3 := source.duplicate() as AudioStreamMP3
 		mp3.loop = true
 		return mp3
+	if source is AudioStreamOggVorbis:
+		var ogg := source.duplicate() as AudioStreamOggVorbis
+		ogg.loop = true
+		return ogg
 	return source

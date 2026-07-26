@@ -3,3 +3,9 @@
 /android/
 .DS_Store
 assets/.DS_Store
+
+# Local test and runtime logs
+/tmp/*.log
+
+# Editor backup files
+*.TMP
