@@ -1,0 +1,34 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://game/scripts/gameplay/enemy_flying_sword_projectile.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://image_asset/weapon_fly_sword/ChatGPT Image 2026年7月26日 12_41_27.png" id="2_sword"]
+
+[node name="EnemyFlyingSwordProjectile" type="Node2D"]
+z_index = 15
+script = ExtResource("1_script")
+
+[node name="Trail3" type="Sprite2D" parent="."]
+visible = false
+z_index = -3
+rotation = -1.5708
+scale = Vector2(0.038, 0.038)
+texture = ExtResource("2_sword")
+
+[node name="Trail2" type="Sprite2D" parent="."]
+visible = false
+z_index = -2
+rotation = -1.5708
+scale = Vector2(0.038, 0.038)
+texture = ExtResource("2_sword")
+
+[node name="Trail1" type="Sprite2D" parent="."]
+visible = false
+z_index = -1
+rotation = -1.5708
+scale = Vector2(0.038, 0.038)
+texture = ExtResource("2_sword")
+
+[node name="SwordSprite" type="Sprite2D" parent="."]
+rotation = -1.5708
+scale = Vector2(0.038, 0.038)
+texture = ExtResource("2_sword")

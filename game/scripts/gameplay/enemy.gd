@@ -29,6 +29,15 @@ const ENEMY_OUTLINE_SHADER: Shader = preload(
 const ENEMY_DISSOLVE_SHADER: Shader = preload(
 	"res://game/shaders/enemy_dissolve.gdshader"
 )
+const RANGED_WEAPON_SHADER: Shader = preload(
+	"res://game/shaders/flying_sword_readiness.gdshader"
+)
+const RANGED_PROJECTILE_SCENE: PackedScene = preload(
+	"res://game/scenes/gameplay/enemy_flying_sword_projectile.tscn"
+)
+const EnemyFlyingSwordProjectileResource = preload(
+	"res://game/scripts/gameplay/enemy_flying_sword_projectile.gd"
+)
 const NORMAL_WALK_ATLAS: Texture2D = preload(
 	"res://assets/enemy_frames/normal_walk.png"
 )
@@ -87,6 +96,18 @@ const MELEE_WEAPON_TRAIL_COUNT: int = 3
 const MELEE_WEAPON_TRAIL_ANGLE_STEP: float = 0.16
 const MELEE_WEAPON_DARK_OUTLINE: Color = Color("681018")
 const MELEE_WEAPON_BRIGHT_OUTLINE: Color = Color("ffb347")
+const RANGED_WEAPON_HOVER_POSITION: Vector2 = Vector2(42.0, -10.0)
+const RANGED_WEAPON_SCALE: float = 0.038
+const RANGED_WEAPON_BACKSTEP_DISTANCE: float = 9.0
+const RANGED_WEAPON_SHAKE_START: float = 0.62
+const RANGED_WEAPON_NORMAL_SPEED: float = 900.0
+const RANGED_WEAPON_ELITE_SPEED: float = 1500.0
+const RANGED_WEAPON_LAUNCH_HIDE_DURATION: float = 0.12
+const RANGED_FULL_CHARGE_HOLD_DURATION: float = 0.1
+const RANGED_WEAPON_OUTLINE_COLOR: Color = Color("d873ff")
+const RANGED_WEAPON_GLOW_COLOR: Color = Color("a43cff")
+const RANGED_AIM_LINE_COLOR: Color = Color("c55cff")
+const RANGED_AIM_LINE_MINIMUM_FILL: float = 0.035
 const DEATH_DISSOLVE_DURATION: float = 0.48
 const IMMOBILIZED_STATUS_PULSE_SPEED: float = 15.0
 const FANTIAN_ROOT_TINT: Color = Color("83dcff")
@@ -96,6 +117,7 @@ const FANTIAN_ROOT_RELEASE_DURATION: float = 0.18
 
 @onready var enemy_sprite: AnimatedSprite2D = $EnemySprite
 @onready var melee_weapon: Sprite2D = $MeleeWeapon
+@onready var ranged_weapon: Sprite2D = $RangedWeapon
 @onready var enemy_shadow: Node2D = $EnemyShadow
 @onready var elite_label: Label = $EliteLabel
 @onready var attack_warning_label: Label = $AttackWarningLabel
@@ -217,6 +239,9 @@ var _melee_weapon_return_start_rotation: float = 0.0
 var _enemy_outline_material: ShaderMaterial
 var _melee_weapon_outline_material: ShaderMaterial
 var _melee_weapon_trails: Array[Sprite2D] = []
+var _ranged_weapon_material: ShaderMaterial
+var _ranged_weapon_launch_hide_remaining: float = 0.0
+var _ranged_full_charge_remaining: float = -1.0
 var _fantian_seal_immobilized_remaining: float = 0.0
 var _fantian_seal_immobilized_position: Vector2 = Vector2.ZERO
 var _fantian_seal_root_flash_remaining: float = 0.0
@@ -243,6 +268,7 @@ func _ready() -> void:
 	z_index = 12 if is_flying else 4
 	_configure_sprite_animation()
 	_configure_melee_weapon()
+	_configure_ranged_weapon()
 	queue_redraw()
 
 
@@ -292,6 +318,8 @@ func _physics_process(delta: float) -> void:
 		if distance_to_target <= explosion_radius:
 			_explode(target)
 			return
+	elif uses_ranged_attack:
+		_update_ranged_attack(delta, distance_to_target, target)
 	else:
 		_update_melee_attack(delta, distance_to_target, target)
 	if archetype == EnemyArchetype.HEALER:
@@ -317,12 +345,14 @@ func _physics_process(delta: float) -> void:
 		queue_redraw()
 	_update_sprite_feedback()
 	_update_melee_weapon_presentation(delta)
+	_update_ranged_weapon_presentation(delta)
 
 
 func _draw() -> void:
 	if not _combat_active:
 		return
 	_draw_threat_indicator()
+	_draw_ranged_aim_line()
 	_draw_fantian_seal_root_vfx()
 
 	var has_authored_sprite := is_instance_valid(enemy_sprite)
@@ -331,7 +361,7 @@ func _draw() -> void:
 		body_color = Color("ff6438")
 	elif archetype == EnemyArchetype.HEALER:
 		body_color = Color("54e59b") if not is_elite else Color("b5ff75")
-	if _is_attack_winding_up:
+	if _is_attack_winding_up and not uses_ranged_attack:
 		var warning_pulse := 0.5 + 0.5 * sin(_indicator_time * 9.0)
 		body_color = body_color.lerp(
 			Color("fff0a6"),
@@ -369,8 +399,6 @@ func _draw() -> void:
 			3.0
 		)
 		draw_line(Vector2.ZERO, Vector2(0.0, 9.0), Color("57141a"), 3.0)
-	if uses_ranged_attack:
-		draw_arc(Vector2.ZERO, 25.0, 0.0, TAU, 28, Color("84dcff"), 3.0)
 	if archetype == EnemyArchetype.BOMBER and not has_authored_sprite:
 		draw_circle(Vector2.ZERO, 8.0, Color("fff18a"))
 	elif archetype == EnemyArchetype.HEALER:
@@ -397,7 +425,11 @@ func _draw() -> void:
 		Rect2(-22.0, -34.0, 44.0 * health_ratio, 5.0),
 		Color("6aff86")
 	)
-	if _attack_flash_remaining > 0.0 and not _uses_melee_weapon():
+	if (
+		_attack_flash_remaining > 0.0
+		and not _uses_melee_weapon()
+		and not uses_ranged_attack
+	):
 		var local_attack_range := _get_local_melee_range()
 		var flash_progress := 1.0 - (
 			_attack_flash_remaining / ATTACK_FLASH_DURATION
@@ -533,6 +565,98 @@ func _configure_melee_weapon() -> void:
 	melee_weapon.scale = Vector2.ONE * MELEE_WEAPON_SCALE
 	melee_weapon.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	melee_weapon.hide()
+
+
+func _configure_ranged_weapon() -> void:
+	if not is_instance_valid(ranged_weapon):
+		return
+	if not uses_ranged_attack or archetype == EnemyArchetype.BOMBER:
+		ranged_weapon.hide()
+		return
+	if _ranged_weapon_material == null:
+		_ranged_weapon_material = ShaderMaterial.new()
+		_ranged_weapon_material.shader = RANGED_WEAPON_SHADER
+	_ranged_weapon_material.set_shader_parameter(
+		&"outline_color",
+		RANGED_WEAPON_OUTLINE_COLOR
+	)
+	_ranged_weapon_material.set_shader_parameter(&"outline_width", 20.0)
+	_ranged_weapon_material.set_shader_parameter(
+		&"glow_color",
+		RANGED_WEAPON_GLOW_COLOR
+	)
+	_ranged_weapon_material.set_shader_parameter(&"glow_width", 64.0)
+	_ranged_weapon_material.set_shader_parameter(&"glow_strength", 0.34)
+	_ranged_weapon_material.set_shader_parameter(&"readiness_strength", 1.0)
+	_ranged_weapon_material.set_shader_parameter(&"warning_energy", 0.0)
+	ranged_weapon.material = _ranged_weapon_material
+	ranged_weapon.position = RANGED_WEAPON_HOVER_POSITION
+	# The authored texture points downward. PI keeps its point upward while idle.
+	ranged_weapon.rotation = PI
+	ranged_weapon.scale = Vector2.ONE * RANGED_WEAPON_SCALE
+	ranged_weapon.self_modulate = Color.WHITE
+	ranged_weapon.show()
+
+
+func _update_ranged_weapon_presentation(delta: float) -> void:
+	if not is_instance_valid(ranged_weapon):
+		return
+	if not _combat_active or not uses_ranged_attack:
+		ranged_weapon.hide()
+		return
+	_ranged_weapon_launch_hide_remaining = maxf(
+		_ranged_weapon_launch_hide_remaining - delta,
+		0.0
+	)
+	if _ranged_weapon_launch_hide_remaining > 0.0:
+		ranged_weapon.hide()
+		return
+	ranged_weapon.show()
+	if not _is_attack_winding_up:
+		ranged_weapon.position = RANGED_WEAPON_HOVER_POSITION
+		ranged_weapon.rotation = PI
+		_set_ranged_weapon_charge(0.0)
+		return
+	var target := _get_combat_target()
+	if not is_instance_valid(target):
+		return
+	var target_direction := global_position.direction_to(
+		_get_target_combat_position(target)
+	)
+	if target_direction.is_zero_approx():
+		target_direction = Vector2.DOWN
+	var charge := get_ranged_aim_fill()
+	var shake_strength := (
+		clampf(
+			(charge - RANGED_WEAPON_SHAKE_START)
+				/ (1.0 - RANGED_WEAPON_SHAKE_START),
+			0.0,
+			1.0
+		)
+		* 2.4
+	)
+	var shake := Vector2(
+		sin(_indicator_time * 37.0),
+		cos(_indicator_time * 29.0)
+	) * shake_strength
+	ranged_weapon.position = (
+		RANGED_WEAPON_HOVER_POSITION
+		- target_direction * RANGED_WEAPON_BACKSTEP_DISTANCE * charge
+		+ shake
+	)
+	# The source points down, so subtracting PI/2 maps it onto the aim vector.
+	ranged_weapon.rotation = target_direction.angle() - PI * 0.5
+	_set_ranged_weapon_charge(charge)
+
+
+func _set_ranged_weapon_charge(charge: float) -> void:
+	if _ranged_weapon_material == null:
+		return
+	_ranged_weapon_material.set_shader_parameter(
+		&"warning_energy",
+		clampf(charge, 0.0, 1.0)
+	)
+	_ranged_weapon_material.set_shader_parameter(&"readiness_strength", 1.0)
 
 
 func _uses_melee_weapon() -> bool:
@@ -806,7 +930,7 @@ func _update_sprite_feedback() -> void:
 	if _hit_flash_remaining > 0.0:
 		enemy_sprite.self_modulate = Color("fff2a8")
 		return
-	if _is_attack_winding_up:
+	if _is_attack_winding_up and not uses_ranged_attack:
 		var warning_pulse := 0.5 + 0.5 * sin(_indicator_time * 9.0)
 		enemy_sprite.self_modulate = Color.WHITE.lerp(
 			Color("fff0a6"),
@@ -896,6 +1020,126 @@ func _update_melee_attack(
 		_begin_melee_attack()
 
 
+func _update_ranged_attack(
+	delta: float,
+	distance_to_target: float,
+	target: Node2D
+) -> void:
+	_melee_cooldown_remaining = maxf(
+		_melee_cooldown_remaining - delta,
+		0.0
+	)
+	if _is_attack_winding_up:
+		if (
+			not is_instance_valid(target)
+			or distance_to_target
+				> ranged_attack_range + threat_indicator_margin
+		):
+			_cancel_ranged_attack_windup()
+			return
+		_attack_direction = global_position.direction_to(
+			_get_target_combat_position(target)
+		)
+		if distance_to_target <= ranged_attack_range:
+			if _ranged_full_charge_remaining < 0.0:
+				_ranged_full_charge_remaining = (
+					RANGED_FULL_CHARGE_HOLD_DURATION
+				)
+			else:
+				_ranged_full_charge_remaining = maxf(
+					_ranged_full_charge_remaining - delta,
+					0.0
+				)
+				if _ranged_full_charge_remaining <= 0.0:
+					_launch_ranged_attack(target)
+		else:
+			_ranged_full_charge_remaining = -1.0
+		queue_redraw()
+		return
+	if (
+		_melee_cooldown_remaining <= 0.0
+		and distance_to_target
+			<= ranged_attack_range + threat_indicator_margin
+	):
+		if not _try_acquire_ranged_attack_slot():
+			return
+		_begin_ranged_attack_windup(target)
+
+
+func _begin_ranged_attack_windup(target: Node2D) -> void:
+	_is_attack_winding_up = true
+	_attack_windup_remaining = 0.0
+	_ranged_full_charge_remaining = -1.0
+	attack_warning_label.hide()
+	if is_instance_valid(target):
+		_attack_direction = global_position.direction_to(
+			_get_target_combat_position(target)
+		)
+	_update_sprite_feedback()
+	queue_redraw()
+
+
+func _cancel_ranged_attack_windup() -> void:
+	_is_attack_winding_up = false
+	_attack_windup_remaining = 0.0
+	_ranged_full_charge_remaining = -1.0
+	_release_ranged_attack_slot()
+	attack_warning_label.hide()
+	_set_ranged_weapon_charge(0.0)
+	_update_sprite_feedback()
+	queue_redraw()
+
+
+func _launch_ranged_attack(target: Node2D) -> void:
+	if not is_instance_valid(target) or get_parent() == null:
+		_cancel_ranged_attack_windup()
+		return
+	var target_position := _get_target_combat_position(target)
+	var launch_position := ranged_weapon.global_position
+	var launch_direction := launch_position.direction_to(target_position)
+	if launch_direction.is_zero_approx():
+		launch_direction = _attack_direction
+	var projectile := (
+		RANGED_PROJECTILE_SCENE.instantiate()
+		as EnemyFlyingSwordProjectileResource
+	)
+	if projectile == null:
+		push_error(
+			"Enemy ranged projectile scene must instantiate "
+			+ "EnemyFlyingSwordProjectile."
+		)
+		_cancel_ranged_attack_windup()
+		return
+	get_parent().add_child(projectile)
+	projectile.global_position = launch_position
+	projectile.configure(
+		self,
+		target,
+		launch_direction,
+		melee_damage,
+		(
+			RANGED_WEAPON_ELITE_SPEED
+			if is_elite
+			else RANGED_WEAPON_NORMAL_SPEED
+		),
+		ranged_attack_range * 2.5,
+		is_elite
+	)
+	_is_attack_winding_up = false
+	_attack_windup_remaining = 0.0
+	_ranged_full_charge_remaining = -1.0
+	_release_ranged_attack_slot()
+	_melee_cooldown_remaining = maxf(melee_attack_interval, 0.1)
+	_ranged_weapon_launch_hide_remaining = (
+		RANGED_WEAPON_LAUNCH_HIDE_DURATION
+	)
+	ranged_weapon.hide()
+	attack_warning_label.hide()
+	_set_ranged_weapon_charge(0.0)
+	_update_sprite_feedback()
+	queue_redraw()
+
+
 func _begin_melee_attack() -> void:
 	_is_attack_winding_up = true
 	_attack_windup_remaining = _get_windup_duration()
@@ -957,6 +1201,44 @@ func _update_attack_warning_label() -> void:
 		0.78 + pulse * 0.22
 	)
 	attack_warning_label.scale = Vector2.ONE * lerpf(0.9, 1.3, progress)
+
+
+func _draw_ranged_aim_line() -> void:
+	if not uses_ranged_attack or not _is_attack_winding_up:
+		return
+	var target := _get_combat_target()
+	if not is_instance_valid(target):
+		return
+	var start := ranged_weapon.position
+	var finish := to_local(_get_target_combat_position(target))
+	var aim_vector := finish - start
+	if aim_vector.is_zero_approx():
+		return
+	var fill := maxf(
+		get_ranged_aim_fill(),
+		RANGED_AIM_LINE_MINIMUM_FILL
+	)
+	draw_line(
+		start,
+		finish,
+		Color(RANGED_AIM_LINE_COLOR, 0.14),
+		2.0,
+		true
+	)
+	draw_line(
+		start,
+		start + aim_vector * fill,
+		Color(RANGED_AIM_LINE_COLOR, lerpf(0.48, 0.92, fill)),
+		3.0,
+		true
+	)
+	draw_line(
+		start,
+		start + aim_vector * fill,
+		Color(1.0, 0.78, 1.0, lerpf(0.24, 0.72, fill)),
+		1.0,
+		true
+	)
 
 
 func _draw_threat_indicator() -> void:
@@ -1258,6 +1540,7 @@ func _begin_dissolve_disappearance(delay: float = 0.0) -> void:
 	attack_warning_label.hide()
 	elite_label.hide()
 	melee_weapon.set_process(false)
+	ranged_weapon.set_process(false)
 	queue_redraw()
 
 	var dissolve_material := ShaderMaterial.new()
@@ -1265,6 +1548,7 @@ func _begin_dissolve_disappearance(delay: float = 0.0) -> void:
 	dissolve_material.set_shader_parameter(&"dissolve_amount", 0.0)
 	enemy_sprite.material = dissolve_material
 	melee_weapon.material = dissolve_material
+	ranged_weapon.material = dissolve_material
 
 	var dissolve_tween := create_tween()
 	if delay > 0.0:
@@ -1419,6 +1703,7 @@ func configure_flying(
 			z_index = 4
 			_configure_sprite_animation()
 			_configure_melee_weapon()
+			_configure_ranged_weapon()
 			queue_redraw()
 		return
 	is_flying = true
@@ -1431,6 +1716,7 @@ func configure_flying(
 		z_index = 12
 		_configure_sprite_animation()
 		_configure_melee_weapon()
+		_configure_ranged_weapon()
 		queue_redraw()
 
 
@@ -1452,6 +1738,7 @@ func configure_archetype(new_archetype: EnemyArchetype) -> void:
 		z_index = 12 if is_flying else 4
 		_configure_sprite_animation()
 		_configure_melee_weapon()
+		_configure_ranged_weapon()
 		queue_redraw()
 
 
@@ -1474,6 +1761,8 @@ func is_attack_winding_up() -> bool:
 func get_attack_windup_progress() -> float:
 	if not _is_attack_winding_up:
 		return 0.0
+	if uses_ranged_attack:
+		return get_ranged_aim_fill()
 	return 1.0 - clampf(
 		_attack_windup_remaining / _get_windup_duration(),
 		0.0,
@@ -1509,6 +1798,25 @@ func _release_ranged_attack_slot() -> void:
 	_holds_ranged_attack_slot = false
 	if _ranged_attack_slot_release.is_valid():
 		_ranged_attack_slot_release.call(self)
+
+
+## Returns the solid fraction of the ranged aim line. Zero is the outer warning
+## boundary and one is the actual attack radius; cooldown never contributes.
+func get_ranged_aim_fill() -> float:
+	if not uses_ranged_attack or not _is_attack_winding_up:
+		return 0.0
+	var target := _get_combat_target()
+	if not is_instance_valid(target):
+		return 0.0
+	var distance_to_target := global_position.distance_to(
+		_get_target_combat_position(target)
+	)
+	return 1.0 - clampf(
+		(distance_to_target - ranged_attack_range)
+			/ maxf(threat_indicator_margin, 1.0),
+		0.0,
+		1.0
+	)
 
 
 ## Keeps this enemy inside a dynamic road whose width is sampled at the
@@ -1570,6 +1878,7 @@ func configure_elite(
 		_update_elite_identity()
 		_configure_sprite_animation()
 		_configure_melee_weapon()
+		_configure_ranged_weapon()
 		queue_redraw()
 
 
@@ -1955,6 +2264,7 @@ func set_combat_enabled(enabled: bool) -> void:
 		if is_node_ready():
 			attack_warning_label.hide()
 			melee_weapon.hide()
+			ranged_weapon.hide()
 			_hide_melee_weapon_trails()
 			_set_melee_weapon_outline(Color.TRANSPARENT)
 		queue_redraw()
